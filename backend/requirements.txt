@@ -2,10 +2,6 @@ fastapi
 uvicorn
 beanie
 motor
-fastapi
-uvicorn
-beanie
-motor
 pydantic-settings
 python-multipart
 passlib[bcrypt]
