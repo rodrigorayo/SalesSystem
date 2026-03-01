@@ -10,7 +10,7 @@ const FALLBACK_URL = isProductionUrl
     ? 'https://sales-system-kappa.vercel.app/api/v1' 
     : 'http://localhost:8000/api/v1';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? FALLBACK_URL;
+export const BASE_URL = import.meta.env.VITE_API_URL ?? FALLBACK_URL;
 
 export async function client<T>(
     endpoint: string,
