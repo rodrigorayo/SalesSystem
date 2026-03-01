@@ -1,0 +1,3 @@
+﻿src/pages/CajaPage.tsx(18,30): error TS2307: Cannot find module '../store' or its corresponding type declarations.
+src/pages/CajaPage.tsx(153,22): error TS2304: Cannot find name 'SessionTable'.
+src/pages/CajaPage.tsx(287,11): error TS6133: 'user' is declared but its value is never read.
