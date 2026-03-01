@@ -16,8 +16,7 @@ export default function TenantDashboard() {
     const queryClient = useQueryClient();
     const [showProductModal, setShowProductModal] = useState(false);
     const [showEmployeeModal, setShowEmployeeModal] = useState(false);
-    const [productForm, setProductForm] = useState<ProductCreate>(BLANK_PRODUCT);
-    const [employeeForm, setEmployeeForm] = useState<EmployeeCreate>({ username: '', password: '', full_name: '' });
+    const [employeeForm, setEmployeeForm] = useState<EmployeeCreate>({ username: '', password: '', full_name: '', email: '' });
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const { data: stats } = useQuery({ queryKey: ['tenant-stats'], queryFn: getTenantStats });
@@ -48,8 +47,7 @@ export default function TenantDashboard() {
         mutationFn: (data: EmployeeCreate) => createEmployee(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            setShowEmployeeModal(false);
-            setEmployeeForm({ username: '', password: '', full_name: '' });
+            setEmployeeForm({ username: '', password: '', full_name: '', email: '' });
         },
     });
 
@@ -312,6 +310,9 @@ export default function TenantDashboard() {
                             <input type="text" placeholder="Usuario para Login" required
                                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
                                 value={employeeForm.username} onChange={e => setEmployeeForm({ ...employeeForm, username: e.target.value })} />
+                            <input type="email" placeholder="Correo Electrónico" required
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
+                                value={employeeForm.email || ''} onChange={e => setEmployeeForm({ ...employeeForm, email: e.target.value })} />
                             <input type="password" placeholder="Contraseña" required
                                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
                                 value={employeeForm.password} onChange={e => setEmployeeForm({ ...employeeForm, password: e.target.value })} />
