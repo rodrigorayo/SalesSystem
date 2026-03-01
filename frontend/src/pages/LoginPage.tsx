@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BASE_URL } from '../api/client';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -25,7 +26,7 @@ export default function LoginPage() {
             formData.append('username', username);
             formData.append('password', password);
 
-            const response = await fetch('http://localhost:8000/api/v1/token', {
+            const response = await fetch(`${BASE_URL}/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData,
@@ -39,7 +40,7 @@ export default function LoginPage() {
             const token = data.access_token;
 
             // 2. Get User Details
-            const userResponse = await fetch('http://localhost:8000/api/v1/users/me', {
+            const userResponse = await fetch(`${BASE_URL}/users/me`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 

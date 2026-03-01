@@ -5,6 +5,7 @@ import { Plus, Users, Package, DollarSign, Store, ShoppingBag, Loader2, X, Uploa
 import { useAuthStore } from '../store/authStore';
 import type { Product, ProductCreate, EmployeeCreate } from '../api/types';
 import { Link } from 'react-router-dom';
+import { BASE_URL } from '../api/client';
 
 const BLANK_PRODUCT: ProductCreate = {
     descripcion: '', categoria_id: '', precio_venta: 0, costo_producto: 0,
@@ -81,7 +82,7 @@ export default function TenantDashboard() {
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const res = await fetch('http://localhost:8000/api/v1/upload', { method: 'POST', body: formData });
+            const res = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
             const data = await res.json();
             if (data.url) setProductForm(prev => ({ ...prev, image_url: data.url }));
         } catch {
