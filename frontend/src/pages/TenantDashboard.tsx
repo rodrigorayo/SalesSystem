@@ -16,6 +16,7 @@ export default function TenantDashboard() {
     const queryClient = useQueryClient();
     const [showProductModal, setShowProductModal] = useState(false);
     const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+    const [productForm, setProductForm] = useState<ProductCreate>(BLANK_PRODUCT);
     const [employeeForm, setEmployeeForm] = useState<EmployeeCreate>({ username: '', password: '', full_name: '', email: '' });
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
