@@ -6,8 +6,8 @@ from app.auth import get_password_hash
 from app.core.config import settings
 
 async def main():
-    print(f"Connecting to MongoDB at {settings.MONGO_URI}...")
-    client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGO_URI)
+    print(f"Connecting to MongoDB at {settings.MONGODB_URL}...")
+    client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
     
     print("Dropping database 'salessystem'...")
     await client.drop_database('salessystem')
