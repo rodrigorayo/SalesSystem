@@ -36,6 +36,9 @@ app.add_middleware(
 from fastapi.staticfiles import StaticFiles
 import os
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+STATIC_DIR = "/tmp/static" if settings.ENVIRONMENT == "production" else "static"
+os.makedirs(os.path.join(STATIC_DIR, "images"), exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(api_router, prefix="/api/v1")

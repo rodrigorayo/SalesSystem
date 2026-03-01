@@ -3,9 +3,12 @@ import shutil
 import os
 import uuid
 
+from app.core.config import settings
+
 router = APIRouter()
 
-UPLOAD_DIR = "static/images"
+STATIC_DIR = "/tmp/static" if settings.ENVIRONMENT == "production" else "static"
+UPLOAD_DIR = os.path.join(STATIC_DIR, "images")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload")
