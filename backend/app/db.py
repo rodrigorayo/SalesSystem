@@ -23,7 +23,7 @@ from app.models.price_list import ListaPrecio, ListaPrecioItem
 from app.core.config import settings
 
 async def init_db():
-    client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGO_URI)
+    client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
     await init_beanie(
         database=client.salessystem,
         document_models=[
