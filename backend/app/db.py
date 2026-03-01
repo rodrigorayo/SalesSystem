@@ -20,9 +20,10 @@ from app.models.pedido_item import PedidoItemDocument
 from app.models.cliente import Cliente
 from app.models.price_list import ListaPrecio, ListaPrecioItem
 
+from app.core.config import settings
 
 async def init_db():
-    client = motor.motor_asyncio.AsyncIOMotorClient("mongodb://user:password@localhost:27017")
+    client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGO_URI)
     await init_beanie(
         database=client.salessystem,
         document_models=[
