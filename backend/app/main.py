@@ -8,7 +8,16 @@ from app.api.v1.router import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    print("--- STARTUP DEBUG ---")
+    import os
+    print(f"ENV VARS IN VERCEL: {list(os.environ.keys())}")
+    print(f"Current settings.MONGODB_URL: {settings.MONGODB_URL}")
+    print("---------------------")
+    try:
+        await init_db()
+        print("Database initialized successfully.")
+    except Exception as e:
+        print(f"Failed to initialize database: {e}")
     # User initialization should be done via a dedicated script or secure endpoint
     yield
 
