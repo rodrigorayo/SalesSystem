@@ -23,8 +23,7 @@ async def upload_image(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # Return URL (Relative path for frontend to prepend backend URL)
-        # Or absolute URL if we knew the domain. Let's return relative.
-        return {"url": f"http://localhost:8000/static/images/{filename}"} 
+        base_url = "https://sales-system-kappa.vercel.app" if settings.ENVIRONMENT == "production" else "http://localhost:8000"
+        return {"url": f"{base_url}/static/images/{filename}"} 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
