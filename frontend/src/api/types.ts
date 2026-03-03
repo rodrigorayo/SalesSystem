@@ -221,7 +221,15 @@ export interface Sale {
     _id: string;
     tenant_id: string;
     sucursal_id: string;
-    items: { producto_id: string; producto_nombre: string; cantidad: number; precio: number; subtotal: number }[];
+    items: {
+        producto_id: string;
+        descripcion: string;
+        cantidad: number;
+        precio_unitario: number;
+        costo_unitario: number;
+        descuento_unitario: number;
+        subtotal: number;
+    }[];
     total: number;
     pagos: PagoItem[];
     descuento?: { nombre?: string; tipo: string; valor: number };

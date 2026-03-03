@@ -150,15 +150,15 @@ export default function VentasPage() {
                                                         <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-50 last:border-0 pb-2 last:pb-0">
                                                             <div className="flex items-center gap-2 text-gray-800">
                                                                 <span className="font-semibold text-gray-900">{it.cantidad}x</span>
-                                                                {it.producto_nombre} <span className="text-gray-400 text-xs">(${it.precio.toFixed(2)})</span>
+                                                                {it.descripcion || 'Producto'} <span className="text-gray-400 text-xs">(${(it.precio_unitario || 0).toFixed(2)})</span>
                                                             </div>
-                                                            <div className="font-medium text-gray-900">${(it.subtotal).toFixed(2)}</div>
+                                                            <div className="font-medium text-gray-900">${(it.subtotal || 0).toFixed(2)}</div>
                                                         </div>
                                                     ))}
                                                     {venta.descuento && (
                                                         <div className="flex justify-between items-center text-sm pt-2 text-indigo-600 font-medium border-t border-gray-100">
                                                             <span>Descuento Aplicado ({venta.descuento.nombre || venta.descuento.tipo})</span>
-                                                            <span>- ${venta.descuento.valor.toFixed(2)}</span>
+                                                            <span>- ${(venta.descuento.valor || 0).toFixed(2)}</span>
                                                         </div>
                                                     )}
                                                 </div>
