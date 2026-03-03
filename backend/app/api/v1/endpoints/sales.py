@@ -2,9 +2,10 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.models.sale import Sale, SaleItem, PagoItem, ClienteInfo, DescuentoInfo
-from app.models.sale_item import SaleItem as SaleItemAnalytics
-from app.models.product import Product
+from bson import ObjectId
+from app.models.sale import Sale, ClienteInfo, PagoItem, SaleItem, DescuentoInfo
+from app.models.analytics import SaleItem as SaleItemAnalytics
+from app.models.producto import Product
 from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
 from app.models.user import User, UserRole

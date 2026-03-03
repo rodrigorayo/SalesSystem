@@ -150,7 +150,7 @@ export default function DescuentosPage() {
                                 const isLocked = !esMatriz && isFromMatriz;
                                 
                                 return (
-                                <div key={d._id} className={`bg-white rounded-2xl border ${d.activo ? 'border-indigo-100 shadow-sm' : 'border-gray-200 opacity-60'} p-5 flex flex-col relative transition-all hover:shadow-md`}>
+                                <div key={d._id} className={`bg-white rounded-2xl border ${d.activo ? 'border-indigo-100 shadow-sm' : 'border-gray-200 shadow-sm'} p-5 flex flex-col relative transition-all hover:shadow-md`}>
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex items-center gap-2">
                                             <div className={`p-2 rounded-xl ${d.tipo === 'PORCENTAJE' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
@@ -307,11 +307,11 @@ export default function DescuentosPage() {
                                             <div className="grid grid-cols-2 gap-3 mt-2">
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-gray-500 mb-1">Desde</label>
-                                                    <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none" />
+                                                    <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} className="w-full border border-gray-200 bg-white text-gray-900 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-gray-500 mb-1">Hasta</label>
-                                                    <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none" />
+                                                    <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} className="w-full border border-gray-200 bg-white text-gray-900 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none" />
                                                 </div>
                                             </div>
                                         )}
