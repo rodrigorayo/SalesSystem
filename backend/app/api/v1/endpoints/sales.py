@@ -408,7 +408,7 @@ async def anular_sale(
                 tenant_id=tenant_id,
                 sucursal_id=sucursal_id,
                 producto_id=item.producto_id,
-                tipo_movimiento=TipoMovimiento.ENTRADA,
+                tipo_movimiento=TipoMovimiento.ENTRADA_MANUAL,
                 cantidad_movida=item.cantidad,
                 stock_resultante=updated_inv["cantidad"],
                 usuario_id=str(current_user.id),
