@@ -4,8 +4,9 @@ import { getSales, anularSale, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import {
     Receipt, Loader2, ChevronRight, ChevronDown,
-    Search, Ban, CalendarDays, ScrollText
+    Search, Ban, CalendarDays, ScrollText, AlertTriangle
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VentasPage() {
     const qc = useQueryClient();
@@ -16,6 +17,13 @@ export default function VentasPage() {
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? '' : (user?.sucursal_id || ''));
     const [searchTerm, setSearchTerm] = useState('');
     const [expanded, setExpanded] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        action: () => void;
+        type: 'danger' | 'info' | 'success';
+    }>({ isOpen: false, title: '', message: '', action: () => {}, type: 'danger' });
 
     const { data: sucursales = [] } = useQuery({
         queryKey: ['sucursales'],
@@ -40,9 +48,13 @@ export default function VentasPage() {
 
     const handleAnular = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (window.confirm('¿Estás seguro de ANULAR esta venta? Esto devolverá el stock y registrará un egreso en la caja abierta. Esta acción NO se puede deshacer.')) {
-            anularMut.mutate(id);
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Anular Venta',
+            message: '¿Estás seguro de ANULAR esta venta? Esto devolverá el stock y registrará un egreso en la caja abierta. Esta acción NO se puede deshacer.',
+            type: 'danger',
+            action: () => anularMut.mutate(id)
+        });
     };
 
     const filteredVentas = ventas.filter(v => {
@@ -199,6 +211,62 @@ export default function VentasPage() {
                     })}
                 </div>
             )}
+
+            {/* Confirmation Modal */}
+            <AnimatePresence>
+                {confirmModal.isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl relative"
+                        >
+                            <button onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} className="absolute right-4 top-4 text-gray-400 hover:bg-gray-100 p-1 rounded-lg transition-colors">
+                                <span className="text-xl leading-none">&times;</span>
+                            </button>
+                            
+                            <div className="flex flex-col items-center text-center">
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 
+                                    ${confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' :
+                                      confirmModal.type === 'success' ? 'bg-green-100 text-green-600' :
+                                      'bg-blue-100 text-blue-600'}`}
+                                >
+                                    {confirmModal.type === 'danger' ? <AlertTriangle size={32} /> : 
+                                     confirmModal.type === 'success' ? <Receipt size={32} /> : 
+                                     <ScrollText size={32} />}
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+                                <p className="text-sm text-gray-600 mb-6 px-2">{confirmModal.message}</p>
+                                
+                                <div className="flex gap-3 w-full">
+                                    <button 
+                                        onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            confirmModal.action();
+                                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                                        }}
+                                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-colors
+                                            ${confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                                              confirmModal.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                                              'bg-blue-600 hover:bg-blue-700'}`}
+                                    >
+                                        Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

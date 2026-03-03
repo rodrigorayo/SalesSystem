@@ -20,6 +20,7 @@ class Descuento(Document, SoftDeleteMixin):
     hora_fin: Optional[str] = None
     uso_maximo: Optional[int] = None
     uso_actual: int = 0
+    creado_por_rol: str = "ADMIN_MATRIZ"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -41,6 +42,8 @@ class DescuentoBase(BaseModel):
     tipo: str = Field(..., description="Tipo de descuento: MONTO o PORCENTAJE")
     valor: float = Field(..., gt=0, description="Valor numérico del descuento")
     is_active: bool = Field(True, description="Si el descuento está disponible para usarse")
+    fecha_inicio: Optional[datetime] = None
+    fecha_fin: Optional[datetime] = None
 
 class DescuentoCreate(DescuentoBase):
     pass
@@ -50,11 +53,14 @@ class DescuentoUpdate(BaseModel):
     tipo: Optional[str] = None
     valor: Optional[float] = None
     is_active: Optional[bool] = None
+    fecha_inicio: Optional[datetime] = None
+    fecha_fin: Optional[datetime] = None
 
 class DescuentoResponse(DescuentoBase):
     id: str = Field(..., alias="_id")
     tenant_id: str
     sucursal_id: str
+    creado_por_rol: str
     created_at: datetime
     updated_at: datetime
 

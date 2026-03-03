@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useDescuentos, useCreateDescuento, useUpdateDescuento, useDeleteDescuento } from '../hooks/useDescuentos';
-import { Tag, Plus, Loader2, Edit2, Trash2, ShieldCheck, Power, Percent, DollarSign, AlertCircle } from 'lucide-react';
+import { Tag, Plus, Loader2, Edit2, Trash2, ShieldCheck, Power, Percent, DollarSign, AlertCircle, CalendarDays, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DescuentosPage() {
@@ -22,6 +22,12 @@ export default function DescuentosPage() {
     const [valor, setValor] = useState('');
     const [activoState, setActivoState] = useState(true);
     const [aplicaTodas, setAplicaTodas] = useState(false);
+    const [isIndefinido, setIsIndefinido] = useState(true);
+    const [fechaInicio, setFechaInicio] = useState('');
+    const [fechaFin, setFechaFin] = useState('');
+    
+    // Check if user is matrix admin
+    const esMatriz = ['ADMIN', 'SUPERADMIN', 'ADMIN_MATRIZ'].includes(role || '');
 
     if (!isAuthorized) {
         return (
@@ -39,6 +45,9 @@ export default function DescuentosPage() {
         setValor('');
         setActivoState(true);
         setAplicaTodas(false);
+        setIsIndefinido(true);
+        setFechaInicio('');
+        setFechaFin('');
         setMultiModalOpen(true);
     };
 
@@ -49,6 +58,9 @@ export default function DescuentosPage() {
         setValor(d.valor.toString());
         setActivoState(d.activo);
         setAplicaTodas(d.aplica_todas_sucursales || false);
+        setIsIndefinido(!d.fecha_inicio && !d.fecha_fin);
+        setFechaInicio(d.fecha_inicio ? d.fecha_inicio.split('T')[0] : '');
+        setFechaFin(d.fecha_fin ? d.fecha_fin.split('T')[0] : '');
         setMultiModalOpen(true);
     };
 
@@ -60,7 +72,9 @@ export default function DescuentosPage() {
             tipo,
             valor: parseFloat(valor),
             activo: activoState,
-            aplica_todas_sucursales: aplicaTodas
+            aplica_todas_sucursales: aplicaTodas,
+            fecha_inicio: isIndefinido || !fechaInicio ? null : new Date(fechaInicio + 'T00:00:00').toISOString(),
+            fecha_fin: isIndefinido || !fechaFin ? null : new Date(fechaFin + 'T23:59:59').toISOString(),
         };
 
         if (editId) {
@@ -118,7 +132,11 @@ export default function DescuentosPage() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {descuentos.map((d: any) => (
+                            {descuentos.map((d: any) => {
+                                const isFromMatriz = ['ADMIN', 'SUPERADMIN', 'ADMIN_MATRIZ'].includes(d.creado_por_rol);
+                                const isLocked = !esMatriz && isFromMatriz;
+                                
+                                return (
                                 <div key={d._id} className={`bg-white rounded-2xl border ${d.activo ? 'border-indigo-100 shadow-sm' : 'border-gray-200 opacity-60'} p-5 flex flex-col relative transition-all hover:shadow-md`}>
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex items-center gap-2">
@@ -126,7 +144,9 @@ export default function DescuentosPage() {
                                                 {d.tipo === 'PORCENTAJE' ? <Percent size={18} /> : <DollarSign size={18} />}
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-gray-900 leading-tight">{d.nombre}</h3>
+                                                <h3 className="font-bold text-gray-900 leading-tight flex items-center gap-1.5">
+                                                    {d.nombre} {isLocked && <Lock size={12} className="text-gray-400" title="Controlado por Empresa" />}
+                                                </h3>
                                                 <p className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
                                                     {d.tipo === 'PORCENTAJE' ? 'PORCENTAJE' : 'MONTO FIJO'}
                                                     {d.aplica_todas_sucursales && <span className="text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md ml-1">GLOBAL</span>}
@@ -135,38 +155,47 @@ export default function DescuentosPage() {
                                         </div>
                                     </div>
 
-                                    <div className="my-2 flex items-center gap-1">
+                                    <div className="my-2 flex flex-col">
                                         <span className="text-3xl font-black text-gray-900 tracking-tighter">
                                             {d.tipo === 'PORCENTAJE' ? '' : 'Bs. '}{d.valor}{d.tipo === 'PORCENTAJE' ? '%' : ''}
+                                        </span>
+                                        <span className="text-xs text-gray-500 mt-1 flex items-center gap-1 font-medium bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">
+                                            <CalendarDays size={12} />
+                                            {d.fecha_inicio && d.fecha_fin ? `${new Date(d.fecha_inicio).toLocaleDateString()} al ${new Date(d.fecha_fin).toLocaleDateString()}` : 'Indefinido'}
                                         </span>
                                     </div>
 
                                     <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
                                         <button
-                                            onClick={() => toggleActivo(d._id, d.activo)}
-                                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${d.activo ? 'text-green-700 bg-green-50 hover:bg-green-100' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'}`}
-                                            title={d.activo ? "Desactivar" : "Activar"}
+                                            onClick={() => { if(!isLocked) toggleActivo(d._id, d.activo); }}
+                                            disabled={isLocked}
+                                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${d.activo ? 'text-green-700 bg-green-50 hover:bg-green-100' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'} ${isLocked && 'opacity-50 cursor-not-allowed'}`}
+                                            title={isLocked ? "Bloqueado (Matriz)" : (d.activo ? "Desactivar" : "Activar")}
                                         >
                                             <Power size={12} /> {d.activo ? 'Activo' : 'Inactivo'}
                                         </button>
                                         <div className="flex gap-2">
-                                            <button onClick={() => openEditModal(d)} className="text-gray-400 hover:text-indigo-600 transition-colors bg-gray-50 hover:bg-indigo-50 p-1.5 rounded-lg">
-                                                <Edit2 size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm(`¿Deseas borrar permanentemente el descuento "${d.nombre}"?`)) {
-                                                        deleteMut.mutate(d._id);
-                                                    }
-                                                }}
-                                                className="text-gray-400 hover:text-red-600 transition-colors bg-gray-50 hover:bg-red-50 p-1.5 rounded-lg"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                            {!isLocked && (
+                                                <>
+                                                <button onClick={() => openEditModal(d)} className="text-gray-400 hover:text-indigo-600 transition-colors bg-gray-50 hover:bg-indigo-50 p-1.5 rounded-lg border border-gray-100">
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`¿Deseas borrar permanentemente el descuento "${d.nombre}"?`)) {
+                                                            deleteMut.mutate(d._id);
+                                                        }
+                                                    }}
+                                                    className="text-gray-400 hover:text-red-600 transition-colors bg-gray-50 hover:bg-red-50 p-1.5 rounded-lg border border-gray-100"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     )}
                 </div>
@@ -228,15 +257,41 @@ export default function DescuentosPage() {
                                         </div>
                                     )}
 
-                                    <div className="flex items-center gap-2 mt-2 bg-gray-50 border border-gray-100 p-3 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setAplicaTodas(!aplicaTodas)}>
-                                        <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border transition-all ${aplicaTodas ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-gray-300'}`}>
-                                            {aplicaTodas && <ShieldCheck size={12} className="text-white" />}
+                                    {/* Dates */}
+                                    <div className="pt-2 border-t border-gray-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">Duración del descuento</label>
+                                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                                <input type="checkbox" checked={isIndefinido} onChange={() => setIsIndefinido(!isIndefinido)} className="accent-indigo-600 cursor-pointer" />
+                                                <span className="text-[10px] font-bold text-gray-700">Indefinido</span>
+                                            </label>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-semibold text-gray-900">Aplicar en todas las sucursales</p>
-                                            <p className="text-[10px] text-gray-500 leading-tight mt-0.5">Si se marca, este descuento estará disponible en el POS de cualquier sucursal.</p>
-                                        </div>
+                                        
+                                        {!isIndefinido && (
+                                            <div className="grid grid-cols-2 gap-3 mt-2">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">Desde</label>
+                                                    <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">Hasta</label>
+                                                    <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none" />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {esMatriz && (
+                                        <div className="flex items-center gap-2 mt-2 bg-gray-50 border border-gray-100 p-3 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setAplicaTodas(!aplicaTodas)}>
+                                            <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border transition-all ${aplicaTodas ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-gray-300'}`}>
+                                                {aplicaTodas && <ShieldCheck size={12} className="text-white" />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">Aplicar en todas las sucursales</p>
+                                                <p className="text-[10px] text-gray-500 leading-tight mt-0.5">Si se marca, este descuento estará disponible en el POS de cualquier sucursal.</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="p-4 border-t border-gray-100 flex gap-2">
                                     <button onClick={() => setMultiModalOpen(false)} className="flex-1 py-2 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition-colors text-sm">Cancelar</button>

@@ -40,9 +40,14 @@ async def create_descuento(
     tenant_id = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
     
+    if current_user.role == "ADMIN_SUCURSAL":
+        descuento.aplica_todas_sucursales = False
+        descuento.sucursal_id = sucursal_id
+    
     nuevo_descuento = Descuento(
         tenant_id=tenant_id,
         sucursal_id=sucursal_id,
+        creado_por_rol=current_user.role.value if hasattr(current_user.role, 'value') else current_user.role,
         **descuento.model_dump()
     )
     
@@ -69,6 +74,11 @@ async def update_descuento(
     
     if not existente:
         raise HTTPException(status_code=404, detail="Descuento no encontrado")
+        
+    if current_user.role == "ADMIN_SUCURSAL":
+        if existente.creado_por_rol in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ"]:
+            raise HTTPException(status_code=403, detail="No puedes modificar un descuento administrado por la Matriz")
+        descuento_update.aplica_todas_sucursales = False
         
     update_data = descuento_update.model_dump(exclude_unset=True)
     if update_data:
@@ -98,5 +108,8 @@ async def delete_descuento(
     
     if not existente:
         raise HTTPException(status_code=404, detail="Descuento no encontrado")
+        
+    if current_user.role == "ADMIN_SUCURSAL" and existente.creado_por_rol in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ"]:
+        raise HTTPException(status_code=403, detail="No puedes eliminar un descuento administrado por la Matriz")
         
     await existente.delete()
