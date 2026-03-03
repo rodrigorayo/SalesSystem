@@ -40,22 +40,27 @@ export default function PedidosPage() {
     const createMut = useMutation({
         mutationFn: createPedido,
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['pedidos'] }); setShowCreate(false); resetForm(); },
+        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al crear pedido')
     });
     const despacharMut = useMutation({
         mutationFn: despacharPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al despachar pedido')
     });
     const recibirMut = useMutation({
         mutationFn: recibirPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al recibir pedido')
     });
     const cancelarMut = useMutation({
         mutationFn: cancelarPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al cancelar pedido')
     });
     const aceptarMut = useMutation({
         mutationFn: aceptarPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al aceptar pedido')
     });
 
     const resetForm = () => { setSelectedSucursal(''); setOrderItems([]); setNotas(''); };
@@ -170,21 +175,21 @@ export default function PedidosPage() {
                                                 </button>
                                             )}
                                             {pedido.estado === 'CREADO' && isMatriz() && (
-                                                <button onClick={() => aceptarMut.mutate(pedido._id)} disabled={aceptarMut.isPending}
+                                                <button onClick={() => { if (window.confirm("¿Estás seguro de ACEPTAR este pedido y comenzar a prepararlo?")) aceptarMut.mutate(pedido._id); }} disabled={aceptarMut.isPending}
                                                     className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     {aceptarMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckSquare size={14} />}
                                                     Aceptar Pedido
                                                 </button>
                                             )}
                                             {pedido.estado === 'ACEPTADO' && isMatriz() && (
-                                                <button onClick={() => despacharMut.mutate(pedido._id)} disabled={despacharMut.isPending}
+                                                <button onClick={() => { if (window.confirm("¿Confirmas que este pedido ya salió y está EN CAMINO a la sucursal? El inventario central se descontará ahora.")) despacharMut.mutate(pedido._id); }} disabled={despacharMut.isPending}
                                                     className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     {despacharMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
                                                     Despachar
                                                 </button>
                                             )}
                                             {pedido.estado === 'DESPACHADO' && isSucursal() && (
-                                                <button onClick={() => recibirMut.mutate(pedido._id)} disabled={recibirMut.isPending}
+                                                <button onClick={() => { if (window.confirm("¿Confirmas que has RECIBIDO este pedido correctamente en tu sucursal?")) recibirMut.mutate(pedido._id); }} disabled={recibirMut.isPending}
                                                     className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     {recibirMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                                                     Confirmar Recepción
