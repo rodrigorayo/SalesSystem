@@ -17,12 +17,17 @@ async def get_descuentos(
     Cajeros y Admins pueden verlos.
     """
     tenant_id = current_user.tenant_id or "default"
-    sucursal_id = current_user.sucursal_id or "CENTRAL"
     
-    descuentos = await Descuento.find(
-        Descuento.tenant_id == tenant_id,
-        Descuento.sucursal_id == sucursal_id
-    ).sort("-created_at").to_list()
+    if current_user.role in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ"]:
+        descuentos = await Descuento.find(
+            Descuento.tenant_id == tenant_id
+        ).sort("-created_at").to_list()
+    else:
+        sucursal_id = current_user.sucursal_id or "CENTRAL"
+        descuentos = await Descuento.find(
+            Descuento.tenant_id == tenant_id,
+            {"$or": [{"sucursal_id": sucursal_id}, {"aplica_todas_sucursales": True}]}
+        ).sort("-created_at").to_list()
     
     return [DescuentoResponse(**d.model_dump(), _id=str(d.id)) for d in descuentos]
 
@@ -38,15 +43,16 @@ async def create_descuento(
         raise HTTPException(status_code=403, detail="No tienes permisos para crear descuentos")
         
     tenant_id = current_user.tenant_id or "default"
-    sucursal_id = current_user.sucursal_id or "CENTRAL"
     
     if current_user.role == "ADMIN_SUCURSAL":
         descuento.aplica_todas_sucursales = False
-        descuento.sucursal_id = sucursal_id
+        descuento.sucursal_id = current_user.sucursal_id or "CENTRAL"
+    else:
+        if not descuento.aplica_todas_sucursales and not descuento.sucursal_id:
+            raise HTTPException(status_code=400, detail="Debe especificar una sucursal o marcar aplicar_todas_sucursales=True")
     
     nuevo_descuento = Descuento(
         tenant_id=tenant_id,
-        sucursal_id=sucursal_id,
         creado_por_rol=current_user.role.value if hasattr(current_user.role, 'value') else current_user.role,
         **descuento.model_dump()
     )

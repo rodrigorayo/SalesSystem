@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useDescuentos, useCreateDescuento, useUpdateDescuento, useDeleteDescuento } from '../hooks/useDescuentos';
-import { Tag, Plus, Loader2, Edit2, Trash2, ShieldCheck, Power, Percent, DollarSign, AlertCircle, CalendarDays, Lock } from 'lucide-react';
+import { Tag, Plus, Loader2, Edit2, Trash2, ShieldCheck, Power, Percent, DollarSign, AlertCircle, CalendarDays, Lock, Store } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { getSucursales } from '../api/api';
 
 export default function DescuentosPage() {
     const { role } = useAuthStore();
@@ -25,9 +27,16 @@ export default function DescuentosPage() {
     const [isIndefinido, setIsIndefinido] = useState(true);
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
+    const [sucursalId, setSucursalId] = useState('');
     
     // Check if user is matrix admin
     const esMatriz = ['ADMIN', 'SUPERADMIN', 'ADMIN_MATRIZ'].includes(role || '');
+
+    const { data: sucursales = [] } = useQuery({
+        queryKey: ['sucursales'],
+        queryFn: getSucursales,
+        enabled: esMatriz
+    });
 
     if (!isAuthorized) {
         return (
@@ -48,6 +57,7 @@ export default function DescuentosPage() {
         setIsIndefinido(true);
         setFechaInicio('');
         setFechaFin('');
+        setSucursalId('');
         setMultiModalOpen(true);
     };
 
@@ -61,11 +71,13 @@ export default function DescuentosPage() {
         setIsIndefinido(!d.fecha_inicio && !d.fecha_fin);
         setFechaInicio(d.fecha_inicio ? d.fecha_inicio.split('T')[0] : '');
         setFechaFin(d.fecha_fin ? d.fecha_fin.split('T')[0] : '');
+        setSucursalId(d.sucursal_id || '');
         setMultiModalOpen(true);
     };
 
     const handleSave = () => {
         if (!nombre || !valor || parseFloat(valor) <= 0) return;
+        if (esMatriz && !aplicaTodas && !sucursalId) return;
 
         const data = {
             nombre,
@@ -73,8 +85,9 @@ export default function DescuentosPage() {
             valor: parseFloat(valor),
             activo: activoState,
             aplica_todas_sucursales: aplicaTodas,
-            fecha_inicio: isIndefinido || !fechaInicio ? null : new Date(fechaInicio + 'T00:00:00').toISOString(),
-            fecha_fin: isIndefinido || !fechaFin ? null : new Date(fechaFin + 'T23:59:59').toISOString(),
+            sucursal_id: esMatriz ? (aplicaTodas ? undefined : sucursalId) : undefined,
+            fecha_inicio: isIndefinido || !fechaInicio ? undefined : new Date(fechaInicio + 'T00:00:00').toISOString(),
+            fecha_fin: isIndefinido || !fechaFin ? undefined : new Date(fechaFin + 'T23:59:59').toISOString(),
         };
 
         if (editId) {
@@ -145,11 +158,18 @@ export default function DescuentosPage() {
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-gray-900 leading-tight flex items-center gap-1.5">
-                                                    {d.nombre} {isLocked && <Lock size={12} className="text-gray-400" title="Controlado por Empresa" />}
+                                                    {d.nombre} {isLocked && <span title="Controlado por Empresa"><Lock size={12} className="text-gray-400" /></span>}
                                                 </h3>
                                                 <p className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
                                                     {d.tipo === 'PORCENTAJE' ? 'PORCENTAJE' : 'MONTO FIJO'}
-                                                    {d.aplica_todas_sucursales && <span className="text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md ml-1">GLOBAL</span>}
+                                                    {d.aplica_todas_sucursales ? (
+                                                        <span className="text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md ml-1 inline-flex items-center gap-1"><Store size={10} /> GLOBAL</span>
+                                                    ) : (
+                                                        <span className="text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded-md ml-1 inline-flex items-center gap-1 border border-gray-100">
+                                                            <Store size={10} /> 
+                                                            {esMatriz ? sucursales.find((s:any) => s._id === d.sucursal_id)?.nombre || 'Específico' : 'Mi Sucursal'}
+                                                        </span>
+                                                    )}
                                                 </p>
                                             </div>
                                         </div>
@@ -249,6 +269,22 @@ export default function DescuentosPage() {
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {esMatriz && !aplicaTodas && (
+                                        <div className="pt-1">
+                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Sucursal Destino</label>
+                                            <select
+                                                value={sucursalId}
+                                                onChange={e => setSucursalId(e.target.value)}
+                                                className={`w-full border rounded-xl px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-indigo-400 outline-none transition-all cursor-pointer font-bold ${!sucursalId ? 'border-red-300' : 'border-gray-200'}`}
+                                            >
+                                                <option value="" disabled>Seleccione una sucursal...</option>
+                                                {sucursales.map(s => (
+                                                    <option key={s._id} value={s._id}>{s.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
 
                                     {tipo === 'PORCENTAJE' && parseFloat(valor) > 50 && (
                                         <div className="flex items-center gap-2 text-amber-600 bg-amber-50 text-[11px] p-2 rounded-lg font-medium border border-amber-200">
@@ -297,7 +333,7 @@ export default function DescuentosPage() {
                                     <button onClick={() => setMultiModalOpen(false)} className="flex-1 py-2 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition-colors text-sm">Cancelar</button>
                                     <button
                                         onClick={handleSave}
-                                        disabled={createMut.isPending || updateMut.isPending || !nombre || !valor || parseFloat(valor) <= 0}
+                                        disabled={createMut.isPending || updateMut.isPending || !nombre || !valor || parseFloat(valor) <= 0 || (esMatriz && !aplicaTodas && !sucursalId)}
                                         className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-sm active:scale-95 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                                     >
                                         {(createMut.isPending || updateMut.isPending) ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
