@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
+import { toast } from 'sonner';
 
 const fmt = (n?: number) => (n || 0).toFixed(2);
 
@@ -134,6 +135,24 @@ export default function POSPage() {
     const restanteVal = restante();
     const cambioVal = cambio();
     const ticketCovered = cubierto >= totalVal && totalVal > 0;  // no more payments allowed
+
+    const handleTryFinalize = () => {
+        if (!canFinalize()) return;
+
+        // Validaciones de Cliente
+        if (cliente.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliente.email)) {
+            toast.error('El formato del correo electrónico es inválido');
+            return;
+        }
+        
+        // Letras y espacios unicamente. No numeros ni caracteres especiales.
+        if (cliente.razon_social && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(cliente.razon_social)) {
+            toast.error('El nombre/razón social solo puede contener letras y espacios');
+            return;
+        }
+
+        setConfirmSale(true);
+    };
 
     return (
         <div className="flex h-full bg-gray-100 overflow-hidden">
@@ -606,7 +625,7 @@ export default function POSPage() {
                         )}
 
                         {/* Finalize */}
-                        <button onClick={() => setConfirmSale(true)}
+                        <button onClick={handleTryFinalize}
                             disabled={!canFinalize() || saleMut.isPending || success}
                             className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all
                             ${canFinalize() && !success

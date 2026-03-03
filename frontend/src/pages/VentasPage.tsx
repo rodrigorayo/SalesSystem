@@ -153,6 +153,19 @@ export default function VentasPage() {
 
                                 {isOpen && (
                                     <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                                        {venta.cliente && (venta.cliente.razon_social || venta.cliente.nit || venta.cliente.email) && (
+                                            <div className="mb-4 bg-white border border-gray-200 rounded-xl p-3 flex flex-wrap gap-6 text-sm">
+                                                {venta.cliente.razon_social && (
+                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Cliente</span><span className="font-bold text-gray-900">{venta.cliente.razon_social}</span></div>
+                                                )}
+                                                {venta.cliente.nit && (
+                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">NIT / CI</span><span className="font-mono font-medium text-gray-800">{venta.cliente.nit}</span></div>
+                                                )}
+                                                {venta.cliente.email && (
+                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Correo</span><span className="text-gray-600">{venta.cliente.email}</span></div>
+                                                )}
+                                            </div>
+                                        )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {/* Detalle Productos */}
                                             <div>
