@@ -193,59 +193,9 @@ async def despachar_pedido(
 
     tenant_id = current_user.tenant_id or ""
 
-    # Validate central stock first to avoid partial deductions
-    for item in pedido.items:
-        central_inv = await Inventario.find_one(
-            Inventario.tenant_id == tenant_id,
-            Inventario.sucursal_id == "CENTRAL",
-            Inventario.producto_id == item.producto_id,
-        )
-        available = central_inv.cantidad if central_inv else 0
-        if available < item.cantidad:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Stock central insuficiente para '{item.producto_nombre}'. Disponible: {available}, solicitado: {item.cantidad}"
-            )
-
-    # All checks passed — now deduct atomically and log
-    total = 0.0
-    for item in pedido.items:
-        updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
-            {
-                "tenant_id": tenant_id,
-                "sucursal_id": "CENTRAL",
-                "producto_id": item.producto_id,
-                "cantidad": {"$gte": item.cantidad}
-            },
-            {
-                "$inc": {"cantidad": -item.cantidad}
-            },
-            return_document=ReturnDocument.AFTER
-        )
-        
-        if not updated_inv:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Error de concurrencia: Stock insuficiente para '{item.producto_nombre}'."
-            )
-
-        # Log to Kardex
-        await InventoryLog(
-            tenant_id=tenant_id,
-            sucursal_id="CENTRAL",
-            producto_id=item.producto_id,
-            descripcion=item.descripcion,
-            tipo_movimiento=TipoMovimiento.TRASLADO,
-            cantidad_movida=-item.cantidad,
-            stock_resultante=updated_inv["cantidad"],
-            costo_unitario_momento=item.precio_mayorista,
-            usuario_id=str(current_user.id),
-            usuario_nombre=current_user.full_name or current_user.username,
-            notas=f"Despacho Pedido a Sucursal {pedido.sucursal_id}",
-            referencia_id=str(pedido.id)
-        ).create()
-
-        total += item.cantidad * item.precio_mayorista
+    # Since products come directly from the factory, we do NOT deduct from any CENTRAL inventory.
+    # We just register the total and update the state to DESPACHADO.
+    total = sum(item.cantidad * item.precio_mayorista for item in pedido.items)
 
     pedido.estado = EstadoPedido.DESPACHADO
     pedido.despachado_at = datetime.utcnow()

@@ -200,7 +200,7 @@ export default function PedidosPage() {
                                             {pedido.estado === 'ACEPTADO' && isMatriz() && (
                                                 <button onClick={() => setConfirmModal({
                                                     isOpen: true, title: 'Despachar a Sucursal',
-                                                    message: '¿Confirmas que este pedido ya salió y está EN CAMINO a la sucursal? El inventario central se descontará en este momento.',
+                                                    message: '¿Confirmas que la fábrica ya envió los productos y están EN CAMINO a la sucursal?',
                                                     type: 'info', action: () => despacharMut.mutate(pedido._id)
                                                 })} disabled={despacharMut.isPending}
                                                     className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
