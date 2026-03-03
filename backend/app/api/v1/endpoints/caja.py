@@ -55,6 +55,7 @@ class ResumenCaja(BaseModel):
     total_efectivo_ventas: float
     total_cambio:          float
     total_gastos:          float
+    total_ajustes:         float = 0.0
     saldo_calculado:       float
     # ── Digital channels ─────────────────────────────────────────────────────
     total_qr:              float
@@ -94,7 +95,8 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
         ef   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
         cc   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.CAMBIO)
         gs   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.GASTO)
-        saldo = float(s.monto_inicial) + ef - cc - gs
+        aj   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.AJUSTE)
+        saldo = float(s.monto_inicial) + ef - cc - gs + aj
 
         # Digital totals from sales during this session
         cerrada_at = s.cerrada_at or datetime.utcnow()
@@ -103,6 +105,7 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
             Sale.sucursal_id == sucursal_id,
             Sale.created_at  >= s.abierta_at,
             Sale.created_at  <= cerrada_at,
+            Sale.anulada     == False,
         ).to_list()
         total_qr      = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "QR")
         total_tarjeta = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "TARJETA")
@@ -119,6 +122,7 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
             "total_efectivo":  round(ef, 2),
             "total_cambio":    round(cc, 2),
             "total_gastos":    round(gs, 2),
+            "total_ajustes":   round(aj, 2),
             "total_qr":        round(total_qr, 2),
             "total_tarjeta":   round(total_tarjeta, 2),
             "total_ventas":    round(total_ventas, 2),
@@ -214,8 +218,9 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
     total_ventas_ef = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
     total_cambio    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.CAMBIO)
     total_gastos    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.GASTO)
+    total_ajustes   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.AJUSTE)
     monto_inicial   = float(sesion.monto_inicial)
-    saldo_calculado = monto_inicial + total_ventas_ef - total_cambio - total_gastos
+    saldo_calculado = monto_inicial + total_ventas_ef - total_cambio - total_gastos + total_ajustes
 
     # ── Sales made during this session (for digital channel totals) ───────────
     cerrada_at = sesion.cerrada_at or datetime.utcnow()
@@ -224,6 +229,7 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
         Sale.sucursal_id  == (sesion.sucursal_id),
         Sale.created_at   >= sesion.abierta_at,
         Sale.created_at   <= cerrada_at,
+        Sale.anulada      == False,
     ).to_list()
 
     total_qr       = 0.0
@@ -252,6 +258,7 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
         total_efectivo_ventas  = total_ventas_ef,
         total_cambio           = total_cambio,
         total_gastos           = total_gastos,
+        total_ajustes          = total_ajustes,
         saldo_calculado        = saldo_calculado,
         total_qr               = total_qr,
         total_tarjeta          = total_tarjeta,
