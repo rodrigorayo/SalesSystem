@@ -6,8 +6,9 @@ import { useAuthStore } from '../store/authStore';
 import {
     ClipboardList, Plus, Truck, CheckCircle2, Clock,
     X, Check, Loader2, ChevronDown, ChevronRight, Package,
-    CheckSquare, Ban
+    CheckSquare, Ban, AlertTriangle
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type TabType = 'todos' | 'CREADO' | 'ACEPTADO' | 'DESPACHADO' | 'RECIBIDO' | 'CANCELADO';
 
@@ -25,6 +26,13 @@ export default function PedidosPage() {
     const [tab, setTab] = useState<TabType>('todos');
     const [showCreate, setShowCreate] = useState(false);
     const [expanded, setExpanded] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        action: () => void;
+        type: 'danger' | 'info' | 'success';
+    }>({ isOpen: false, title: '', message: '', action: () => {}, type: 'info' });
 
     const [selectedSucursal, setSelectedSucursal] = useState('');
     const [orderItems, setOrderItems] = useState<{ producto_id: string; cantidad: number }[]>([]);
@@ -168,28 +176,44 @@ export default function PedidosPage() {
 
                                         <div className="flex justify-end gap-2 mt-3">
                                             {pedido.estado === 'CREADO' && (
-                                                <button onClick={() => { if (window.confirm("¿Estás seguro de cancelar este pedido?")) cancelarMut.mutate(pedido._id); }} disabled={cancelarMut.isPending}
+                                                <button onClick={() => setConfirmModal({
+                                                    isOpen: true, title: 'Cancelar Pedido',
+                                                    message: '¿Estás seguro de cancelar este pedido? Esta acción no se puede deshacer.',
+                                                    type: 'danger', action: () => cancelarMut.mutate(pedido._id)
+                                                })} disabled={cancelarMut.isPending}
                                                     className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm mr-auto">
                                                     {cancelarMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
                                                     Cancelar
                                                 </button>
                                             )}
                                             {pedido.estado === 'CREADO' && isMatriz() && (
-                                                <button onClick={() => { if (window.confirm("¿Estás seguro de ACEPTAR este pedido y comenzar a prepararlo?")) aceptarMut.mutate(pedido._id); }} disabled={aceptarMut.isPending}
+                                                <button onClick={() => setConfirmModal({
+                                                    isOpen: true, title: 'Aceptar Pedido',
+                                                    message: '¿Estás seguro de ACEPTAR este pedido y comenzar a prepararlo?',
+                                                    type: 'info', action: () => aceptarMut.mutate(pedido._id)
+                                                })} disabled={aceptarMut.isPending}
                                                     className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     {aceptarMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckSquare size={14} />}
                                                     Aceptar Pedido
                                                 </button>
                                             )}
                                             {pedido.estado === 'ACEPTADO' && isMatriz() && (
-                                                <button onClick={() => { if (window.confirm("¿Confirmas que este pedido ya salió y está EN CAMINO a la sucursal? El inventario central se descontará ahora.")) despacharMut.mutate(pedido._id); }} disabled={despacharMut.isPending}
+                                                <button onClick={() => setConfirmModal({
+                                                    isOpen: true, title: 'Despachar a Sucursal',
+                                                    message: '¿Confirmas que este pedido ya salió y está EN CAMINO a la sucursal? El inventario central se descontará en este momento.',
+                                                    type: 'info', action: () => despacharMut.mutate(pedido._id)
+                                                })} disabled={despacharMut.isPending}
                                                     className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     {despacharMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
                                                     Despachar
                                                 </button>
                                             )}
                                             {pedido.estado === 'DESPACHADO' && isSucursal() && (
-                                                <button onClick={() => { if (window.confirm("¿Confirmas que has RECIBIDO este pedido correctamente en tu sucursal?")) recibirMut.mutate(pedido._id); }} disabled={recibirMut.isPending}
+                                                <button onClick={() => setConfirmModal({
+                                                    isOpen: true, title: 'Confirmar Recepción',
+                                                    message: '¿Confirmas que has RECIBIDO este pedido correctamente en tu sucursal? El stock se sumará a tu inventario local.',
+                                                    type: 'success', action: () => recibirMut.mutate(pedido._id)
+                                                })} disabled={recibirMut.isPending}
                                                     className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     {recibirMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                                                     Confirmar Recepción
@@ -283,6 +307,62 @@ export default function PedidosPage() {
                     </div>
                 </div>
             )}
+
+            {/* Confirmation Modal */}
+            <AnimatePresence>
+                {confirmModal.isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl relative"
+                        >
+                            <button onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} className="absolute right-4 top-4 text-gray-400 hover:bg-gray-100 p-1 rounded-lg transition-colors">
+                                <X size={20} />
+                            </button>
+                            
+                            <div className="flex flex-col items-center text-center">
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 
+                                    ${confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' :
+                                      confirmModal.type === 'success' ? 'bg-green-100 text-green-600' :
+                                      'bg-blue-100 text-blue-600'}`}
+                                >
+                                    {confirmModal.type === 'danger' ? <AlertTriangle size={32} /> : 
+                                     confirmModal.type === 'success' ? <CheckCircle2 size={32} /> : 
+                                     <ClipboardList size={32} />}
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+                                <p className="text-sm text-gray-600 mb-6 px-2">{confirmModal.message}</p>
+                                
+                                <div className="flex gap-3 w-full">
+                                    <button 
+                                        onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            confirmModal.action();
+                                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                                        }}
+                                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-colors
+                                            ${confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                                              confirmModal.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                                              'bg-blue-600 hover:bg-blue-700'}`}
+                                    >
+                                        Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
