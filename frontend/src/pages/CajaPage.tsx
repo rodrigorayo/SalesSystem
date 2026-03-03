@@ -93,7 +93,7 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 
 function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen, categoriasGlobal: CajaGastoCategoria[] }) {
     const { data: resumen, isLoading } = useResumenCaja(sesion.id);
-    const efNeto = sesion.total_efectivo - sesion.total_cambio;
+    const efNeto = sesion.total_efectivo - sesion.total_cambio + (sesion.total_ajustes || 0);
 
     return (
         <tr className="bg-slate-50">
@@ -377,7 +377,7 @@ export default function CajaPage() {
 
     // ── Computed ──────────────────────────────────────────────────────────
     const saldoActual = resumen
-        ? resumen.monto_inicial + resumen.total_efectivo_ventas - resumen.total_cambio - resumen.total_gastos
+        ? resumen.monto_inicial + resumen.total_efectivo_ventas - resumen.total_cambio - resumen.total_gastos + (resumen.total_ajustes || 0)
         : 0;
 
     const diferencia = montoFisico !== ''

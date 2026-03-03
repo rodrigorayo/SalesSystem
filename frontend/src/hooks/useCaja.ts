@@ -75,6 +75,7 @@ export interface CajaSesionResumen {
     total_efectivo: number;
     total_cambio: number;
     total_gastos: number;
+    total_ajustes?: number;
     total_qr: number;
     total_tarjeta: number;
     total_ventas: number;
