@@ -55,15 +55,20 @@ export async function client<T>(
     if (!response.ok) {
         let errorMessage = 'Error en la petición';
         try {
-            const errorData = await response.json();
-            // Soporte para los ValidationError de Pydantic FastAPI
-            if (errorData.detail && Array.isArray(errorData.detail)) {
-                errorMessage = errorData.detail[0].msg || 'Datos inválidos enviados al servidor';
-            } else if (errorData.detail) {
-                errorMessage = errorData.detail;
+            const textResponse = await response.text();
+            try {
+                const errorData = JSON.parse(textResponse);
+                // Soporte para los ValidationError de Pydantic FastAPI
+                if (errorData.detail && Array.isArray(errorData.detail)) {
+                    errorMessage = errorData.detail[0].msg || 'Datos inválidos enviados al servidor';
+                } else if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                }
+            } catch {
+                errorMessage = textResponse || errorMessage;
             }
         } catch {
-            errorMessage = await response.text() || errorMessage;
+            // Ignorar errores adicionales al leer el body
         }
         
         // Show the beautiful sonner toast error specifically for the user
