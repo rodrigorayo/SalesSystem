@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from bson import ObjectId
 from app.models.sale import Sale, ClienteInfo, PagoItem, SaleItem, DescuentoInfo
-from app.models.analytics import SaleItem as SaleItemAnalytics
-from app.models.producto import Product
+from app.models.sale_item import SaleItem as SaleItemAnalytics
+from app.models.product import Product
 from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
 from app.models.user import User, UserRole
