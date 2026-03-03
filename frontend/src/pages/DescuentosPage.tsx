@@ -8,7 +8,7 @@ import { getSucursales } from '../api/api';
 
 export default function DescuentosPage() {
     const { role } = useAuthStore();
-    const isAuthorized = role === 'ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN_SUCURSAL';
+    const isAuthorized = role === 'ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN_SUCURSAL' || role === 'ADMIN_MATRIZ';
 
     const { data: descuentos = [], isLoading } = useDescuentos();
     const createMut = useCreateDescuento();
