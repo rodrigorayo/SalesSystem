@@ -120,6 +120,55 @@ export const importGlobalExcel = async (file: File) => {
     return response.json();
 };
 
+export const exportProductPriceTemplate = async (sucursal_id: string) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+    const response = await fetch(`${CACHE_URL}/productos/exportar-plantilla-precios?sucursal_id=${sucursal_id}`, {
+        method: 'GET',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!response.ok) throw new Error('Error al descargar la plantilla de precios');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `plantilla_precios.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+};
+
+export const importProductPrices = async (sucursal_id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('sucursal_id', sucursal_id);
+    formData.append('file', file);
+    
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+        
+    const response = await fetch(`${CACHE_URL}/productos/importar-precios`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    
+    if (!response.ok) {
+        let errMsg = 'Error en la importación de precios';
+        try {
+            const errData = await response.json();
+            errMsg = errData.detail || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    
+    return response.json();
+};
+
 
 // ─── Inventario ───────────────────────────────────────────────────────────
 export const getInventario = (sucursal_id = 'CENTRAL') =>

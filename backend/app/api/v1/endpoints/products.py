@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pymongo import UpdateOne
@@ -678,6 +678,166 @@ async def importacion_global_excel(
             "productos_catalogo_afectados": cat_procesados,
             "ajustes_inventario_generados": inv_procesados,
             "detalles": sucess_msg
+        },
+        "errores": errores
+    }
+
+
+@router.get("/productos/exportar-plantilla-precios")
+async def export_product_price_template(
+    sucursal_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="No autorizado para exportar plantilla de precios")
+        
+    tenant_id = current_user.tenant_id or "default"
+    
+    # Validar sucursal
+    sucursal = await Sucursal.get(sucursal_id)
+    if not sucursal or (current_user.role != UserRole.SUPERADMIN and sucursal.tenant_id != tenant_id):
+        raise HTTPException(status_code=400, detail="Sucursal no encontrada o no pertenece a tu empresa")
+        
+    products = await Product.find(Product.tenant_id == tenant_id, Product.is_active == True).to_list()
+    
+    # Obtener inventarios p/ precio actual
+    invs = await Inventario.find(Inventario.sucursal_id == sucursal_id).to_list()
+    price_map = {str(i.producto_id): i.precio_sucursal for i in invs}
+    
+    headers = ["CODIGO CORTO", "DESCRIPCION", "PRECIO ACTUAL", "NUEVO PRECIO"]
+    data = []
+    
+    for p in products:
+        if not p.codigo_corto: continue
+        precio_actual = price_map.get(str(p.id))
+        
+        data.append({
+            "CODIGO CORTO": p.codigo_corto,
+            "DESCRIPCION": p.descripcion,
+            "PRECIO ACTUAL": precio_actual if precio_actual is not None else p.precio_venta,
+            "NUEVO PRECIO": "" # Usuario llena esto
+        })
+        
+    df = pd.DataFrame(data, columns=headers)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='ActualizacionPrecios', index=False)
+        
+    output.seek(0)
+    clean_name = sucursal.nombre.replace(" ", "_").lower()
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=plantilla_precios_{clean_name}.xlsx"}
+    )
+
+
+@router.post("/productos/importar-precios")
+async def import_product_prices(
+    sucursal_id: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="No autorizado para importar precios")
+        
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Formato de archivo inválido. Solo se permite .xlsx o .xls")
+        
+    tenant_id = current_user.tenant_id or "default"
+    
+    # Validar sucursal
+    sucursal = await Sucursal.get(sucursal_id)
+    if not sucursal or (current_user.role != UserRole.SUPERADMIN and sucursal.tenant_id != tenant_id):
+        raise HTTPException(status_code=400, detail="Sucursal no encontrada")
+    
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al leer el archivo Excel: {str(e)}")
+        
+    # Standardize columns
+    df.columns = df.columns.astype(str).str.strip().str.upper()
+    df.columns = df.columns.str.replace(' ', '_')
+    
+    if "CODIGO_CORTO" not in df.columns or "NUEVO_PRECIO" not in df.columns:
+        raise HTTPException(status_code=400, detail="Faltan columnas obligatorias: CODIGO_CORTO o NUEVO_PRECIO")
+        
+    products = await Product.find(Product.tenant_id == tenant_id).to_list()
+    prod_map = {p.codigo_corto: p for p in products if p.codigo_corto}
+    
+    errores = []
+    procesados = 0
+    actualizados = 0
+    ignorados = 0
+    
+    operaciones_inventario = []
+    
+    for index, row in df.iterrows():
+        procesados += 1
+        fila_num = index + 2
+        
+        codigo_corto = str(row.get("CODIGO_CORTO", "")).strip()
+        if not codigo_corto or codigo_corto == "nan":
+            errores.append({"fila": fila_num, "motivo": "Falta CODIGO_CORTO"})
+            ignorados += 1
+            continue
+            
+        nuevo_precio_val = row.get("NUEVO_PRECIO")
+        if pd.isna(nuevo_precio_val) or str(nuevo_precio_val).strip() == "":
+            ignorados += 1 # Empty price ignored
+            continue
+            
+        try:
+            nuevo_precio = float(nuevo_precio_val)
+            if math.isnan(nuevo_precio) or nuevo_precio < 0:
+                raise ValueError()
+        except ValueError:
+            errores.append({"fila": fila_num, "motivo": f"Precio '{nuevo_precio_val}' inválido"})
+            ignorados += 1
+            continue
+            
+        if codigo_corto not in prod_map:
+            errores.append({"fila": fila_num, "motivo": f"Producto con código '{codigo_corto}' no existe en la base de datos"})
+            ignorados += 1
+            continue
+            
+        p = prod_map[codigo_corto]
+        product_id = str(p.id)
+        
+        operaciones_inventario.append(
+            UpdateOne(
+                {
+                    "tenant_id": tenant_id,
+                    "sucursal_id": sucursal_id,
+                    "producto_id": product_id
+                },
+                {
+                    "$setOnInsert": {
+                        "tenant_id": tenant_id,
+                        "sucursal_id": sucursal_id,
+                        "producto_id": product_id,
+                        "cantidad": 0
+                    },
+                    "$set": {"precio_sucursal": nuevo_precio},
+                    "$currentDate": {"updated_at": True}
+                },
+                upsert=True
+            )
+        )
+        actualizados += 1
+        
+    if operaciones_inventario:
+        col_inv = getattr(Inventario, "get_motor_collection", Inventario.get_pymongo_collection)()
+        await col_inv.bulk_write(operaciones_inventario)
+        
+    return {
+        "resumen": {
+            "filas_leidas": procesados,
+            "precios_actualizados": actualizados,
+            "filas_ignoradas": ignorados,
+            "errores": len(errores)
         },
         "errores": errores
     }
