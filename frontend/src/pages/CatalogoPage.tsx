@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit2, Loader2, Package, Image as ImageIcon, Check, X, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getProducts, getCategories, createProduct, updateProduct, exportProductTemplate, importProductsExcel, importGlobalExcel } from '../api/api';
+import { getProducts, getCategories, createProduct, updateProduct, exportProductTemplate, importProductsExcel, importGlobalExcel, getSucursales } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
-import type { Product, Category, ProductCreate } from '../api/types';
+import type { Product, Category, ProductCreate, Sucursal } from '../api/types';
 
 export default function CatalogoPage() {
     const { user } = useAuthStore();
@@ -25,8 +25,14 @@ export default function CatalogoPage() {
         queryKey: ['categories'],
         queryFn: getCategories
     });
-
+    
     const isEditor = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN';
+
+    const { data: sucursales = [] } = useQuery({
+        queryKey: ['sucursales'],
+        queryFn: getSucursales,
+        enabled: isEditor
+    });
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -191,6 +197,7 @@ export default function CatalogoPage() {
                     onClose={() => setIsModalOpen(false)}
                     product={editingProduct}
                     categories={categories}
+                    sucursales={sucursales}
                 />
             )}
             
@@ -378,7 +385,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     );
 }
 
-function ProductModal({ onClose, product, categories }: { isOpen: boolean, onClose: () => void, product: Product | null, categories: Category[] }) {
+function ProductModal({ onClose, product, categories, sucursales }: { isOpen: boolean, onClose: () => void, product: Product | null, categories: Category[], sucursales: Sucursal[] }) {
     const isEditing = !!product;
     const queryClient = useQueryClient();
 
@@ -390,7 +397,19 @@ function ProductModal({ onClose, product, categories }: { isOpen: boolean, onClo
         codigo_corto: product?.codigo_corto || '',
         codigo_largo: product?.codigo_largo || '',
         image_url: product?.image_url || '',
+        precios_sucursales: product?.precios_sucursales || {},
     });
+    
+    const handlePriceChange = (sucursalId: string, val: string) => {
+        const numVal = parseFloat(val);
+        setFormData(prev => ({
+            ...prev,
+            precios_sucursales: {
+                ...(prev.precios_sucursales || {}),
+                [sucursalId]: isNaN(numVal) ? 0 : numVal
+            }
+        }));
+    };
 
     const createMut = useMutation({
         mutationFn: createProduct,
@@ -509,6 +528,32 @@ function ProductModal({ onClose, product, categories }: { isOpen: boolean, onClo
                             placeholder="https://ejemplo.com/imagen.jpg"
                         />
                     </div>
+
+                    {sucursales.length > 0 && (
+                        <div className="border-t border-gray-100 pt-5 mt-2">
+                            <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <Tag size={16} className="text-indigo-500" />
+                                Precios Específicos por Sucursal
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {sucursales.map(suc => (
+                                    <div key={suc._id} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1.5 truncate" title={suc.nombre}>{suc.nombre}</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Bs.</span>
+                                            <input
+                                                type="number" step="0.01" min="0" required
+                                                className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg pl-9 pr-3 py-1.5 outline-none transition-all text-sm text-gray-900"
+                                                value={formData.precios_sucursales?.[suc._id] ?? ''}
+                                                onChange={e => handlePriceChange(suc._id, e.target.value)}
+                                                placeholder={formData.precio_venta.toString()}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {(createMut.isError || updateMut.isError) && (
                         <div className="p-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 font-medium">

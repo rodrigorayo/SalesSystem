@@ -26,6 +26,7 @@ class ProductCreate(BaseModel):
     codigo_largo: Optional[str] = None
     codigo_corto: Optional[str] = None
     image_url: Optional[str] = None
+    precios_sucursales: Optional[dict[str, float]] = None
 
 
 class ProductUpdate(BaseModel):
@@ -37,6 +38,7 @@ class ProductUpdate(BaseModel):
     codigo_corto: Optional[str] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
+    precios_sucursales: Optional[dict[str, float]] = None
 
 
 async def _enrich(product: Product) -> Product:
@@ -58,6 +60,26 @@ async def get_products(
         products = await Product.find_all().skip(skip).limit(limit).to_list()
     else:
         products = await Product.find(Product.tenant_id == current_user.tenant_id).skip(skip).limit(limit).to_list()
+        
+    p_ids = [str(p.id) for p in products]
+    from beanie.operators import In
+    
+    if current_user.sucursal_id:
+        invs = await Inventario.find(In(Inventario.producto_id, p_ids), Inventario.sucursal_id == current_user.sucursal_id).to_list()
+        price_map = {i.producto_id: i.precio_sucursal for i in invs if i.precio_sucursal is not None}
+        for p in products:
+            if str(p.id) in price_map:
+                p.precio_venta = price_map[str(p.id)]
+            p.precios_sucursales = {} # Hide from branch
+    else:
+        invs = await Inventario.find(In(Inventario.producto_id, p_ids)).to_list()
+        p_map = {str(p.id): {} for p in products}
+        for i in invs:
+            if i.precio_sucursal is not None:
+                p_map[str(i.producto_id)][i.sucursal_id] = i.precio_sucursal
+        for p in products:
+            p.precios_sucursales = p_map.get(str(p.id), {})
+
     return [await _enrich(p) for p in products]
 
 
@@ -87,9 +109,30 @@ async def create_product(
 
     product = Product(
         tenant_id=tenant_id,
-        **data.model_dump(),
+        **data.model_dump(exclude={"precios_sucursales"}),
     )
     await product.create()
+    
+    if data.precios_sucursales:
+        from pymongo import UpdateOne
+        ops = []
+        for suc_id, precio in data.precios_sucursales.items():
+            if precio is not None and precio >= 0:
+                ops.append(
+                    UpdateOne(
+                        {"tenant_id": tenant_id, "sucursal_id": suc_id, "producto_id": str(product.id)},
+                        {
+                            "$setOnInsert": {"cantidad": 0},
+                            "$set": {"precio_sucursal": precio},
+                            "$currentDate": {"updated_at": True}
+                        },
+                        upsert=True
+                    )
+                )
+        if ops:
+            await Inventario.get_motor_collection().bulk_write(ops)
+            
+    product.precios_sucursales = data.precios_sucursales or {}
     return await _enrich(product)
 
 
@@ -139,8 +182,35 @@ async def update_product(
         ).create()
 
     for field, value in updates.items():
+        if field == "precios_sucursales": continue
         setattr(product, field, value)
     await product.save()
+    
+    if "precios_sucursales" in updates and updates["precios_sucursales"] is not None:
+        from pymongo import UpdateOne
+        precios = updates["precios_sucursales"]
+        ops = []
+        for suc_id, precio in precios.items():
+            if precio is not None and precio >= 0:
+                ops.append(
+                    UpdateOne(
+                        {"tenant_id": product.tenant_id, "sucursal_id": suc_id, "producto_id": str(product.id)},
+                        {
+                            "$setOnInsert": {"cantidad": 0},
+                            "$set": {"precio_sucursal": precio},
+                            "$currentDate": {"updated_at": True}
+                        },
+                        upsert=True
+                    )
+                )
+        if ops:
+            await Inventario.get_motor_collection().bulk_write(ops)
+        product.precios_sucursales = precios
+    else:
+        # Load them to return properly to admin
+        invs = await Inventario.find(Inventario.producto_id == str(product.id)).to_list()
+        product.precios_sucursales = {i.sucursal_id: i.precio_sucursal for i in invs if i.precio_sucursal is not None}
+        
     return await _enrich(product)
 
 

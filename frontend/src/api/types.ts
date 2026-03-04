@@ -62,6 +62,7 @@ export interface Product {
     precio_venta: number;         // retail price
     image_url?: string;
     is_active?: boolean;
+    precios_sucursales?: Record<string, number>; // sucursal_id -> branch specific price
 }
 
 export interface ProductCreate {
@@ -72,6 +73,7 @@ export interface ProductCreate {
     codigo_largo?: string;
     codigo_corto?: string;
     image_url?: string;
+    precios_sucursales?: Record<string, number>;
 }
 
 export interface ProductUpdate extends Partial<ProductCreate> { }
