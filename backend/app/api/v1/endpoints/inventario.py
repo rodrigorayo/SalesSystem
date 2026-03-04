@@ -202,7 +202,6 @@ async def export_inventory_template(
             "CODIGO CORTO": p.codigo_corto,
             "DESCRIPCION": p.descripcion,
             "CATEGORIA": p.categoria_id, # Can be enriched if needed
-            f"PRECIO PUBLICO {suc_name}": p.precio_venta,
             f"INVENTARIO FISICO {suc_name}": "" # Leaves it empty for them to fill
         })
         
