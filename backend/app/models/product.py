@@ -35,6 +35,7 @@ class Product(Document, SoftDeleteMixin):
     # optional enrichment (resolved at query time, not stored)
     categoria_nombre: Optional[str] = None
     image_url: Optional[str] = None
+    precios_sucursales: Optional[dict[str, float]] = None
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
