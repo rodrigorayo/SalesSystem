@@ -168,20 +168,25 @@ async def export_product_template(
         
     tenant_id = current_user.tenant_id or "default"
     
-    # Get categories for this tenant
     categories = await Category.find(Category.tenant_id == tenant_id, Category.is_active == True).to_list()
+    sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
     
-    # Create the Products sheet (Empty template with headers)
-    df_products = pd.DataFrame(columns=["codigo_corto", "nombre", "precio_base", "id_categoria"])
+    # Construir cabeceras maestras
+    headers = ["CODIGO", "CODIGO CORTO", "DESCRIPCION", "COSTO UNITARIO", "PRECIO PUBLICO", "CATEGORIA"]
     
-    # Create the Categories sheet (Reference)
+    # Agregar cabecera de precio por cada sucursal
+    for s in sucursales:
+        clean_name = s.nombre.replace(" ", "").upper()
+        headers.append(f"PRECIO PUBLICO {clean_name}")
+        
+    df_products = pd.DataFrame(columns=headers)
+    
     cat_data = [{"ID Categoría": str(c.id), "Nombre": c.name} for c in categories]
     df_categories = pd.DataFrame(cat_data)
     
-    # Generate Excel in memory
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_products.to_excel(writer, sheet_name='Productos', index=False)
+        df_products.to_excel(writer, sheet_name='Catálogo', index=False)
         if not df_categories.empty:
             df_categories.to_excel(writer, sheet_name='Categorias (Guia)', index=False)
         else:
@@ -192,7 +197,7 @@ async def export_product_template(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=plantilla_productos.xlsx"}
+        headers={"Content-Disposition": "attachment; filename=plantilla_maestra_catalogo.xlsx"}
     )
 
 
@@ -394,6 +399,13 @@ async def importacion_global_excel(
         if suc_name in suc_map:
             col_to_sucursal_id[col] = suc_map[suc_name]
             
+    precio_cols = [col for col in df.columns if col.startswith("PRECIO_PUBLICO_") and col != "PRECIO_PUBLICO"]
+    col_to_precio_sucursal_id = {}
+    for col in precio_cols:
+        suc_name = col.replace("PRECIO_PUBLICO_", "").replace(" ", "").upper()
+        if suc_name in suc_map:
+            col_to_precio_sucursal_id[col] = suc_map[suc_name]
+            
     # 3. PROCESAR CATÁLOGO E INVENTARIO
     productos_db = await Product.find(Product.tenant_id == tenant_id).to_list()
     prod_map = {p.codigo_corto: p for p in productos_db if p.codigo_corto}
@@ -487,6 +499,39 @@ async def importacion_global_excel(
             prod_map[codigo_corto] = nuevo_prod
             cat_procesados += 1
             
+        # -- PRECIOS POR SUCURSAL (Sin alterar inventario físico, solo precio_sucursal) --
+        for col in precio_cols:
+            if col in col_to_precio_sucursal_id:
+                suc_val = col_to_precio_sucursal_id[col]
+                precio_suc = safe_float(row.get(col, 0))
+                
+                if precio_suc > 0:
+                    precio_anterior = None
+                    if suc_val in inv_map and product_id in inv_map[suc_val]:
+                        precio_anterior = inv_map[suc_val][product_id].precio_sucursal
+                        
+                    if precio_suc != precio_anterior:
+                        operaciones_inventario.append(
+                            UpdateOne(
+                                {
+                                    "tenant_id": tenant_id,
+                                    "sucursal_id": suc_val,
+                                    "producto_id": product_id
+                                },
+                                {
+                                    "$setOnInsert": {
+                                        "tenant_id": tenant_id,
+                                        "sucursal_id": suc_val,
+                                        "producto_id": product_id,
+                                        "cantidad": 0
+                                    },
+                                    "$set": {"precio_sucursal": precio_suc},
+                                    "$currentDate": {"updated_at": True}
+                                },
+                                upsert=True
+                            )
+                        )
+                    
         # -- INVENTARIO UPSERT --
         for col in inv_columns:
             if col in col_to_sucursal_id:

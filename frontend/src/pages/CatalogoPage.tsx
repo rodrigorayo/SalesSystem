@@ -143,7 +143,10 @@ export default function CatalogoPage() {
                                                 )}
                                                 <div>
                                                     <div className="font-medium text-gray-900">{p.descripcion}</div>
-                                                    <div className="text-xs text-indigo-400 mt-0.5 font-mono">{p.codigo_corto || 'SIN SKU'}</div>
+                                                    <div className="text-xs text-indigo-500 mt-0.5 font-mono flex gap-2">
+                                                        <span>{p.codigo_corto || 'SIN SKU'}</span>
+                                                        {p.codigo_largo && <span className="text-gray-400">| EAN: {p.codigo_largo}</span>}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -385,6 +388,7 @@ function ProductModal({ onClose, product, categories }: { isOpen: boolean, onClo
         precio_venta: product?.precio_venta || 0,
         costo_producto: product?.costo_producto || 0,
         codigo_corto: product?.codigo_corto || '',
+        codigo_largo: product?.codigo_largo || '',
         image_url: product?.image_url || '',
     });
 
@@ -438,27 +442,38 @@ function ProductModal({ onClose, product, categories }: { isOpen: boolean, onClo
                         />
                     </div>
 
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Categoría</label>
+                        <select
+                            required
+                            className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-gray-900"
+                            value={formData.categoria_id}
+                            onChange={e => setFormData({ ...formData, categoria_id: e.target.value })}
+                        >
+                            <option value="" disabled>Seleccionar...</option>
+                            {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                        </select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Categoría</label>
-                            <select
-                                required
-                                className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-gray-900"
-                                value={formData.categoria_id}
-                                onChange={e => setFormData({ ...formData, categoria_id: e.target.value })}
-                            >
-                                <option value="" disabled>Seleccionar...</option>
-                                {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">SKU (Opcional)</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">SKU (Código Corto)</label>
                             <input
                                 type="text"
                                 className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-gray-900 placeholder-gray-400 uppercase font-mono"
                                 value={formData.codigo_corto}
                                 onChange={e => setFormData({ ...formData, codigo_corto: e.target.value })}
-                                placeholder="C-COLA-2L"
+                                placeholder="Ej: C-COLA-2L"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">EAN (Código Largo)</label>
+                            <input
+                                type="text"
+                                className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-gray-900 placeholder-gray-400 font-mono"
+                                value={formData.codigo_largo}
+                                onChange={e => setFormData({ ...formData, codigo_largo: e.target.value })}
+                                placeholder="Ej: 777123456789"
                             />
                         </div>
                     </div>
