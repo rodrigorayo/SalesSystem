@@ -75,7 +75,7 @@ export const importProductsExcel = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await fetch(`${CACHE_URL}/productos/importar`, {
+    const response = await fetch(`${CACHE_URL}/productos/importacion-global`, {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData
