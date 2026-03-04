@@ -242,7 +242,7 @@ async def export_product_template(
     sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
     
     # Construir cabeceras maestras
-    headers = ["CODIGO", "CODIGO CORTO", "DESCRIPCION", "COSTO UNITARIO", "PRECIO PUBLICO", "CATEGORIA"]
+    headers = ["CODIGO", "CODIGO CORTO", "DESCRIPCION", "COSTO UNITARIO", "CATEGORIA"]
     
     # Agregar cabecera de precio por cada sucursal
     for s in sucursales:
@@ -294,7 +294,7 @@ async def import_products(
     df.columns = df.columns.astype(str).str.strip().str.lower()
     
     # Required columns
-    required_cols = {"codigo_corto", "nombre", "precio_base", "id_categoria"}
+    required_cols = {"codigo_corto", "nombre", "id_categoria"}
     if not required_cols.issubset(set(df.columns)):
         missing = required_cols - set(df.columns)
         raise HTTPException(status_code=400, detail=f"Faltan columnas obligatorias en el archivo: {missing}")

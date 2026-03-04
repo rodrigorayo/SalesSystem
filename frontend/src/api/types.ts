@@ -68,7 +68,7 @@ export interface Product {
 export interface ProductCreate {
     descripcion: string;
     categoria_id: string;
-    precio_venta: number;
+    precio_venta?: number;
     costo_producto?: number;
     codigo_largo?: string;
     codigo_corto?: string;

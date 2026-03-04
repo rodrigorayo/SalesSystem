@@ -113,7 +113,11 @@ export default function CatalogoPage() {
                             <tr>
                                 <th className="px-6 py-4">Producto</th>
                                 <th className="px-6 py-4">Categoría</th>
-                                <th className="px-6 py-4 text-right">Público (Bs)</th>
+                                {user?.sucursal_id ? (
+                                    <th className="px-6 py-4 text-right">Precio Final (Bs)</th>
+                                ) : (
+                                    <th className="px-6 py-4 text-right">Precios (Bs)</th>
+                                )}
                                 {isEditor && <th className="px-6 py-4 text-right">Costo (Bs)</th>}
                                 <th className="px-6 py-4 text-center">Estado</th>
                                 {isEditor && <th className="px-6 py-4 text-right">Acciones</th>}
@@ -163,7 +167,11 @@ export default function CatalogoPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right font-semibold text-gray-900">
-                                            {(p.precio_venta || 0).toFixed(2)}
+                                            {user?.sucursal_id ? (
+                                                (p.precio_venta || 0).toFixed(2)
+                                            ) : (
+                                                <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-1 rounded-md">Por Sucursal</span>
+                                            )}
                                         </td>
                                         {isEditor && (
                                             <td className="px-6 py-4 text-right text-gray-500">
@@ -497,25 +505,15 @@ function ProductModal({ onClose, product, categories, sucursales }: { isOpen: bo
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Costo Base (Bs) (Opcional)</label>
-                            <input
-                                type="number" step="0.01" min="0" required
-                                className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-gray-900"
-                                value={formData.costo_producto === 0 ? '' : formData.costo_producto}
-                                onChange={e => setFormData({ ...formData, costo_producto: parseFloat(e.target.value) || 0 })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-indigo-700 mb-1.5">Público Final (Bs)</label>
-                            <input
-                                type="number" step="0.01" min="0" required
-                                className="w-full bg-indigo-50 border border-indigo-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm font-bold text-indigo-900"
-                                value={formData.precio_venta === 0 ? '' : formData.precio_venta}
-                                onChange={e => setFormData({ ...formData, precio_venta: parseFloat(e.target.value) || 0 })}
-                            />
-                        </div>
+                    <div className="pb-4 border-b border-gray-100">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Costo Base (Bs) (Opcional)</label>
+                        <input
+                            type="number" step="0.01" min="0" required
+                            className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-gray-900"
+                            value={formData.costo_producto === 0 ? '' : formData.costo_producto}
+                            onChange={e => setFormData({ ...formData, costo_producto: parseFloat(e.target.value) || 0 })}
+                            placeholder="Costo de adquisición"
+                        />
                     </div>
 
                     <div>
@@ -546,7 +544,7 @@ function ProductModal({ onClose, product, categories, sucursales }: { isOpen: bo
                                                 className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg pl-9 pr-3 py-1.5 outline-none transition-all text-sm text-gray-900"
                                                 value={formData.precios_sucursales?.[suc._id] ?? ''}
                                                 onChange={e => handlePriceChange(suc._id, e.target.value)}
-                                                placeholder={formData.precio_venta.toString()}
+                                                placeholder="0.00"
                                             />
                                         </div>
                                     </div>

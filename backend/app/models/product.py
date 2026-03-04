@@ -30,7 +30,7 @@ class Product(Document, SoftDeleteMixin):
     descripcion: str                             # product name
     categoria_id: str                            # required FK → categories
     costo_producto: float = 0.0                  # production/purchase cost
-    precio_venta: float                          # retail price
+    precio_venta: float = 0.0                    # retail price (deprecated for MATRIZ, mapped from sucursal)
 
     # optional enrichment (resolved at query time, not stored)
     categoria_nombre: Optional[str] = None
