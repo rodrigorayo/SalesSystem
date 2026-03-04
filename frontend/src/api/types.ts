@@ -158,7 +158,7 @@ export interface Descuento {
     nombre: string;
     tipo: 'MONTO' | 'PORCENTAJE';
     valor: number;
-    activo: boolean;
+    is_active: boolean;
     fecha_inicio?: string;
     fecha_fin?: string;
     creado_por_rol: string;
@@ -172,7 +172,7 @@ export interface DescuentoCreate {
     valor: number;
     sucursal_id?: string;
     aplica_todas_sucursales: boolean;
-    activo: boolean;
+    is_active: boolean;
     fecha_inicio?: string;
     fecha_fin?: string;
 }
@@ -183,7 +183,7 @@ export interface DescuentoUpdate {
     valor?: number;
     sucursal_id?: string;
     aplica_todas_sucursales?: boolean;
-    activo?: boolean;
+    is_active?: boolean;
     fecha_inicio?: string;
     fecha_fin?: string;
 }

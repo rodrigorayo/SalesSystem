@@ -66,7 +66,7 @@ export default function DescuentosPage() {
         setNombre(d.nombre);
         setTipo(d.tipo);
         setValor(d.valor.toString());
-        setActivoState(d.activo);
+        setActivoState(d.is_active);
         setAplicaTodas(d.aplica_todas_sucursales || false);
         setIsIndefinido(!d.fecha_inicio && !d.fecha_fin);
         setFechaInicio(d.fecha_inicio ? d.fecha_inicio.split('T')[0] : '');
@@ -83,7 +83,7 @@ export default function DescuentosPage() {
             nombre,
             tipo,
             valor: parseFloat(valor),
-            activo: activoState,
+            is_active: activoState,
             aplica_todas_sucursales: aplicaTodas,
             sucursal_id: esMatriz ? (aplicaTodas ? undefined : sucursalId) : undefined,
             fecha_inicio: isIndefinido || !fechaInicio ? undefined : new Date(fechaInicio + 'T00:00:00').toISOString(),
@@ -102,7 +102,7 @@ export default function DescuentosPage() {
     };
 
     const toggleActivo = (id: string, currentActivo: boolean) => {
-        updateMut.mutate({ id, data: { activo: !currentActivo } });
+        updateMut.mutate({ id, data: { is_active: !currentActivo } });
     };
 
     return (
@@ -150,7 +150,7 @@ export default function DescuentosPage() {
                                 const isLocked = !esMatriz && isFromMatriz;
                                 
                                 return (
-                                <div key={d._id} className={`bg-white rounded-2xl border ${d.activo ? 'border-indigo-100 shadow-sm' : 'border-gray-200 shadow-sm'} p-5 flex flex-col relative transition-all hover:shadow-md`}>
+                                <div key={d._id} className={`bg-white rounded-2xl border ${d.is_active ? 'border-indigo-100 shadow-sm' : 'border-gray-200 shadow-sm'} p-5 flex flex-col relative transition-all hover:shadow-md`}>
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex items-center gap-2">
                                             <div className={`p-2 rounded-xl ${d.tipo === 'PORCENTAJE' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
@@ -187,12 +187,12 @@ export default function DescuentosPage() {
 
                                     <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
                                         <button
-                                            onClick={() => { if(!isLocked) toggleActivo(d._id, d.activo); }}
+                                            onClick={() => { if(!isLocked) toggleActivo(d._id, d.is_active); }}
                                             disabled={isLocked}
-                                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${d.activo ? 'text-green-700 bg-green-50 hover:bg-green-100' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'} ${isLocked && 'opacity-50 cursor-not-allowed'}`}
-                                            title={isLocked ? "Bloqueado (Matriz)" : (d.activo ? "Desactivar" : "Activar")}
+                                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${d.is_active ? 'text-green-700 bg-green-50 hover:bg-green-100' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'} ${isLocked && 'opacity-50 cursor-not-allowed'}`}
+                                            title={isLocked ? "Bloqueado (Matriz)" : (d.is_active ? "Desactivar" : "Activar")}
                                         >
-                                            <Power size={12} /> {d.activo ? 'Activo' : 'Inactivo'}
+                                            <Power size={12} /> {d.is_active ? 'Activo' : 'Inactivo'}
                                         </button>
                                         <div className="flex gap-2">
                                             {!isLocked && (

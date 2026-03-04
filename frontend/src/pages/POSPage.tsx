@@ -418,7 +418,7 @@ export default function POSPage() {
                                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Descuentos Activos</span>
                                 {loadingD ? (
                                     <div className="h-6 flex items-center"><Loader2 size={14} className="animate-spin text-gray-400" /></div>
-                                ) : descuentosDisponibles.filter(d => d.activo).length === 0 ? (
+                                ) : descuentosDisponibles.filter(d => d.is_active).length === 0 ? (
                                     <p className="text-[10px] text-gray-400 italic">No hay descuentos predefinidos habilitados.</p>
                                 ) : (
                                     <div className="flex flex-wrap gap-1.5">
@@ -428,7 +428,7 @@ export default function POSPage() {
                                         >
                                             Ninguno
                                         </button>
-                                        {descuentosDisponibles.filter(d => d.activo).map(d => {
+                                        {descuentosDisponibles.filter(d => d.is_active).map(d => {
                                             const isActive = descuento.nombre === d.nombre && descuento.valor === d.valor.toString();
                                             return (
                                                 <button

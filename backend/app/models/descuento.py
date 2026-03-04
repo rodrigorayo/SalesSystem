@@ -46,7 +46,8 @@ class DescuentoBase(BaseModel):
     fecha_fin: Optional[datetime] = None
 
 class DescuentoCreate(DescuentoBase):
-    pass
+    aplica_todas_sucursales: bool = False
+    sucursal_id: Optional[str] = None
 
 class DescuentoUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -55,6 +56,8 @@ class DescuentoUpdate(BaseModel):
     is_active: Optional[bool] = None
     fecha_inicio: Optional[datetime] = None
     fecha_fin: Optional[datetime] = None
+    aplica_todas_sucursales: Optional[bool] = None
+    sucursal_id: Optional[str] = None
 
 class DescuentoResponse(DescuentoBase):
     id: str = Field(..., alias="_id")
