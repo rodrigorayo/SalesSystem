@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit2, Loader2, Package, Image as ImageIcon, Check, X, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getProducts, getCategories, createProduct, updateProduct, exportProductTemplate, importProductsExcel } from '../api/api';
+import { getProducts, getCategories, createProduct, updateProduct, exportProductTemplate, importProductsExcel, importGlobalExcel } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { Product, Category, ProductCreate } from '../api/types';
@@ -13,6 +13,7 @@ export default function CatalogoPage() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isImportGlobalModalOpen, setIsImportGlobalModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const { data: products = [], isLoading: loadingProducts } = useQuery({
@@ -56,9 +57,13 @@ export default function CatalogoPage() {
                 </div>
                 {isEditor && (
                     <div className="flex gap-2">
+                        <button onClick={() => setIsImportGlobalModalOpen(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-transparent px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all transform hover:scale-105">
+                            <Package size={18} />
+                            <span className="hidden sm:inline">Importación Global Excel</span>
+                        </button>
                         <button onClick={() => setIsImportModalOpen(true)} className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-sm transition-colors">
                             <FileSpreadsheet size={18} className="text-emerald-600" />
-                            <span className="hidden sm:inline">Importar</span>
+                            <span className="hidden sm:inline">Importar Básica</span>
                         </button>
                         <button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-sm transition-colors">
                             <Plus size={18} />
@@ -188,6 +193,10 @@ export default function CatalogoPage() {
             
             {isImportModalOpen && (
                 <ImportModal onClose={() => setIsImportModalOpen(false)} />
+            )}
+            
+            {isImportGlobalModalOpen && (
+                <ImportGlobalModal onClose={() => setIsImportGlobalModalOpen(false)} />
             )}
         </div>
     );
@@ -502,6 +511,183 @@ function ProductModal({ onClose, product, categories }: { isOpen: boolean, onClo
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+}
+
+function ImportGlobalModal({ onClose }: { onClose: () => void }) {
+    const queryClient = useQueryClient();
+    const [isUploading, setIsUploading] = useState(false);
+    const [result, setResult] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const onDrop = async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        setError(null);
+        try {
+            const data = await importGlobalExcel(file);
+            setResult(data);
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            queryClient.invalidateQueries({ queryKey: ['inventario'] });
+            queryClient.invalidateQueries({ queryKey: ['tenant_stats'] });
+        } catch (err: any) {
+            setError(err.message || 'Error al procesar el archivo global');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+            'application/vnd.ms-excel': ['.xls']
+        },
+        maxFiles: 1,
+        disabled: isUploading || !!result
+    });
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border-2 border-purple-500/20">
+                <div className="px-6 py-4 border-b border-purple-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-white">
+                    <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-700 to-indigo-700 flex items-center gap-2">
+                        <Package size={20} className="text-purple-600" />
+                        Importación Global A-Medida
+                    </h3>
+                    <button onClick={onClose} disabled={isUploading} className="p-1.5 text-gray-400 hover:text-purple-700 rounded-lg hover:bg-purple-100 transition-colors disabled:opacity-50">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1">
+                    {!result ? (
+                        <div className="space-y-6">
+                            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-5 rounded-xl border border-purple-100 shadow-inner">
+                                <h4 className="font-bold text-purple-900 mb-3 text-sm flex items-center gap-2">
+                                    <FileSpreadsheet size={18} className="text-purple-600" /> 
+                                    Formato del Archivo Único
+                                </h4>
+                                <p className="text-xs text-purple-800 mb-3 leading-relaxed">
+                                    Este módulo lee <b>un solo archivo</b> que contiene el catálogo maestro y los stock de todas tus sucursales.
+                                </p>
+                                <ul className="list-disc list-inside text-xs text-purple-800/90 space-y-1.5 ml-1">
+                                    <li>Las categorías que no existan <b>se crearán solas</b>.</li>
+                                    <li>Cabeceras obligatorias: <b>CODIGO CORTO</b>, <b>DESCRIPCION</b>, <b>PRECIO PUBLICO</b>, <b>CATEGORIA</b></li>
+                                    <li>Para Inyectar inventario, nombra tus cabeceras así: <b>INV_CENTRAL</b>, <b>INV_LAPAZ</b> (el nombre tras "INV_" debe coincidir con el nombre de tu sucursal).</li>
+                                </ul>
+                            </div>
+
+                            <div 
+                                {...getRootProps()} 
+                                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center min-h-[160px] relative overflow-hidden
+                                    ${isDragActive ? 'border-purple-500 bg-purple-50 shadow-inner' : 'border-gray-300 hover:border-purple-400 hover:bg-purple-50/30'}
+                                    ${isUploading ? 'opacity-80 pointer-events-none' : ''}`}
+                            >
+                                <input {...getInputProps()} />
+                                {isUploading ? (
+                                    <div className="flex flex-col items-center text-purple-600 z-10">
+                                        <Loader2 size={32} className="animate-spin mb-3" />
+                                        <p className="font-bold text-sm">Procesando Ecosistema...</p>
+                                        <p className="text-[10px] opacity-70 mt-1">Sincronizando catálogos y calculando kárdex multi-sucursal</p>
+                                    </div>
+                                ) : (
+                                    <div className="z-10 flex flex-col items-center">
+                                        <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-indigo-100 text-purple-600 rounded-full flex items-center justify-center mb-4 shadow-sm border border-purple-200">
+                                            <Upload size={24} />
+                                        </div>
+                                        <p className="font-bold text-gray-800 mb-1">Cargar Sistema Completo</p>
+                                        <p className="text-xs text-gray-500 font-medium">Arrastra el mega-excel aquí (.xlsx)</p>
+                                    </div>
+                                )}
+                                {isUploading && (
+                                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 animate-pulse"></div>
+                                )}
+                            </div>
+
+                            {error && (
+                                <div className="p-4 bg-red-50/80 text-red-700 text-sm rounded-xl border border-red-200 font-bold flex items-start gap-2 shadow-sm">
+                                    <X size={18} className="shrink-0 mt-0.5" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 p-5 rounded-2xl shadow-sm">
+                                <h4 className="font-black text-emerald-900 flex items-center gap-2 mb-4 text-base">
+                                    <Check size={20} className="text-emerald-500 bg-emerald-100 rounded-full p-1" />
+                                    Sincronización Terminada
+                                </h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                                    <div className="bg-white p-3 rounded-xl shadow-sm border border-emerald-50/50">
+                                        <div className="text-2xl font-black text-gray-800">{result.resumen.filas_leidas}</div>
+                                        <div className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-wider">Filas Leídas</div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl shadow-sm border border-emerald-50/50">
+                                        <div className="text-2xl font-black text-purple-600">{result.resumen.productos_catalogo_afectados}</div>
+                                        <div className="text-[10px] text-purple-600/80 font-bold uppercase mt-1 tracking-wider">Productos<br/>Catálogo</div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl shadow-sm border border-emerald-50/50">
+                                        <div className="text-2xl font-black text-emerald-600">{result.resumen.ajustes_inventario_generados}</div>
+                                        <div className="text-[10px] text-emerald-600/80 font-bold uppercase mt-1 tracking-wider">Ajustes de<br/>Stock Kárdex</div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl shadow-sm border border-emerald-50/50">
+                                        <div className="text-2xl font-black text-red-500">{result.errores?.length || 0}</div>
+                                        <div className="text-[10px] text-red-500/80 font-bold uppercase mt-1 tracking-wider">Errores<br/>Omitidos</div>
+                                    </div>
+                                </div>
+                                
+                                {result.resumen.detalles && result.resumen.detalles.length > 0 && (
+                                    <div className="mt-4 p-3 bg-white/60 rounded-lg border border-emerald-200/50 text-[11px] text-emerald-800 font-medium">
+                                        {result.resumen.detalles[0]}
+                                    </div>
+                                )}
+                            </div>
+
+                            {result.errores && result.errores.length > 0 && (
+                                <div className="animate-in fade-in duration-700">
+                                    <h5 className="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                        Filas con Incidencias ({result.errores.length})
+                                    </h5>
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                        <div className="max-h-[220px] overflow-y-auto bg-white hover:bg-gray-50/50 transition-colors">
+                                            <table className="w-full text-left text-xs">
+                                                <thead className="bg-gray-100/50 border-b border-gray-200 sticky top-0 backdrop-blur-md">
+                                                    <tr>
+                                                        <th className="px-4 py-2 font-bold text-gray-700 w-20 text-center">Fila n°</th>
+                                                        <th className="px-4 py-2 font-bold text-gray-700">Motivo Reportado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {result.errores.map((err: any, idx: number) => (
+                                                        <tr key={idx} className="hover:bg-red-50/50 transition-colors">
+                                                            <td className="px-4 py-2.5 text-center font-mono text-gray-600 font-bold bg-gray-50/30">{err.fila}</td>
+                                                            <td className="px-4 py-2.5 text-red-600 font-medium">{err.motivo}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end pt-4">
+                                <button onClick={onClose} className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center gap-2">
+                                    <Check size={18} />
+                                    Finalizar Módulo
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

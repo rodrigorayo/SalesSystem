@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from app.models.product import Product
 from app.models.category import Category
 from app.models.user import User, UserRole
+from app.models.sucursal import Sucursal
+from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.auth import get_current_active_user
 
 router = APIRouter()
@@ -319,6 +321,244 @@ async def import_products(
             "insertados": insertados,
             "actualizados": actualizados,
             "fallidos": fallidos
+        },
+        "errores": errores
+    }
+
+
+@router.post("/productos/importacion-global")
+async def importacion_global_excel(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Súper Endpoint a Medida: Sube el Catálogo Maestro y el Inventario Físico de TODAS las sucursales a la vez.
+    Opcional: Crea categorías al vuelo que no existan.
+    Las columnas esperadas: CODIGO CORTO (o CODIGO_CORTO), DESCRIPCION, PRECIO PUBLICO, CATEGORIA.
+    Para el inventario físico, usar la cabecera "INV_..." (ej: INV_CENTRAL).
+    """
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="No autorizado para la importación global")
+        
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Formato inválido. Solo .xlsx o .xls")
+        
+    tenant_id = current_user.tenant_id or "default"
+    
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error leyendo origen Excel: {str(e)}")
+        
+    df.columns = df.columns.astype(str).str.strip().str.upper()
+    df.columns = df.columns.str.replace(' ', '_')
+    
+    if "CATEGORIA" not in df.columns:
+        raise HTTPException(status_code=400, detail="Falta columna obligatoria: CATEGORIA")
+        
+    nombres_categorias_excel = df['CATEGORIA'].dropna().unique()
+    
+    # 1. CATEGORÍAS
+    categorias_db = await Category.find(Category.tenant_id == tenant_id).to_list()
+    cat_map = {c.name.strip().upper(): c for c in categorias_db}
+    
+    categorias_a_insertar = []
+    for cat_name in nombres_categorias_excel:
+        cat_key = str(cat_name).strip().upper()
+        if cat_key and cat_key not in cat_map:
+            nueva_cat = Category(tenant_id=tenant_id, name=str(cat_name).strip().capitalize(), is_active=True)
+            categorias_a_insertar.append(nueva_cat)
+            cat_map[cat_key] = nueva_cat
+            
+    if categorias_a_insertar:
+        await Category.insert_many(categorias_a_insertar)
+        
+    # 2. SUCURSALES (Multi-stock)
+    sucursales_db = await Sucursal.find(Sucursal.tenant_id == tenant_id, fetch_links=True).to_list()
+    suc_map = {}
+    for s in sucursales_db:
+        clean_name = s.nombre.replace(" ", "").upper()
+        suc_map[clean_name] = str(s.id)
+    suc_map["CENTRAL"] = "CENTRAL" # Fallback mapping
+    
+    inv_columns = [col for col in df.columns if col.startswith("INV_")]
+    col_to_sucursal_id = {}
+    
+    for col in inv_columns:
+        suc_name = col.replace("INV_", "").replace(" ", "").upper()
+        if suc_name in suc_map:
+            col_to_sucursal_id[col] = suc_map[suc_name]
+            
+    # 3. PROCESAR CATÁLOGO E INVENTARIO
+    productos_db = await Product.find(Product.tenant_id == tenant_id).to_list()
+    prod_map = {p.codigo_corto: p for p in productos_db if p.codigo_corto}
+    
+    inventarios_db = await Inventario.find(Inventario.tenant_id == tenant_id).to_list()
+    inv_map = {}
+    for i in inventarios_db:
+        if i.sucursal_id not in inv_map:
+            inv_map[i.sucursal_id] = {}
+        inv_map[i.sucursal_id][str(i.producto_id)] = i
+
+    operaciones_catalogo = []
+    productos_a_insertar = []
+    operaciones_inventario = []
+    logs_inventario = []
+    
+    errores = []
+    procesados = 0
+    cat_procesados = 0
+    inv_procesados = 0
+    
+    from bson import ObjectId
+    
+    for index, row in df.iterrows():
+        procesados += 1
+        fila_num = index + 2
+        
+        # CODIGO CORTO validation
+        codigo_corto = str(row.get("CODIGO_CORTO", row.get("CODIGOCORTO", ""))).strip()
+        if codigo_corto == "nan" or not codigo_corto:
+             codigo_corto = str(row.get("CODIGO", "")).strip()
+             
+        if not codigo_corto or codigo_corto == "nan":
+            errores.append({"fila": fila_num, "motivo": "Falta CODIGO o CODIGO CORTO"})
+            continue
+            
+        descripcion = str(row.get("DESCRIPCION", "")).strip()
+        
+        # Parse precios safely
+        def safe_float(val):
+            try:
+                return float(val) if pd.notnull(val) else 0.0
+            except: return 0.0
+            
+        precio_publico = safe_float(row.get("PRECIO_PUBLICO", 0))
+        costo_unitario = safe_float(row.get("COSTO_UNITARIO", 0))
+        codigo_largo = str(row.get("CODIGO", "")).strip()
+        if codigo_largo == "nan": codigo_largo = ""
+        
+        cat_str = str(row.get("CATEGORIA", "")).strip().upper()
+        categoria_id = str(cat_map.get(cat_str).id) if cat_str in cat_map else None
+        
+        product_id = ""
+        
+        # -- CATÁLOGO UPSERT --
+        if codigo_corto in prod_map:
+            # Producto existe: Se actualiza
+            p = prod_map[codigo_corto]
+            product_id = str(p.id)
+            # Evitar sobreescribir con valores nulos si no vienen en este excel
+            update_fields = {}
+            if descripcion: update_fields["descripcion"] = descripcion
+            if precio_publico > 0: update_fields["precio_venta"] = precio_publico
+            if costo_unitario > 0: update_fields["costo_producto"] = costo_unitario
+            if categoria_id: update_fields["categoria_id"] = categoria_id
+            if codigo_largo: update_fields["codigo_largo"] = codigo_largo
+            
+            if update_fields:
+                operaciones_catalogo.append(
+                    UpdateOne({"_id": p.id}, {"$set": update_fields})
+                )
+            cat_procesados += 1
+            
+        else:
+            # Producto nuevo: Se inserta
+            new_object_id = ObjectId()
+            product_id = str(new_object_id)
+            nuevo_prod = Product(
+                id=new_object_id,
+                tenant_id=tenant_id,
+                descripcion=descripcion or "S/N",
+                precio_venta=precio_publico,
+                costo_producto=costo_unitario,
+                categoria_id=categoria_id,
+                codigo_corto=codigo_corto,
+                codigo_sistema=str(uuid.uuid4())[:8].upper(),
+                codigo_largo=codigo_largo,
+                is_active=True
+            )
+            productos_a_insertar.append(nuevo_prod)
+            prod_map[codigo_corto] = nuevo_prod
+            cat_procesados += 1
+            
+        # -- INVENTARIO UPSERT --
+        for col in inv_columns:
+            if col in col_to_sucursal_id:
+                suc_val = col_to_sucursal_id[col]
+                valor_celda = row.get(col, 0)
+                
+                try:
+                    cantidad_fisica = float(valor_celda) if pd.notnull(valor_celda) else 0.0
+                except:
+                    cantidad_fisica = 0.0
+                    
+                stock_anterior = 0.0
+                if suc_val in inv_map and product_id in inv_map[suc_val]:
+                    stock_anterior = inv_map[suc_val][product_id].cantidad
+                    
+                # Sólo ajustar si el excel marca una cantidad diferente al stock en bd
+                if cantidad_fisica != stock_anterior:
+                    diff = cantidad_fisica - stock_anterior
+                    
+                    operaciones_inventario.append(
+                        UpdateOne(
+                            {
+                                "tenant_id": tenant_id,
+                                "sucursal_id": suc_val,
+                                "producto_id": product_id
+                            },
+                            {
+                                "$setOnInsert": {
+                                    "tenant_id": tenant_id,
+                                    "sucursal_id": suc_val,
+                                    "producto_id": product_id,
+                                    "precio_sucursal": None
+                                },
+                                "$inc": {"cantidad": diff},
+                                "$currentDate": {"updated_at": True}
+                            },
+                            upsert=True
+                        )
+                    )
+                    
+                    logs_inventario.append(InventoryLog(
+                        tenant_id=tenant_id,
+                        sucursal_id=suc_val,
+                        producto_id=product_id,
+                        tipo_movimiento=TipoMovimiento.AJUSTE_FISICO,
+                        cantidad_movida=diff,
+                        stock_resultante=cantidad_fisica,
+                        usuario_id=str(current_user.id),
+                        usuario_nombre=current_user.full_name or current_user.username,
+                        notas="Súper Importación: Auto-Ajuste desde Excel A Medida."
+                    ))
+                    inv_procesados += 1
+
+    # EJECUTAR TODOS LOS BULK
+    if productos_a_insertar:
+        await Product.insert_many(productos_a_insertar)
+        
+    if operaciones_catalogo:
+        col_prod = getattr(Product, "get_motor_collection", Product.get_pymongo_collection)()
+        await col_prod.bulk_write(operaciones_catalogo)
+        
+    if logs_inventario:
+        await InventoryLog.insert_many(logs_inventario)
+        
+    if operaciones_inventario:
+        col_inv = getattr(Inventario, "get_motor_collection", Inventario.get_pymongo_collection)()
+        await col_inv.bulk_write(operaciones_inventario)
+        
+    sucess_msg = [f"Sucursales vinculadas a columnas Excel: {list({k: v for k, v in col_to_sucursal_id.items()}.keys())}"]
+    
+    return {
+        "resumen": {
+            "filas_leidas": procesados,
+            "productos_catalogo_afectados": cat_procesados,
+            "ajustes_inventario_generados": inv_procesados,
+            "detalles": sucess_msg
         },
         "errores": errores
     }

@@ -93,6 +93,34 @@ export const importProductsExcel = async (file: File) => {
     return response.json();
 };
 
+export const importGlobalExcel = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+        
+    const response = await fetch(`${CACHE_URL}/productos/importacion-global`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    
+    if (!response.ok) {
+        let errMsg = 'Error en la importación global';
+        try {
+            const errData = await response.json();
+            errMsg = errData.detail || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    
+    return response.json();
+};
+
+
 // ─── Inventario ───────────────────────────────────────────────────────────
 export const getInventario = (sucursal_id = 'CENTRAL') =>
     client<InventarioItem[]>(`/inventario?sucursal_id=${sucursal_id}`);
