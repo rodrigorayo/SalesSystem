@@ -134,7 +134,23 @@ async def delete_tenant(tenant_id: str, current_user: User = Depends(get_current
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
         
-    # Hard delete the tenant for MVP cleanup (deletes only the tenant document, 
-    # to be safe cascading can be implemented later)
+    # Hard delete the tenant for MVP cleanup
     await tenant.delete()
-    return {"message": "Tenant deleted successfully"}
+    
+    # Cascade delete all related entities so credentials and codes are freed
+    from app.models.user import User
+    from app.models.product import Product
+    from app.models.category import Category
+    from app.models.sucursal import Sucursal
+    from app.models.inventario import Inventario, InventoryLog
+    from app.models.sale import Sale
+    
+    await User.find(User.tenant_id == tenant_id).delete()
+    await Sucursal.find(Sucursal.tenant_id == tenant_id).delete()
+    await Category.find(Category.tenant_id == tenant_id).delete()
+    await Product.find(Product.tenant_id == tenant_id).delete()
+    await Inventario.find(Inventario.tenant_id == tenant_id).delete()
+    await InventoryLog.find(InventoryLog.tenant_id == tenant_id).delete()
+    await Sale.find(Sale.tenant_id == tenant_id).delete()
+
+    return {"message": "Tenant and all associated data deleted successfully"}
