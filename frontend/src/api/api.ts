@@ -180,6 +180,33 @@ export const importInventoryExcel = async (sucursal_id: string, file: File) => {
     return response.json();
 };
 
+export const importInventoryBranchExcel = async (sucursal_id: string, file: File) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${CACHE_URL}/inventario/sincronizar-sucursal?sucursal_id=${sucursal_id}`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    
+    if (!response.ok) {
+        let errMsg = 'Error en la sincronización';
+        try {
+            const errData = await response.json();
+            errMsg = errData.detail || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    
+    return response.json();
+};
+
 // ─── Pedidos Internos ─────────────────────────────────────────────────────
 export const getPedidos = (sucursal_id?: string, estado?: string) => {
     const params = new URLSearchParams();

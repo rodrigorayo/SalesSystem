@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryExcel } from '../api/api';
+import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
@@ -507,7 +507,7 @@ function ImportInventoryModal({ onClose, sucursalId }: { onClose: () => void, su
         setIsUploading(true);
         setError(null);
         try {
-            const data = await importInventoryExcel(sucursalId, file);
+            const data = await importInventoryBranchExcel(sucursalId, file);
             setResult(data);
             queryClient.invalidateQueries({ queryKey: ['inventario', sucursalId] });
             queryClient.invalidateQueries({ queryKey: ['movimientos', sucursalId] });
@@ -559,9 +559,9 @@ function ImportInventoryModal({ onClose, sucursalId }: { onClose: () => void, su
                                     <FileSpreadsheet size={16} /> Instrucciones de Conteo
                                 </h4>
                                 <ol className="list-decimal list-inside text-[11px] text-emerald-800 space-y-1.5">
-                                    <li>Descarga la plantilla dinámica. Esta ya contiene tu inventario esperado basado en la Matriz.</li>
-                                    <li>Abre tu Excel y completa <b>SÓLO</b> la columna <b>cantidad_fisica</b> con el stock real.</li>
-                                    <li>Asegúrate de no borrar las cabeceras originales (`codigo_corto`, `cantidad_fisica`).</li>
+                                    <li>Descarga la plantilla o usa el archivo maestro proporcionado por la Central (ej. <b>test1.xlsx</b>).</li>
+                                    <li>Ubica la columna que lleva el nombre de tu sucursal (ej. <b>INVENTARIO FISICO LA PAZ</b>).</li>
+                                    <li>Asegúrate de llenar sólo las celdas de tu columna y vuelve a subir el archivo.</li>
                                 </ol>
                                 <button onClick={handleDownloadTemplate} className="mt-4 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
                                     <Download size={14} />
