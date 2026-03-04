@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Loader2, Package, Image as ImageIcon, Check, X, Tag } from 'lucide-react';
-import { getProducts, getCategories, createProduct, updateProduct } from '../api/api';
+import { Plus, Search, Edit2, Loader2, Package, Image as ImageIcon, Check, X, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { getProducts, getCategories, createProduct, updateProduct, exportProductTemplate, importProductsExcel } from '../api/api';
+import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { Product, Category, ProductCreate } from '../api/types';
 
@@ -11,6 +12,7 @@ export default function CatalogoPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const { data: products = [], isLoading: loadingProducts } = useQuery({
@@ -53,10 +55,16 @@ export default function CatalogoPage() {
                     <p className="text-sm text-gray-500 mt-1">Gestión centralizada de productos e información base.</p>
                 </div>
                 {isEditor && (
-                    <button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-sm transition-colors">
-                        <Plus size={18} />
-                        <span>Nuevo Producto</span>
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsImportModalOpen(true)} className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-sm transition-colors">
+                            <FileSpreadsheet size={18} className="text-emerald-600" />
+                            <span className="hidden sm:inline">Importar</span>
+                        </button>
+                        <button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-sm transition-colors">
+                            <Plus size={18} />
+                            <span className="hidden sm:inline">Nuevo Producto</span>
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -168,7 +176,7 @@ export default function CatalogoPage() {
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Modals */}
             {isModalOpen && (
                 <ProductModal
                     isOpen={isModalOpen}
@@ -177,6 +185,183 @@ export default function CatalogoPage() {
                     categories={categories}
                 />
             )}
+            
+            {isImportModalOpen && (
+                <ImportModal onClose={() => setIsImportModalOpen(false)} />
+            )}
+        </div>
+    );
+}
+
+function ImportModal({ onClose }: { onClose: () => void }) {
+    const queryClient = useQueryClient();
+    const [isUploading, setIsUploading] = useState(false);
+    const [result, setResult] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const onDrop = async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        setError(null);
+        try {
+            const data = await importProductsExcel(file);
+            setResult(data);
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['tenant_stats'] });
+        } catch (err: any) {
+            setError(err.message || 'Error al procesar el archivo');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+            'application/vnd.ms-excel': ['.xls']
+        },
+        maxFiles: 1,
+        disabled: isUploading || !!result
+    });
+
+    const handleDownloadTemplate = async () => {
+        try {
+            await exportProductTemplate();
+        } catch (err) {
+            alert("Error descargando plantilla");
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <FileSpreadsheet size={20} className="text-emerald-600" />
+                        Importación Masiva
+                    </h3>
+                    <button onClick={onClose} disabled={isUploading} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1">
+                    {!result ? (
+                        <div className="space-y-6">
+                            <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                                <h4 className="font-semibold text-blue-900 mb-2">Instrucciones</h4>
+                                <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1.5 ml-1">
+                                    <li>Descarga la plantilla dinámica. Contiene tus categorías pre-cargadas para guiarte.</li>
+                                    <li>Llena tus productos sin modificar el nombre de las columnas.</li>
+                                    <li>Las columnas con asterisco (*) son obligatorias en tu mente (código y nombre mínimo).</li>
+                                    <li>Sube el archivo aquí. El sistema detectará si hay que crear o actualizar según el <b>código_corto</b>.</li>
+                                </ol>
+                                <button onClick={handleDownloadTemplate} className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+                                    <Download size={16} />
+                                    Descargar Plantilla
+                                </button>
+                            </div>
+
+                            <div 
+                                {...getRootProps()} 
+                                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center min-h-[160px]
+                                    ${isDragActive ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300 hover:border-emerald-400 hover:bg-gray-50'}
+                                    ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
+                                <input {...getInputProps()} />
+                                {isUploading ? (
+                                    <div className="flex flex-col items-center text-emerald-600">
+                                        <Loader2 size={32} className="animate-spin mb-3" />
+                                        <p className="font-medium">Procesando y validando productos...</p>
+                                        <p className="text-xs text-emerald-600/70 mt-1">Dependiendo del tamaño, esto puede tardar unos segundos.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-3 text-emerald-600">
+                                            <Upload size={24} />
+                                        </div>
+                                        <p className="font-semibold text-gray-700 mb-1">Haz clic o arrastra tu archivo Excel aquí</p>
+                                        <p className="text-sm text-gray-500">Formato .xlsx o .xls, máximo 5MB</p>
+                                    </>
+                                )}
+                            </div>
+
+                            {error && (
+                                <div className="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 font-medium flex items-start gap-2">
+                                    <X size={18} className="shrink-0 mt-0.5" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-xl">
+                                <h4 className="font-bold text-emerald-900 flex items-center gap-2 mb-3">
+                                    <Check size={20} className="text-emerald-600" />
+                                    Proceso Completado
+                                </h4>
+                                <div className="grid grid-cols-4 gap-4 text-center">
+                                    <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-sm">
+                                        <div className="text-2xl font-black text-gray-900">{result.resumen.procesados}</div>
+                                        <div className="text-xs text-gray-500 font-medium uppercase mt-1">Procesados</div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-sm">
+                                        <div className="text-2xl font-black text-emerald-600">{result.resumen.insertados}</div>
+                                        <div className="text-xs text-emerald-600/70 font-medium uppercase mt-1">Nuevos</div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-sm">
+                                        <div className="text-2xl font-black text-blue-600">{result.resumen.actualizados}</div>
+                                        <div className="text-xs text-blue-600/70 font-medium uppercase mt-1">Actualizados</div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-sm">
+                                        <div className="text-2xl font-black text-red-600">{result.resumen.fallidos}</div>
+                                        <div className="text-xs text-red-600/70 font-medium uppercase mt-1">Omitidos</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {result.errores && result.errores.length > 0 && (
+                                <div>
+                                    <h5 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                        Detalle de Errores ({result.errores.length})
+                                    </h5>
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                        <div className="max-h-[300px] overflow-y-auto bg-white">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-4 py-2 font-semibold text-gray-600 w-20 text-center">Fila Excel</th>
+                                                        <th className="px-4 py-2 font-semibold text-gray-600">Motivo del Error</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {result.errores.map((err: any, idx: number) => (
+                                                        <tr key={idx} className="hover:bg-red-50/30">
+                                                            <td className="px-4 py-3 text-center font-mono text-gray-500">{err.fila}</td>
+                                                            <td className="px-4 py-3 text-red-600 font-medium">{err.motivo}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">Corrija únicamente estas filas en su archivo original y vuelva a subirlas.</p>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end pt-2">
+                                <button onClick={onClose} className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-colors shadow-sm">
+                                    Cerrar y Volver
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

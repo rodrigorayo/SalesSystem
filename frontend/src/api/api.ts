@@ -45,6 +45,54 @@ export const createProduct = (data: ProductCreate) => client<Product>('/products
 export const updateProduct = (id: string, data: ProductCreate) =>
     client<Product>(`/products/${id}`, { method: 'PUT', body: data });
 
+export const exportProductTemplate = async () => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+    const response = await fetch(`${CACHE_URL}/productos/exportar-plantilla`, {
+        method: 'GET',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!response.ok) throw new Error('Error al descargar la plantilla');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'plantilla_productos.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+};
+
+export const importProductsExcel = async (file: File) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${CACHE_URL}/productos/importar`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    
+    if (!response.ok) {
+        let errMsg = 'Error en la importación';
+        try {
+            const errData = await response.json();
+            errMsg = errData.detail || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    
+    return response.json();
+};
+
 // ─── Inventario ───────────────────────────────────────────────────────────
 export const getInventario = (sucursal_id = 'CENTRAL') =>
     client<InventarioItem[]>(`/inventario?sucursal_id=${sucursal_id}`);
@@ -54,6 +102,54 @@ export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: 
     const params = new URLSearchParams({ sucursal_id });
     if (producto_id) params.set('producto_id', producto_id);
     return client<InventoryLog[]>(`/inventario/movimientos?${params.toString()}`);
+};
+
+export const exportInventoryTemplate = async (sucursal_id: string) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+    const response = await fetch(`${CACHE_URL}/inventario/exportar-plantilla?sucursal_id=${sucursal_id}`, {
+        method: 'GET',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!response.ok) throw new Error('Error al descargar la plantilla');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `plantilla_inventario_${sucursal_id}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+};
+
+export const importInventoryExcel = async (sucursal_id: string, file: File) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${CACHE_URL}/inventario/importar?sucursal_id=${sucursal_id}`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    
+    if (!response.ok) {
+        let errMsg = 'Error en la importación';
+        try {
+            const errData = await response.json();
+            errMsg = errData.detail || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    
+    return response.json();
 };
 
 // ─── Pedidos Internos ─────────────────────────────────────────────────────

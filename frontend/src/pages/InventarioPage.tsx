@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag } from 'lucide-react';
-import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio } from '../api/api';
+import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryExcel } from '../api/api';
+import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 
@@ -36,6 +37,7 @@ export default function InventarioPage() {
     // Modals State
     const [adjItem, setAdjItem] = useState<{ id: string, name: string } | null>(null);
     const [priceReqItem, setPriceReqItem] = useState<{ id: string, name: string, currentPrice: number } | null>(null);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     const filteredInv = useMemo(() => {
         if (!searchTerm) return inventario;
@@ -77,33 +79,44 @@ export default function InventarioPage() {
             </div>
 
             {/* Toolbar (Buscador + Tabs) */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                    <input
-                        type="text"
-                        placeholder="Buscar producto..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 bg-white text-gray-900 border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg outline-none transition-all text-xs font-medium shadow-sm"
-                    />
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-3 w-full">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                        <input
+                            type="text"
+                            placeholder="Buscar producto..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 bg-white text-gray-900 border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg outline-none transition-all text-xs font-medium shadow-sm"
+                        />
+                    </div>
+                    <div className="bg-white p-1 rounded-lg shadow-sm border border-gray-100 inline-flex">
+                        <button
+                            onClick={() => setTab('stock')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === 'stock' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                        >
+                            <Warehouse size={14} className={tab === 'stock' ? 'text-indigo-600' : 'text-gray-400'} />
+                            <span>Stock Actual</span>
+                        </button>
+                        <button
+                            onClick={() => setTab('kardex')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === 'kardex' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                        >
+                            <History size={14} className={tab === 'kardex' ? 'text-indigo-600' : 'text-gray-400'} />
+                            <span>Kárdex (Movimientos)</span>
+                        </button>
+                    </div>
                 </div>
-                <div className="bg-white p-1 rounded-lg shadow-sm border border-gray-100 inline-flex">
-                    <button
-                        onClick={() => setTab('stock')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === 'stock' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                {tab === 'stock' && (
+                    <button 
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap"
                     >
-                        <Warehouse size={14} className={tab === 'stock' ? 'text-indigo-600' : 'text-gray-400'} />
-                        <span>Stock Actual</span>
+                        <FileSpreadsheet size={14} />
+                        Importar Conteo Excel
                     </button>
-                    <button
-                        onClick={() => setTab('kardex')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === 'kardex' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                    >
-                        <History size={14} className={tab === 'kardex' ? 'text-indigo-600' : 'text-gray-400'} />
-                        <span>Kárdex (Movimientos)</span>
-                    </button>
-                </div>
+                )}
             </div>
 
             {tab === 'stock' && (
@@ -293,6 +306,10 @@ export default function InventarioPage() {
                     onSuccess={handleAjusteSuccess}
                 />
             )}
+
+            {isImportModalOpen && (
+                <ImportInventoryModal onClose={() => setIsImportModalOpen(false)} sucursalId={selectedSucursal} />
+            )}
         </div>
     );
 }
@@ -472,6 +489,177 @@ function AjusteModal({ onClose, sucursalId, productoId, productoNombre, onSucces
                         Confirmar Movimiento
                     </button>
                 </form>
+            </div>
+        </div>
+    );
+}
+
+function ImportInventoryModal({ onClose, sucursalId }: { onClose: () => void, sucursalId: string }) {
+    const queryClient = useQueryClient();
+    const [isUploading, setIsUploading] = useState(false);
+    const [result, setResult] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const onDrop = async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        setError(null);
+        try {
+            const data = await importInventoryExcel(sucursalId, file);
+            setResult(data);
+            queryClient.invalidateQueries({ queryKey: ['inventario', sucursalId] });
+            queryClient.invalidateQueries({ queryKey: ['movimientos', sucursalId] });
+        } catch (err: any) {
+            setError(err.message || 'Error al procesar el conteo físico');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+            'application/vnd.ms-excel': ['.xls']
+        },
+        maxFiles: 1,
+        disabled: isUploading || !!result
+    });
+
+    const handleDownloadTemplate = async () => {
+        try {
+            await exportInventoryTemplate(sucursalId);
+        } catch (err) {
+            alert("Error descargando plantilla de inventario");
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
+                    <div>
+                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <Warehouse size={18} className="text-emerald-600" />
+                            Importar Conteo de Inventario
+                        </h3>
+                    </div>
+                    <button onClick={onClose} disabled={isUploading} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1">
+                    {!result ? (
+                        <div className="space-y-6">
+                            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                                <h4 className="font-semibold text-emerald-900 mb-2 text-sm flex items-center gap-1.5">
+                                    <FileSpreadsheet size={16} /> Instrucciones de Conteo
+                                </h4>
+                                <ol className="list-decimal list-inside text-[11px] text-emerald-800 space-y-1.5">
+                                    <li>Descarga la plantilla dinámica. Esta ya contiene tu inventario esperado basado en la Matriz.</li>
+                                    <li>Abre tu Excel y completa <b>SÓLO</b> la columna <b>cantidad_fisica</b> con el stock real.</li>
+                                    <li>Asegúrate de no borrar las cabeceras originales (`codigo_corto`, `cantidad_fisica`).</li>
+                                </ol>
+                                <button onClick={handleDownloadTemplate} className="mt-4 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
+                                    <Download size={14} />
+                                    Descargar Plantilla Actual
+                                </button>
+                            </div>
+
+                            <div 
+                                {...getRootProps()} 
+                                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center min-h-[140px]
+                                    ${isDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30'}
+                                    ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
+                                <input {...getInputProps()} />
+                                {isUploading ? (
+                                    <div className="flex flex-col items-center text-indigo-600">
+                                        <Loader2 size={24} className="animate-spin mb-2" />
+                                        <p className="font-medium text-xs">Ajustando inventario y generando Kárdex...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="w-10 h-10 bg-indigo-100/50 text-indigo-500 rounded-lg flex items-center justify-center mb-3">
+                                            <Upload size={20} />
+                                        </div>
+                                        <p className="font-semibold text-gray-700 mb-1 text-sm">Arrastra tu archivo aquí</p>
+                                        <p className="text-xs text-gray-400">Sólo formatos .xlsx o .xls</p>
+                                    </>
+                                )}
+                            </div>
+
+                            {error && (
+                                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 font-bold flex items-start gap-1.5">
+                                    <X size={14} className="shrink-0 mt-0.5" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
+                            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl">
+                                <h4 className="font-bold text-indigo-900 flex items-center gap-2 mb-3 text-sm">
+                                    <Check size={16} className="text-indigo-600" />
+                                    Importación Finalizada
+                                </h4>
+                                <div className="grid grid-cols-3 gap-3 text-center">
+                                    <div className="bg-white p-2.5 rounded-lg shadow-sm border border-indigo-50">
+                                        <div className="text-xl font-black text-gray-800">{result.resumen.procesados}</div>
+                                        <div className="text-[9px] text-gray-500 font-bold uppercase mt-1 tracking-wider">Productos Leídos</div>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg shadow-sm border border-indigo-50">
+                                        <div className="text-xl font-black text-emerald-600">{result.resumen.actualizados}</div>
+                                        <div className="text-[9px] text-emerald-600/80 font-bold uppercase mt-1 tracking-wider">Ajustes Realizados</div>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg shadow-sm border border-indigo-50">
+                                        <div className="text-xl font-black text-red-500">{result.resumen.fallidos}</div>
+                                        <div className="text-[9px] text-red-500/80 font-bold uppercase mt-1 tracking-wider">Errores Listados</div>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-indigo-600/70 mt-3 font-medium">Nota: Si la diferencia con el sistema era 0, esos productos no sufrieron ajustes ni se listaron como errores.</p>
+                            </div>
+
+                            {result.errores && result.errores.length > 0 && (
+                                <div className="animate-in fade-in duration-500">
+                                    <h5 className="font-bold text-gray-900 mb-2 text-xs flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                        Detalle de Filas Omitidas ({result.errores.length})
+                                    </h5>
+                                    <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                                        <div className="max-h-[200px] overflow-y-auto bg-white">
+                                            <table className="w-full text-left text-[10px]">
+                                                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-3 py-1.5 font-bold text-gray-600 w-16 text-center">Fila n°</th>
+                                                        <th className="px-3 py-1.5 font-bold text-gray-600">Motivo Detectado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {result.errores.map((err: any, idx: number) => (
+                                                        <tr key={idx} className="hover:bg-red-50/20">
+                                                            <td className="px-3 py-2 text-center font-mono text-gray-500 font-bold">{err.fila}</td>
+                                                            <td className="px-3 py-2 text-red-600 font-semibold">{err.motivo}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end pt-2">
+                                <button onClick={onClose} className="px-5 py-2 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-lg text-xs transition-colors shadow-sm active:scale-95">
+                                    Aceptar y Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
