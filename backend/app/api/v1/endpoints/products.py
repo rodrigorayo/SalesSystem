@@ -375,18 +375,22 @@ async def importacion_global_excel(
         await Category.insert_many(categorias_a_insertar)
         
     # 2. SUCURSALES (Multi-stock)
-    sucursales_db = await Sucursal.find(Sucursal.tenant_id == tenant_id, fetch_links=True).to_list()
+    sucursales_db = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
     suc_map = {}
     for s in sucursales_db:
         clean_name = s.nombre.replace(" ", "").upper()
         suc_map[clean_name] = str(s.id)
     suc_map["CENTRAL"] = "CENTRAL" # Fallback mapping
     
-    inv_columns = [col for col in df.columns if col.startswith("INV_")]
+    inv_columns = [col for col in df.columns if col.startswith("INV_") or col.startswith("INVENTARIO_")]
     col_to_sucursal_id = {}
     
     for col in inv_columns:
-        suc_name = col.replace("INV_", "").replace(" ", "").upper()
+        if col.startswith("INV_"):
+            suc_name = col.replace("INV_", "").replace(" ", "").upper()
+        else:
+            suc_name = col.replace("INVENTARIO_FISICO_", "").replace("INVENTARIO_", "").replace("_", "").replace("\n", "").replace(" ", "").upper()
+            
         if suc_name in suc_map:
             col_to_sucursal_id[col] = suc_map[suc_name]
             
@@ -440,7 +444,7 @@ async def importacion_global_excel(
         if codigo_largo == "nan": codigo_largo = ""
         
         cat_str = str(row.get("CATEGORIA", "")).strip().upper()
-        categoria_id = str(cat_map.get(cat_str).id) if cat_str in cat_map else None
+        categoria_id = str(cat_map.get(cat_str).id) if (cat_str in cat_map and cat_map[cat_str].id) else None
         
         product_id = ""
         
@@ -528,8 +532,8 @@ async def importacion_global_excel(
                         sucursal_id=suc_val,
                         producto_id=product_id,
                         tipo_movimiento=TipoMovimiento.AJUSTE_FISICO,
-                        cantidad_movida=diff,
-                        stock_resultante=cantidad_fisica,
+                        cantidad_movida=int(diff),
+                        stock_resultante=int(cantidad_fisica),
                         usuario_id=str(current_user.id),
                         usuario_nombre=current_user.full_name or current_user.username,
                         notas="Súper Importación: Auto-Ajuste desde Excel A Medida."
