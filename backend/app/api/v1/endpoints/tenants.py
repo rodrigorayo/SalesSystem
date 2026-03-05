@@ -56,8 +56,9 @@ async def create_tenant(tenant_in: TenantCreate, current_user: User = Depends(ge
         raise HTTPException(status_code=400, detail="Tenant name already exists")
     
     # Check if admin user exists
+    import re
     admin_username_lower = tenant_in.admin_username.lower()
-    if await User.find_one({"username": {"$regex": f"^{admin_username_lower}$", "$options": "i"}}):
+    if await User.find_one({"username": re.compile(f"^{admin_username_lower}$", re.IGNORECASE)}):
         raise HTTPException(status_code=400, detail="Admin username already exists")
 
     # Create Tenant

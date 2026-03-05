@@ -75,7 +75,7 @@ async def create_sucursal(
 
     # Validate username is not taken
     admin_username_lower = data.admin_username.lower()
-    if await User.find_one({"username": {"$regex": f"^{admin_username_lower}$", "$options": "i"}}):
+    if await User.find_one({"username": re.compile(f"^{admin_username_lower}$", re.IGNORECASE)}):
         raise HTTPException(status_code=400, detail=f"Username '{data.admin_username}' already exists")
 
     # 1. Create the Sucursal

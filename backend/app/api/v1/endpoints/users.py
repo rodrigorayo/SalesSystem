@@ -78,8 +78,9 @@ async def create_cajero(
     if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    import re
     username_lower = data.username.lower()
-    if await User.find_one({"username": {"$regex": f"^{username_lower}$", "$options": "i"}}):
+    if await User.find_one({"username": re.compile(f"^{username_lower}$", re.IGNORECASE)}):
         raise HTTPException(status_code=400, detail="Username already exists")
 
     # Strict injection from JWT — client cannot override this
