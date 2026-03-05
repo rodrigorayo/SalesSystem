@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTenantStats, getProducts, getUsers, getCategories, createProduct, updateProduct, createEmployee } from '../api/api';
-import { Plus, Users, Package, DollarSign, Store, ShoppingBag, Loader2, X, Upload, ImageIcon } from 'lucide-react';
+import { Plus, Users, Package, DollarSign, Store, ShoppingBag, Loader2, X, Upload, ImageIcon, KeyRound, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import type { Product, ProductCreate, EmployeeCreate } from '../api/types';
 import { Link } from 'react-router-dom';
 import { BASE_URL } from '../api/client';
+import PasswordField from '../components/PasswordField';
 
 const BLANK_PRODUCT: ProductCreate = {
     descripcion: '', categoria_id: '', precio_venta: 0, costo_producto: 0,
@@ -20,6 +21,9 @@ export default function TenantDashboard() {
     const [productForm, setProductForm] = useState<ProductCreate>(BLANK_PRODUCT);
     const [employeeForm, setEmployeeForm] = useState<EmployeeCreate>({ username: '', password: '', full_name: '', email: '' });
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [credentials, setCredentials] = useState<{ username: string; password: string; full_name: string } | null>(null);
+    const [copied, setCopied] = useState(false);
 
     const { data: stats } = useQuery({ queryKey: ['tenant-stats'], queryFn: getTenantStats });
     const { data: products, isLoading: loadingProducts } = useQuery({ queryKey: ['products'], queryFn: getProducts });
@@ -47,9 +51,12 @@ export default function TenantDashboard() {
 
     const createEmployeeMutation = useMutation({
         mutationFn: (data: EmployeeCreate) => createEmployee(data),
-        onSuccess: () => {
+        onSuccess: (_, vars) => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
+            setCredentials({ username: vars.username, password: vars.password!, full_name: vars.full_name });
+            setShowEmployeeModal(false);
             setEmployeeForm({ username: '', password: '', full_name: '', email: '' });
+            setConfirmPassword('');
         },
     });
 
@@ -90,11 +97,61 @@ export default function TenantDashboard() {
         }
     };
 
+    const handleCopy = () => {
+        if (!credentials) return;
+        navigator.clipboard.writeText(`Cajero: ${credentials.full_name}\nUsuario: ${credentials.username}\nContraseña: ${credentials.password}`);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     const pf = (key: keyof ProductCreate, val: string | number) =>
         setProductForm(f => ({ ...f, [key]: val }));
 
+    const canSubmitEmployee = employeeForm.password === confirmPassword && employeeForm.password!.length >= 8;
+
     return (
-        <div className="max-w-7xl mx-auto p-4 space-y-4">
+        <div className="max-w-7xl mx-auto p-4 space-y-4 relative">
+
+            {/* ── Credentials Modal ─────────────────────────────────────── */}
+            {credentials && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                                <KeyRound size={20} className="text-amber-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Cajero creado</h2>
+                                <p className="text-sm text-gray-500">{credentials.full_name}</p>
+                            </div>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                            <div className="flex items-start gap-2 text-amber-800 text-sm mb-3">
+                                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                                <span>Guarda estas credenciales ahora. La contraseña no se mostrará nuevamente.</span>
+                            </div>
+                            <div className="space-y-2">
+                                {[{ label: 'Usuario', val: credentials.username }, { label: 'Contraseña', val: credentials.password }].map(({ label, val }) => (
+                                    <div key={label} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-200">
+                                        <span className="text-xs text-gray-500">{label}</span>
+                                        <span className="font-mono font-semibold text-gray-900">{val}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={handleCopy}
+                                className="flex items-center gap-2 flex-1 justify-center bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 rounded-xl text-sm font-medium transition-colors">
+                                {copied ? <><Check size={16} className="text-green-600" /> Copiado</> : <><Copy size={16} /> Copiar</>}
+                            </button>
+                            <button onClick={() => setCredentials(null)}
+                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl text-sm font-medium transition-colors">
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             <div className="flex justify-between items-end">
                 <div>
@@ -305,21 +362,33 @@ export default function TenantDashboard() {
                             <h2 className="text-2xl font-bold text-gray-900">Nuevo Cajero</h2>
                             <button onClick={() => setShowEmployeeModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"><X size={20} /></button>
                         </div>
-                        <form onSubmit={e => { e.preventDefault(); createEmployeeMutation.mutate(employeeForm); }} className="space-y-4">
-                            <input type="text" placeholder="Nombre Completo" required
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
-                                value={employeeForm.full_name} onChange={e => setEmployeeForm({ ...employeeForm, full_name: e.target.value })} />
-                            <input type="text" placeholder="Usuario para Login" required
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
-                                value={employeeForm.username} onChange={e => setEmployeeForm({ ...employeeForm, username: e.target.value })} />
-                            <input type="email" placeholder="Correo Electrónico" required
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
-                                value={employeeForm.email || ''} onChange={e => setEmployeeForm({ ...employeeForm, email: e.target.value })} />
-                            <input type="password" placeholder="Contraseña" required
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
-                                value={employeeForm.password} onChange={e => setEmployeeForm({ ...employeeForm, password: e.target.value })} />
-                            <button type="submit" disabled={createEmployeeMutation.isPending}
-                                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                        <form onSubmit={e => {
+                            e.preventDefault();
+                            if (!canSubmitEmployee) return;
+                            createEmployeeMutation.mutate(employeeForm);
+                        }} className="space-y-4">
+                            <div className="space-y-3">
+                                <label className="block text-xs font-semibold text-gray-500">Datos Personales</label>
+                                <input type="text" placeholder="Nombre Completo" required
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
+                                    value={employeeForm.full_name} onChange={e => setEmployeeForm({ ...employeeForm, full_name: e.target.value })} />
+                                <input type="text" placeholder="Usuario para Login" required
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
+                                    value={employeeForm.username} onChange={e => setEmployeeForm({ ...employeeForm, username: e.target.value })} />
+                                <input type="email" placeholder="Correo Electrónico" required
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900"
+                                    value={employeeForm.email || ''} onChange={e => setEmployeeForm({ ...employeeForm, email: e.target.value })} />
+                            </div>
+
+                            <PasswordField
+                                value={employeeForm.password!}
+                                onChange={v => setEmployeeForm({ ...employeeForm, password: v })}
+                                confirmValue={confirmPassword}
+                                onConfirmChange={setConfirmPassword}
+                            />
+
+                            <button type="submit" disabled={createEmployeeMutation.isPending || !canSubmitEmployee}
+                                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 mt-2">
                                 {createEmployeeMutation.isPending ? <Loader2 className="animate-spin" /> : 'Crear Cajero'}
                             </button>
                         </form>
