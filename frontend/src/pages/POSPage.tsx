@@ -1,14 +1,17 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProducts, getInventario, getCategories, getSaleStatsToday } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { usePosStore, type MetodoPago } from '../store/usePosStore';
 import { useDescuentos } from '../hooks/useDescuentos';
+import { useSesionActiva } from '../hooks/useCaja';
 import { client } from '../api/client';
 import {
     ShoppingCart, Search, Plus, Minus, Trash2,
     CreditCard, DollarSign, QrCode, X, CheckCircle2,
     Loader2, Tag, BarChart3, Package, ChevronUp, ChevronDown,
+    Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
@@ -38,7 +41,11 @@ function useStockMap(sucursalId: string) {
 export default function POSPage() {
     const { user } = useAuthStore();
     const qc = useQueryClient();
+    const navigate = useNavigate();
     const sucursalId = user?.sucursal_id || 'CENTRAL';
+
+    // ── Caja session guard ─────────────────────────────────────────────────
+    const { data: sesionActiva, isLoading: loadingSesion } = useSesionActiva();
 
     const {
         items, addItem, removeItem, updateQty,
@@ -153,6 +160,35 @@ export default function POSPage() {
 
         setConfirmSale(true);
     };
+
+    // ── Render blocked state if no caja session ─────────────────────────────
+    if (!loadingSesion && !sesionActiva) {
+        return (
+            <div className="flex h-full items-center justify-center bg-gray-50">
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center gap-5 text-center max-w-sm px-6"
+                >
+                    <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center shadow-inner">
+                        <Lock size={36} className="text-amber-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-black text-gray-900 mb-1">Caja cerrada</h2>
+                        <p className="text-sm text-gray-500">
+                            Debes abrir la caja antes de realizar ventas. Dirígete a la sección de <strong>Caja</strong> para iniciar una sesión.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => navigate('/caja')}
+                        className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all active:scale-95 shadow-md shadow-indigo-200"
+                    >
+                        Ir a Caja →
+                    </button>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-full bg-gray-100 overflow-hidden">
