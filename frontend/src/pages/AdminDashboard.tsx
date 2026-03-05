@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/api';
-import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, KeyRound, AlertTriangle, Copy } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import type { Tenant, TenantCreate, TenantUpdate } from '../api/types';
 import { toast } from 'sonner';
+import PasswordField from '../components/PasswordField';
 
 export default function AdminDashboard() {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [showCreatePassword, setShowCreatePassword] = useState(false);
     const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [credentials, setCredentials] = useState<{ username: string; password: string; name: string } | null>(null);
+    const [copied, setCopied] = useState(false);
 
     // Form State (Create)
     const [formData, setFormData] = useState<TenantCreate>({
@@ -30,11 +33,12 @@ export default function AdminDashboard() {
     // Create Tenant Mutation
     const createTenantMutation = useMutation({
         mutationFn: (newTenant: TenantCreate) => createTenant(newTenant),
-        onSuccess: () => {
+        onSuccess: (_, vars) => {
             queryClient.invalidateQueries({ queryKey: ['tenants'] });
             setIsModalOpen(false);
+            setCredentials({ username: vars.admin_username, password: vars.admin_password, name: vars.name });
             setFormData({ name: '', plan: 'BASIC', admin_username: '', admin_password: '' });
-            toast.success("Empresa creada exitosamente");
+            setConfirmPassword('');
         },
         onError: () => {
             // Sonner toast already triggered in client.ts
@@ -60,7 +64,15 @@ export default function AdminDashboard() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.admin_password !== confirmPassword) return;
         createTenantMutation.mutate(formData);
+    };
+
+    const handleCopy = () => {
+        if (!credentials) return;
+        navigator.clipboard.writeText(`Empresa: ${credentials.name}\nUsuario: ${credentials.username}\nContraseña: ${credentials.password}`);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     const handleUpdate = (e: React.FormEvent) => {
@@ -82,6 +94,8 @@ export default function AdminDashboard() {
         }
     };
 
+    const canSubmit = formData.admin_password === confirmPassword && formData.admin_password.length >= 8;
+
     if (user?.role !== 'SUPERADMIN') {
         return <div className="p-8 text-center text-red-500">Acceso Restringido</div>
     }
@@ -90,6 +104,47 @@ export default function AdminDashboard() {
 
     return (
         <div className="max-w-7xl mx-auto p-4 space-y-4 relative">
+
+            {/* ── Credentials Modal ─────────────────────────────────────── */}
+            {credentials && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                                <KeyRound size={20} className="text-amber-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Empresa creada</h2>
+                                <p className="text-sm text-gray-500">{credentials.name}</p>
+                            </div>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                            <div className="flex items-start gap-2 text-amber-800 text-sm mb-3">
+                                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                                <span>Guarda estas credenciales ahora. La contraseña no se mostrará nuevamente.</span>
+                            </div>
+                            <div className="space-y-2">
+                                {[{ label: 'Usuario', val: credentials.username }, { label: 'Contraseña', val: credentials.password }].map(({ label, val }) => (
+                                    <div key={label} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-200">
+                                        <span className="text-xs text-gray-500">{label}</span>
+                                        <span className="font-mono font-semibold text-gray-900">{val}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={handleCopy}
+                                className="flex items-center gap-2 flex-1 justify-center bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 rounded-xl text-sm font-medium transition-colors">
+                                {copied ? <><Check size={16} className="text-green-600" /> Copiado</> : <><Copy size={16} /> Copiar</>}
+                            </button>
+                            <button onClick={() => setCredentials(null)}
+                                className="flex-1 bg-black hover:bg-gray-900 text-white py-2 rounded-xl text-sm font-medium">
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Panel de Control SaaS</h1>
@@ -224,31 +279,19 @@ export default function AdminDashboard() {
                                         onChange={e => setFormData({ ...formData, admin_username: e.target.value })}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1 ml-1">Contraseña</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showCreatePassword ? "text" : "password"}
-                                            required
-                                            placeholder="••••••••"
-                                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-black/5 text-gray-900 pr-10"
-                                            value={formData.admin_password}
-                                            onChange={e => setFormData({ ...formData, admin_password: e.target.value })}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCreatePassword(!showCreatePassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showCreatePassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-                                </div>
+                                <PasswordField
+                                    value={formData.admin_password}
+                                    onChange={v => setFormData({ ...formData, admin_password: v })}
+                                    confirmValue={confirmPassword}
+                                    onConfirmChange={setConfirmPassword}
+                                    label="Contraseña"
+                                    inputClassName="bg-white border-gray-200"
+                                />
                             </div>
 
                             <button
                                 type="submit"
-                                disabled={createTenantMutation.isPending}
+                                disabled={createTenantMutation.isPending || !canSubmit}
                                 className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-900 transition-all flex items-center justify-center gap-2 mt-4"
                             >
                                 {createTenantMutation.isPending ? <Loader2 className="animate-spin" /> : <>Crear Empresa <Check size={20} /></>}

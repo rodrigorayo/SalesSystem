@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSucursales, createSucursal, updateSucursal, deleteSucursal } from '../api/api';
 import type { SucursalCreate } from '../api/types';
-import { Plus, Store, MapPin, Phone, Pencil, X, Loader2, KeyRound, Copy, Check, AlertTriangle, Building, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Plus, Store, MapPin, Phone, Pencil, X, Loader2, KeyRound, Copy, Check, AlertTriangle, Building, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import PasswordField from '../components/PasswordField';
 
 interface CreatedCredentials {
     username: string;
@@ -23,8 +24,8 @@ export default function SucursalesPage() {
     const [credentials, setCredentials] = useState<CreatedCredentials | null>(null);
     const [copied, setCopied] = useState(false);
     const [form, setForm] = useState<SucursalCreate>(BLANK_FORM);
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [editForm, setEditForm] = useState<{ nombre: string; ciudad: string; direccion: string; telefono: string }>({ nombre: '', ciudad: '', direccion: '', telefono: '' });
-    const [showPassword, setShowPassword] = useState(false);
 
     const { data: sucursales = [], isLoading } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
 
@@ -35,6 +36,7 @@ export default function SucursalesPage() {
             setShowCreate(false);
             setCredentials({ username: res.admin_credentials.username, password: res.admin_credentials.password, sucursal_nombre: res.sucursal.nombre, ciudad: res.sucursal.ciudad });
             setForm(BLANK_FORM);
+            setConfirmPassword('');
         },
     });
     const updateMut = useMutation({
@@ -70,6 +72,8 @@ export default function SucursalesPage() {
 
     const field = (key: keyof SucursalCreate, val: string) =>
         setForm(f => ({ ...f, [key]: val }));
+
+    const canSubmit = form.admin_password === confirmPassword && form.admin_password.length >= 8;
 
     // Bolivian cities suggestions
     const CIUDADES = ['Cochabamba', 'La Paz', 'Santa Cruz', 'Oruro', 'Potosí', 'Sucre', 'Tarija', 'Trinidad', 'Cobija'];
@@ -137,7 +141,7 @@ export default function SucursalesPage() {
                             <h2 className="text-lg font-bold text-gray-900">Nueva Sucursal</h2>
                             <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"><X size={20} /></button>
                         </div>
-                        <form onSubmit={e => { e.preventDefault(); createMut.mutate(form); }} className="space-y-4">
+                        <form onSubmit={e => { e.preventDefault(); if (!canSubmit) return; createMut.mutate(form); }} className="space-y-4">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Datos de la Sucursal</p>
 
                             <div>
@@ -188,21 +192,13 @@ export default function SucursalesPage() {
                                     placeholder="admin@sucursal.com" />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                                <div className="relative">
-                                    <input type={showPassword ? "text" : "password"} value={form.admin_password} onChange={e => field('admin_password', e.target.value)} required
-                                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none pr-10"
-                                        placeholder="Mín. 8 caracteres" />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                    >
-                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                    </button>
-                                </div>
-                            </div>
+                            <PasswordField
+                                value={form.admin_password}
+                                onChange={v => field('admin_password', v)}
+                                confirmValue={confirmPassword}
+                                onConfirmChange={setConfirmPassword}
+                                label="Contraseña del Administrador"
+                            />
 
                             {createMut.isError && (
                                 <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
@@ -210,7 +206,7 @@ export default function SucursalesPage() {
                                 </p>
                             )}
 
-                            <button type="submit" disabled={createMut.isPending}
+                            <button type="submit" disabled={createMut.isPending || !canSubmit}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
                                 {createMut.isPending ? <Loader2 size={18} className="animate-spin" /> : <><Check size={18} /> Crear Sucursal</>}
                             </button>
