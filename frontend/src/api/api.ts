@@ -269,8 +269,33 @@ export const cancelarPedido = (id: string) => client<PedidoInterno>(`/pedidos/${
 export const aceptarPedido = (id: string) => client<PedidoInterno>(`/pedidos/${id}/aceptar`, { method: 'PATCH' });
 export const despacharPedido = (id: string) =>
     client<PedidoInterno>(`/pedidos/${id}/despachar`, { method: 'PATCH' });
-export const recibirPedido = (id: string) =>
-    client<PedidoInterno>(`/pedidos/${id}/recibir`, { method: 'PATCH' });
+export const recibirPedido = (id: string, items?: { producto_id: string, cantidad_recibida: number }[]) =>
+    client<PedidoInterno>(`/pedidos/${id}/recibir`, { method: 'PATCH', body: items ? { items } : undefined });
+
+export const downloadPedidoPDF = async (pedido_id: string) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+        
+    const response = await fetch(`${CACHE_URL}/pedidos/${pedido_id}/pdf`, {
+        method: 'GET',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    
+    if (!response.ok) {
+        throw new Error("No se pudo descargar el comprobante PDF");
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `recepcion_${pedido_id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+};
 
 // ─── Categories ───────────────────────────────────────────────────────────
 export const getCategories = () => client<Category[]>('/categories');

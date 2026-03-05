@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getProducts } from '../api/api';
+import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getProducts, downloadPedidoPDF } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 
 import {
     ClipboardList, Plus, Truck, CheckCircle2, Clock,
     X, Check, Loader2, ChevronDown, ChevronRight, Package,
-    CheckSquare, Ban, AlertTriangle
+    CheckSquare, Ban, AlertTriangle, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -33,6 +33,7 @@ export default function PedidosPage() {
         action: () => void;
         type: 'danger' | 'info' | 'success';
     }>({ isOpen: false, title: '', message: '', action: () => {}, type: 'info' });
+    const [receptionModal, setReceptionModal] = useState<{ isOpen: boolean; pedido: any }>({ isOpen: false, pedido: null });
 
     const [selectedSucursal, setSelectedSucursal] = useState('');
     const [orderItems, setOrderItems] = useState<{ producto_id: string; cantidad: number }[]>([]);
@@ -55,11 +56,7 @@ export default function PedidosPage() {
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
         onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al despachar pedido')
     });
-    const recibirMut = useMutation({
-        mutationFn: recibirPedido,
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
-        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al recibir pedido')
-    });
+
     const cancelarMut = useMutation({
         mutationFn: cancelarPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
@@ -209,14 +206,21 @@ export default function PedidosPage() {
                                                 </button>
                                             )}
                                             {pedido.estado === 'DESPACHADO' && isSucursal() && (
-                                                <button onClick={() => setConfirmModal({
-                                                    isOpen: true, title: 'Confirmar Recepción',
-                                                    message: '¿Confirmas que has RECIBIDO este pedido correctamente en tu sucursal? El stock se sumará a tu inventario local.',
-                                                    type: 'success', action: () => recibirMut.mutate(pedido._id)
-                                                })} disabled={recibirMut.isPending}
+                                                <button onClick={() => setReceptionModal({ isOpen: true, pedido })}
                                                     className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
-                                                    {recibirMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                    <CheckCircle2 size={14} />
                                                     Confirmar Recepción
+                                                </button>
+                                            )}
+                                            {pedido.estado === 'RECIBIDO' && (
+                                                <button onClick={async () => {
+                                                    try {
+                                                        await downloadPedidoPDF(pedido._id);
+                                                    } catch (err: any) { alert(err.message); }
+                                                }}
+                                                    className="flex items-center gap-1.5 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ml-auto shadow-sm">
+                                                    <Download size={14} />
+                                                    Descargar Comprobante PDF
                                                 </button>
                                             )}
                                         </div>
@@ -363,6 +367,94 @@ export default function PedidosPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Reception Modal */}
+            {receptionModal.isOpen && (
+                <ReceptionModal 
+                    pedido={receptionModal.pedido} 
+                    onClose={() => setReceptionModal({ isOpen: false, pedido: null })} 
+                    onSuccess={() => {
+                        setReceptionModal({ isOpen: false, pedido: null });
+                        qc.invalidateQueries({ queryKey: ['pedidos'] });
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
+function ReceptionModal({ pedido, onClose, onSuccess }: { pedido: any; onClose: () => void; onSuccess: () => void }) {
+    const [items, setItems] = useState<{producto_id: string, descripcion: string, cantidad_enviada: number, cantidad_recibida: number}[]>(
+        pedido.items.map((i: any) => ({
+            producto_id: i.producto_id,
+            descripcion: i.producto_nombre || i.descripcion,
+            cantidad_enviada: i.cantidad,
+            cantidad_recibida: i.cantidad // defecto: asume que todo llegó
+        }))
+    );
+
+    const mut = useMutation({
+        mutationFn: () => recibirPedido(pedido._id, items.map(i => ({ producto_id: i.producto_id, cantidad_recibida: i.cantidad_recibida }))),
+        onSuccess,
+        onError: (err: any) => alert(err?.message || "Error al confirmar recepción")
+    });
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                    <div>
+                        <h2 className="text-base font-bold text-gray-900">Confirmar Recepción Variada</h2>
+                        <p className="text-xs text-gray-500 mt-1">Ajusta la cantidad recibida si llegó menos de lo despachado.</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-200">
+                        <X size={18} />
+                    </button>
+                </div>
+                
+                <div className="p-4 overflow-y-auto flex-1">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <tr>
+                                <th className="px-3 py-2">Producto</th>
+                                <th className="px-3 py-2 text-center w-24">Enviada</th>
+                                <th className="px-3 py-2 text-center w-32">Recibida</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {items.map((i, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50/50">
+                                    <td className="px-3 py-2 text-xs font-semibold">{i.descripcion}</td>
+                                    <td className="px-3 py-2 text-center font-bold text-gray-500 bg-gray-50/50">{i.cantidad_enviada}</td>
+                                    <td className="px-3 py-2 relative">
+                                        <input type="number" min="0" max={i.cantidad_enviada}
+                                            value={i.cantidad_recibida}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                setItems(items.map((it, n) => n === idx ? { ...it, cantidad_recibida: Math.min(val, it.cantidad_enviada) } : it));
+                                            }}
+                                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-center text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700 bg-indigo-50"
+                                        />
+                                        {i.cantidad_recibida !== i.cantidad_enviada && (
+                                            <div className="absolute top-1/2 -right-6 -translate-y-1/2 text-amber-500" title="Diferencia de inventario detectada">
+                                                <AlertTriangle size={16} />
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-2 justify-end">
+                    <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg text-sm transition-colors hover:bg-gray-50 shadow-sm">Cancelar</button>
+                    <button disabled={mut.isPending} onClick={() => mut.mutate()} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm transition-colors flex items-center gap-1.5 shadow-sm">
+                        {mut.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                        Confirmar Cantidades
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

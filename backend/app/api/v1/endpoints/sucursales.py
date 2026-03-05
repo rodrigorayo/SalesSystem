@@ -74,7 +74,8 @@ async def create_sucursal(
         raise HTTPException(status_code=403, detail="No tenant context")
 
     # Validate username is not taken
-    if await User.find_one(User.username == data.admin_username):
+    admin_username_lower = data.admin_username.lower()
+    if await User.find_one({"username": {"$regex": f"^{admin_username_lower}$", "$options": "i"}}):
         raise HTTPException(status_code=400, detail=f"Username '{data.admin_username}' already exists")
 
     # 1. Create the Sucursal
@@ -90,7 +91,7 @@ async def create_sucursal(
     # 2. Create the ADMIN_SUCURSAL user bound to this branch
     hashed = get_password_hash(data.admin_password)
     admin = User(
-        username=data.admin_username,
+        username=admin_username_lower,
         hashed_password=hashed,
         full_name=f"Admin {data.nombre}",
         role=UserRole.ADMIN_SUCURSAL,

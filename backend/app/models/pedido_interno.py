@@ -17,6 +17,7 @@ class PedidoItem(BaseModel):
     producto_id: str
     descripcion: str
     cantidad: int = Field(gt=0)
+    cantidad_recibida: Optional[int] = None
     precio_mayorista: float = Field(ge=0)
     subtotal: float = Field(ge=0)
 
