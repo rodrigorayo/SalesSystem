@@ -14,8 +14,8 @@ router = APIRouter()
 @router.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     import re
-    # Use native re case-insensitive regex match for username to allow "Leidy.caceres" or "LEIDY.CACERES"
-    user = await User.find_one({"username": re.compile(f"^{form_data.username}$", re.IGNORECASE)})
+    # Use native re case-insensitive regex match — re.escape() prevents dots/@ in emails from breaking the pattern
+    user = await User.find_one({"username": re.compile(f"^{re.escape(form_data.username)}$", re.IGNORECASE)})
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
