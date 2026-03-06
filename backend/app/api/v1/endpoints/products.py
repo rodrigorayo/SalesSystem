@@ -420,6 +420,8 @@ async def importacion_global_excel(
         
     tenant_id = current_user.tenant_id or "default"
     
+    from bson import ObjectId
+    
     try:
         contents = await file.read()
         df = pd.read_excel(io.BytesIO(contents))
@@ -442,7 +444,13 @@ async def importacion_global_excel(
     for cat_name in nombres_categorias_excel:
         cat_key = str(cat_name).strip().upper()
         if cat_key and cat_key not in cat_map:
-            nueva_cat = Category(tenant_id=tenant_id, name=str(cat_name).strip().capitalize(), is_active=True)
+            new_cat_id = ObjectId()
+            nueva_cat = Category(
+                id=new_cat_id,
+                tenant_id=tenant_id, 
+                name=str(cat_name).strip().capitalize(), 
+                is_active=True
+            )
             categorias_a_insertar.append(nueva_cat)
             cat_map[cat_key] = nueva_cat
             
