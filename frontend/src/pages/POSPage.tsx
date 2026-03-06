@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
 import { toast } from 'sonner';
+import Pagination from '../components/Pagination';
 
 const fmt = (n?: number) => (n || 0).toFixed(2);
 
@@ -118,6 +119,18 @@ export default function POSPage() {
         const matchQ = !q || p.descripcion.toLowerCase().includes(q) || (p.codigo_corto ?? '').toLowerCase().includes(q) || (p.codigo_largo ?? '').toLowerCase().includes(q);
         return matchQ && (selectedCat === 'all' || p.categoria_id === selectedCat) && p.is_active !== false;
     }), [products, search, selectedCat]);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, selectedCat]);
+
+    const paginatedFiltered = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filtered, currentPage]);
 
     const saleMut = useMutation({
         mutationFn: () => client('/ventas', {
@@ -265,9 +278,10 @@ export default function POSPage() {
                             <p className="text-sm text-gray-400">Sin resultados</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                            {filtered.map(p => {
-                                const stock = stockMap[p._id] ?? 0;
+                        <div className="flex flex-col h-full">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-4">
+                                {paginatedFiltered.map(p => {
+                                    const stock = stockMap[p._id] ?? 0;
                                 const inCart = items.find(i => i.product._id === p._id)?.quantity ?? 0;
                                 const noStock = stock <= 0;
                                 return (
@@ -298,6 +312,19 @@ export default function POSPage() {
                                     </button>
                                 );
                             })}
+                            </div>
+                            
+                            <div className="mt-auto pt-4">
+                                {filtered.length > ITEMS_PER_PAGE && (
+                                    <Pagination 
+                                        currentPage={currentPage}
+                                        totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                        onPageChange={setCurrentPage}
+                                        totalItems={filtered.length}
+                                        itemsPerPage={ITEMS_PER_PAGE}
+                                    />
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

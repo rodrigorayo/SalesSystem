@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
@@ -6,6 +6,7 @@ import { getInventario, getMovimientosInventario, ajustarInventario, getSucursal
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
+import Pagination from '../components/Pagination';
 
 export default function InventarioPage() {
     const { user } = useAuthStore();
@@ -38,6 +39,15 @@ export default function InventarioPage() {
     const [adjItem, setAdjItem] = useState<{ id: string, name: string } | null>(null);
     const [priceReqItem, setPriceReqItem] = useState<{ id: string, name: string, currentPrice: number } | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    
+    const [currentPageStock, setCurrentPageStock] = useState(1);
+    const [currentPageKardex, setCurrentPageKardex] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+
+    useEffect(() => {
+        setCurrentPageStock(1);
+        setCurrentPageKardex(1);
+    }, [searchTerm, selectedSucursal, tab]);
 
     const filteredInv = useMemo(() => {
         if (!searchTerm) return inventario;
@@ -48,6 +58,16 @@ export default function InventarioPage() {
         if (!searchTerm) return movimientos;
         return movimientos.filter(m => m.producto_nombre?.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [movimientos, searchTerm]);
+
+    const paginatedInv = useMemo(() => {
+        const startIndex = (currentPageStock - 1) * ITEMS_PER_PAGE;
+        return filteredInv.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredInv, currentPageStock]);
+
+    const paginatedMovs = useMemo(() => {
+        const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
+        return filteredMovs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredMovs, currentPageKardex]);
 
     const handleAjusteSuccess = () => {
         queryClient.invalidateQueries({ queryKey: ['inventario', selectedSucursal] });
@@ -149,7 +169,7 @@ export default function InventarioPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredInv.map((item) => (
+                                        paginatedInv.map((item) => (
                                             <tr key={item.producto_id} className="hover:bg-gray-50/50 transition-colors">
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-2">
@@ -205,6 +225,15 @@ export default function InventarioPage() {
                                 </tbody>
                             </table>
                         </div>
+                        {filteredInv.length > ITEMS_PER_PAGE && (
+                            <Pagination 
+                                currentPage={currentPageStock}
+                                totalPages={Math.ceil(filteredInv.length / ITEMS_PER_PAGE)}
+                                onPageChange={setCurrentPageStock}
+                                totalItems={filteredInv.length}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                            />
+                        )}
                     </div>
                 </div>
             )}
@@ -239,7 +268,7 @@ export default function InventarioPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredMovs.map((mov) => {
+                                    paginatedMovs.map((mov) => {
                                         const isPos = mov.cantidad_movida > 0;
                                         const isNeg = mov.cantidad_movida < 0;
                                         return (
@@ -276,6 +305,15 @@ export default function InventarioPage() {
                             </tbody>
                         </table>
                     </div>
+                    {filteredMovs.length > ITEMS_PER_PAGE && (
+                        <Pagination 
+                            currentPage={currentPageKardex}
+                            totalPages={Math.ceil(filteredMovs.length / ITEMS_PER_PAGE)}
+                            onPageChange={setCurrentPageKardex}
+                            totalItems={filteredMovs.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                        />
+                    )}
                 </div>
             )}
 

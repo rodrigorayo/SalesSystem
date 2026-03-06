@@ -1,15 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit2, Loader2, Package, Image as ImageIcon, Check, X, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import { getProducts, getCategories, createProduct, updateProduct, exportProductTemplate, importProductsExcel, importGlobalExcel, exportProductPriceTemplate, importProductPrices, getSucursales } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { Product, Category, ProductCreate, Sucursal } from '../api/types';
+import Pagination from '../components/Pagination';
 
 export default function CatalogoPage() {
     const { user } = useAuthStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -43,6 +46,16 @@ export default function CatalogoPage() {
             return matchesSearch && matchesCat;
         });
     }, [products, searchTerm, selectedCategory]);
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedCategory]);
+
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredProducts, currentPage]);
 
     const handleOpenCreate = () => {
         setEditingProduct(null);
@@ -145,7 +158,7 @@ export default function CatalogoPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredProducts.map((p) => (
+                                paginatedProducts.map((p) => (
                                     <tr key={p._id} className="hover:bg-indigo-50/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -201,6 +214,16 @@ export default function CatalogoPage() {
                         </tbody>
                     </table>
                 </div>
+                
+                {filteredProducts.length > ITEMS_PER_PAGE && (
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}
+                        onPageChange={setCurrentPage}
+                        totalItems={filteredProducts.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                    />
+                )}
             </div>
 
             {/* Modals */}

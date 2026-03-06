@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/api';
 import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, KeyRound, AlertTriangle, Copy } from 'lucide-react';
@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import type { Tenant, TenantCreate, TenantUpdate } from '../api/types';
 import { toast } from 'sonner';
 import PasswordField from '../components/PasswordField';
+import Pagination from '../components/Pagination';
 
 export default function AdminDashboard() {
     const { user } = useAuthStore();
@@ -24,11 +25,19 @@ export default function AdminDashboard() {
         admin_password: ''
     });
 
-    // Fetch Tenants
     const { data: tenants, isLoading } = useQuery({
         queryKey: ['tenants'],
         queryFn: getTenants,
     });
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+
+    const paginatedTenants = useMemo(() => {
+        if (!tenants) return [];
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return tenants.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [tenants, currentPage]);
 
     // Create Tenant Mutation
     const createTenantMutation = useMutation({
@@ -190,7 +199,7 @@ export default function AdminDashboard() {
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-gray-400" /></div>
                 ) : (
                     <div className="space-y-4">
-                        {tenants?.map(tenant => (
+                        {paginatedTenants.map(tenant => (
                             <div key={tenant._id} className="flex items-center justify-between p-4 rounded-3xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100 group">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500">
@@ -225,6 +234,15 @@ export default function AdminDashboard() {
                         ))}
                         {tenants?.length === 0 && (
                             <p className="text-center text-gray-400 py-8">No hay empresas registradas.</p>
+                        )}
+                        {tenants && tenants.length > ITEMS_PER_PAGE && (
+                            <Pagination 
+                                currentPage={currentPage}
+                                totalPages={Math.ceil(tenants.length / ITEMS_PER_PAGE)}
+                                onPageChange={setCurrentPage}
+                                totalItems={tenants.length}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                            />
                         )}
                     </div>
                 )}

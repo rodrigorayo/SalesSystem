@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSucursales, createSucursal, updateSucursal, deleteSucursal } from '../api/api';
 import type { SucursalCreate } from '../api/types';
 import { Plus, Store, MapPin, Phone, Pencil, X, Loader2, KeyRound, Copy, Check, AlertTriangle, Building, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import PasswordField from '../components/PasswordField';
+import Pagination from '../components/Pagination';
 
 interface CreatedCredentials {
     username: string;
@@ -26,8 +27,16 @@ export default function SucursalesPage() {
     const [form, setForm] = useState<SucursalCreate>(BLANK_FORM);
     const [confirmPassword, setConfirmPassword] = useState('');
     const [editForm, setEditForm] = useState<{ nombre: string; ciudad: string; direccion: string; telefono: string }>({ nombre: '', ciudad: '', direccion: '', telefono: '' });
+    
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 6; // usually fewer branches than products
 
     const { data: sucursales = [], isLoading } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
+
+    const paginatedSucursales = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return sucursales.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [sucursales, currentPage]);
 
     const createMut = useMutation({
         mutationFn: (data: SucursalCreate) => createSucursal(data as any),
@@ -254,11 +263,12 @@ export default function SucursalesPage() {
                     <p className="text-gray-500">No hay sucursales. Crea la primera.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {sucursales.map(s => (
-                        <div key={s._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow group">
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-3">
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {paginatedSucursales.map(s => (
+                            <div key={s._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow group">
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
                                         <Store size={20} className="text-indigo-600" />
                                     </div>
@@ -293,6 +303,16 @@ export default function SucursalesPage() {
                             )}
                         </div>
                     ))}
+                    </div>
+                    {sucursales.length > ITEMS_PER_PAGE && (
+                        <Pagination 
+                            currentPage={currentPage}
+                            totalPages={Math.ceil(sucursales.length / ITEMS_PER_PAGE)}
+                            onPageChange={setCurrentPage}
+                            totalItems={sucursales.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                        />
+                    )}
                 </div>
             )}
         </div>

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getUsers, createEmployee } from '../api/api';
 import { Users, Plus, Loader2, X, KeyRound, AlertTriangle, Copy, Check } from 'lucide-react';
 import type { EmployeeCreate } from '../api/types';
 import PasswordField from '../components/PasswordField';
 import { toast } from 'sonner';
+import Pagination from '../components/Pagination';
 
 interface NewCredentials {
     username: string;
@@ -21,8 +22,17 @@ export default function UsersPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [credentials, setCredentials] = useState<NewCredentials | null>(null);
     const [copied, setCopied] = useState(false);
+    
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 12;
 
     const { data: employees, isLoading } = useQuery({ queryKey: ['employees'], queryFn: getUsers });
+
+    const paginatedEmployees = useMemo(() => {
+        if (!employees) return [];
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return employees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [employees, currentPage]);
 
     const passwordsMatch = form.password === confirmPassword;
     const canSubmit = form.password.length >= 8 && passwordsMatch;
@@ -71,9 +81,10 @@ export default function UsersPage() {
                     <p className="text-gray-500">No hay cajeros registrados aún.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {employees.map(emp => (
-                        <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start justify-between">
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {paginatedEmployees.map(emp => (
+                            <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
                                     <Users size={20} className="text-blue-600" />
@@ -86,6 +97,17 @@ export default function UsersPage() {
                             <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-lg uppercase">Activo</span>
                         </div>
                     ))}
+                    </div>
+                    
+                    {employees && employees.length > ITEMS_PER_PAGE && (
+                        <Pagination 
+                            currentPage={currentPage}
+                            totalPages={Math.ceil(employees.length / ITEMS_PER_PAGE)}
+                            onPageChange={setCurrentPage}
+                            totalItems={employees.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                        />
+                    )}
                 </div>
             )}
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTenantStats, getProducts, getUsers, getCategories, createProduct, updateProduct, createEmployee } from '../api/api';
 import { Plus, Users, Package, DollarSign, Store, ShoppingBag, Loader2, X, Upload, ImageIcon, KeyRound, AlertTriangle, Copy, Check } from 'lucide-react';
@@ -7,6 +7,7 @@ import type { Product, ProductCreate, EmployeeCreate } from '../api/types';
 import { Link } from 'react-router-dom';
 import { BASE_URL } from '../api/client';
 import PasswordField from '../components/PasswordField';
+import Pagination from '../components/Pagination';
 
 const BLANK_PRODUCT: ProductCreate = {
     descripcion: '', categoria_id: '', precio_venta: 0, costo_producto: 0,
@@ -29,6 +30,22 @@ export default function TenantDashboard() {
     const { data: products, isLoading: loadingProducts } = useQuery({ queryKey: ['products'], queryFn: getProducts });
     const { data: employees, isLoading: loadingEmployees } = useQuery({ queryKey: ['employees'], queryFn: getUsers });
     const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
+
+    const [currentPageProducts, setCurrentPageProducts] = useState(1);
+    const [currentPageEmployees, setCurrentPageEmployees] = useState(1);
+    const ITEMS_PER_PAGE = 5;
+
+    const paginatedProducts = useMemo(() => {
+        if (!products) return [];
+        const startIndex = (currentPageProducts - 1) * ITEMS_PER_PAGE;
+        return products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [products, currentPageProducts]);
+
+    const paginatedEmployees = useMemo(() => {
+        if (!employees) return [];
+        const startIndex = (currentPageEmployees - 1) * ITEMS_PER_PAGE;
+        return employees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [employees, currentPageEmployees]);
 
     const createProductMutation = useMutation({
         mutationFn: (data: ProductCreate) => createProduct(data),
@@ -209,7 +226,7 @@ export default function TenantDashboard() {
                         <div className="flex justify-center p-8"><Loader2 className="animate-spin text-gray-400" /></div>
                     ) : (
                         <div className="space-y-3">
-                            {products?.slice(0, 5).map(product => (
+                            {paginatedProducts.map(product => (
                                 <div key={product._id}
                                     className="group p-4 hover:bg-gray-50 rounded-3xl transition-colors flex items-center gap-4 cursor-pointer"
                                     onClick={() => handleEditProduct(product)}>
@@ -238,6 +255,15 @@ export default function TenantDashboard() {
                                     <p>No hay productos aún.</p>
                                 </div>
                             )}
+                            {products && products.length > ITEMS_PER_PAGE && (
+                                <Pagination 
+                                    currentPage={currentPageProducts}
+                                    totalPages={Math.ceil(products.length / ITEMS_PER_PAGE)}
+                                    onPageChange={setCurrentPageProducts}
+                                    totalItems={products.length}
+                                    itemsPerPage={ITEMS_PER_PAGE}
+                                />
+                            )}
                         </div>
                     )}
                 </div>
@@ -251,7 +277,7 @@ export default function TenantDashboard() {
                         <div className="flex justify-center p-8"><Loader2 className="animate-spin text-gray-400" /></div>
                     ) : (
                         <div className="space-y-3">
-                            {employees?.map(emp => (
+                            {paginatedEmployees.map(emp => (
                                 <div key={emp._id} className="p-4 bg-gray-50 rounded-3xl flex items-center justify-between">
                                     <div>
                                         <h4 className="font-bold text-gray-900">{emp.full_name ?? emp.username}</h4>
@@ -262,6 +288,15 @@ export default function TenantDashboard() {
                             ))}
                             {employees?.length === 0 && (
                                 <p className="text-center text-gray-400 text-sm py-8">No hay cajeros registrados.</p>
+                            )}
+                            {employees && employees.length > ITEMS_PER_PAGE && (
+                                <Pagination 
+                                    currentPage={currentPageEmployees}
+                                    totalPages={Math.ceil(employees.length / ITEMS_PER_PAGE)}
+                                    onPageChange={setCurrentPageEmployees}
+                                    totalItems={employees.length}
+                                    itemsPerPage={ITEMS_PER_PAGE}
+                                />
                             )}
                         </div>
                     )}
