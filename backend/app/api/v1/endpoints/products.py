@@ -499,16 +499,22 @@ async def importacion_global_excel(
     
     from bson import ObjectId
     
+    def clean_codigo(val):
+        s = str(val).strip()
+        if s.endswith('.0'): s = s[:-2]
+        if s.lower() == 'nan': return ""
+        return s
+
     for index, row in df.iterrows():
         procesados += 1
         fila_num = index + 2
         
         # CODIGO CORTO validation
-        codigo_corto = str(row.get("CODIGO_CORTO", row.get("CODIGOCORTO", ""))).strip()
-        if codigo_corto == "nan" or not codigo_corto:
-             codigo_corto = str(row.get("CODIGO", "")).strip()
+        codigo_corto = clean_codigo(row.get("CODIGO_CORTO", row.get("CODIGOCORTO", "")))
+        if not codigo_corto:
+             codigo_corto = clean_codigo(row.get("CODIGO", ""))
              
-        if not codigo_corto or codigo_corto == "nan":
+        if not codigo_corto:
             errores.append({"fila": fila_num, "motivo": "Falta CODIGO o CODIGO CORTO"})
             continue
             
@@ -526,7 +532,10 @@ async def importacion_global_excel(
         if codigo_largo == "nan": codigo_largo = ""
         
         cat_str = str(row.get("CATEGORIA", "")).strip().upper()
-        categoria_id = str(cat_map.get(cat_str).id) if (cat_str in cat_map and cat_map[cat_str].id) else None
+        categoria_id = str(cat_map.get(cat_str).id) if (cat_str in cat_map and cat_map[cat_str].id) else ""
+        if not categoria_id:
+            errores.append({"fila": fila_num, "motivo": "Falta categoría o id de categoría no encontrado"})
+            continue
         
         product_id = ""
         
@@ -551,10 +560,7 @@ async def importacion_global_excel(
             
         else:
             # Producto nuevo: Se inserta
-            new_object_id = ObjectId()
-            product_id = str(new_object_id)
             nuevo_prod = Product(
-                id=new_object_id,
                 tenant_id=tenant_id,
                 descripcion=descripcion or "S/N",
                 precio_venta=precio_publico,
@@ -562,9 +568,10 @@ async def importacion_global_excel(
                 categoria_id=categoria_id,
                 codigo_corto=codigo_corto,
                 codigo_sistema=str(uuid.uuid4())[:8].upper(),
-                codigo_largo=codigo_largo,
+                codigo_largo=codigo_largo if codigo_largo else None,
                 is_active=True
             )
+            product_id = str(nuevo_prod.id)
             productos_a_insertar.append(nuevo_prod)
             prod_map[codigo_corto] = nuevo_prod
             cat_procesados += 1
