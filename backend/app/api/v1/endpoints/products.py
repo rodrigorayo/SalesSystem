@@ -53,7 +53,7 @@ async def _enrich(product: Product) -> Product:
 @router.get("/products", response_model=List[Product])
 async def get_products(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
     current_user: User = Depends(get_current_active_user)
 ):
     if current_user.role == UserRole.SUPERADMIN:
