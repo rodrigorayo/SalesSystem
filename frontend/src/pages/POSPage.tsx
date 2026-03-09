@@ -17,6 +17,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
 import { toast } from 'sonner';
 import Pagination from '../components/Pagination';
+import { TicketPrinter } from '../components/TicketPrinter';
+import type { Sale } from '../api/types';
 
 const fmt = (n?: number) => (n || 0).toFixed(2);
 
@@ -61,6 +63,7 @@ export default function POSPage() {
     const [search, setSearch] = useLocalStorage('pos-search', '');
     const [selectedCat, setSelectedCat] = useLocalStorage('pos-selected-cat', 'all');
     const [success, setSuccess] = useState(false);
+    const [lastSale, setLastSale] = useState<Sale | null>(null);
     const [confirmSale, setConfirmSale] = useState(false);
     const [panelOpen, setPanelOpen] = useLocalStorage('pos-panel-open', true); // factura+pagos+totals visible
 
@@ -133,7 +136,7 @@ export default function POSPage() {
     }, [filtered, currentPage]);
 
     const saleMut = useMutation({
-        mutationFn: () => client('/ventas', {
+        mutationFn: () => client<Sale>('/ventas', {
             body: {
                 sucursal_id: sucursalId,
                 items: items.map(i => ({ producto_id: i.product._id, cantidad: i.quantity, precio: i.precio })),
@@ -142,11 +145,11 @@ export default function POSPage() {
                 cliente: cliente.es_factura || cliente.nit ? cliente : undefined,
             },
         }),
-        onSuccess: () => {
+        onSuccess: (data) => {
             qc.invalidateQueries({ queryKey: ['inventario', sucursalId] });
             qc.invalidateQueries({ queryKey: ['pos-stats'] });
+            setLastSale(data);
             setSuccess(true);
-            setTimeout(() => { setSuccess(false); reset(); }, 2500);
         },
     });
 
@@ -689,9 +692,9 @@ export default function POSPage() {
 
                         {/* Finalize */}
                         <button onClick={handleTryFinalize}
-                            disabled={!canFinalize() || saleMut.isPending || success}
+                            disabled={!canFinalize() || saleMut.isPending || !!lastSale}
                             className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all
-                            ${canFinalize() && !success
+                            ${canFinalize() && !lastSale
                                     ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 active:scale-[0.97]'
                                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
                             {saleMut.isPending
@@ -749,6 +752,44 @@ export default function POSPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Modal de Impresión / Venta Exitosa */}
+            <AnimatePresence>
+                {lastSale && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 print:hidden">
+                        <motion.div initial={{ scale: 0.95, y: 20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col p-6 items-center text-center">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+                                <CheckCircle2 size={32} />
+                            </div>
+                            <h3 className="text-xl font-black text-gray-900 mb-1">¡Venta Exitosa!</h3>
+                            <p className="text-sm text-gray-500 mb-6">El pago ha sido registrado en caja correctamente.</p>
+
+                            <div className="flex flex-col gap-3 w-full">
+                                <button 
+                                    onClick={() => window.print()} 
+                                    // Make sure it doesn't trigger form submit
+                                    type="button"
+                                    className="w-full py-3 rounded-xl font-bold text-white bg-gray-900 hover:bg-black transition-colors flex items-center justify-center gap-2"
+                                >
+                                    Imprimir {lastSale.cliente?.es_factura ? 'Factura/NIT' : 'Recibo'}
+                                </button>
+                                <button 
+                                    onClick={() => { setLastSale(null); setSuccess(false); reset(); }} 
+                                    type="button"
+                                    className="w-full py-3 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                                >
+                                    Siguiente Venta
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Hidden wrapper for thermal printing */}
+            <div className="print-only">
+                {lastSale && <TicketPrinter sale={lastSale} tenantName={user?.tenant_id || "Mi Tienda"} />}
+            </div>
         </div>
     );
 }
