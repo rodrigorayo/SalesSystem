@@ -7,6 +7,8 @@ import {
     Search, Ban, CalendarDays, ScrollText, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TicketPrinter } from '../components/TicketPrinter';
+import type { Sale } from '../api/types';
 
 export default function VentasPage() {
     const qc = useQueryClient();
@@ -16,7 +18,9 @@ export default function VentasPage() {
     // Filtros
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? '' : (user?.sucursal_id || ''));
     const [searchTerm, setSearchTerm] = useState('');
+    const [soloFacturas, setSoloFacturas] = useState(false);
     const [expanded, setExpanded] = useState<string | null>(null);
+    const [printSale, setPrintSale] = useState<Sale | null>(null);
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
         title: string;
@@ -58,6 +62,10 @@ export default function VentasPage() {
     };
 
     const filteredVentas = ventas.filter(v => {
+        if (soloFacturas) {
+            if (!v.cliente?.nit && !v.cliente?.es_factura) return false;
+        }
+
         if (!searchTerm) return true;
         const search = searchTerm.toLowerCase();
         // search by ticket id or partial cashier name
@@ -90,12 +98,23 @@ export default function VentasPage() {
                         <select
                             value={selectedSucursal}
                             onChange={(e) => setSelectedSucursal(e.target.value)}
-                            className="bg-white border border-gray-200 text-gray-900 text-xs font-semibold rounded-lg px-3 py-1.5 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none shadow-sm"
+                            className="bg-white border border-gray-200 text-gray-900 text-xs font-semibold rounded-lg px-3 py-1.5 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none shadow-sm h-[32px]"
                         >
                             <option value="">Todas las Sucursales</option>
                             {sucursales.map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                         </select>
                     )}
+
+                    {/* Filtro Sólo Facturas */}
+                    <label className="flex items-center gap-2 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm cursor-pointer hover:bg-gray-50 transition-colors h-[32px] shrink-0">
+                        <input 
+                            type="checkbox" 
+                            checked={soloFacturas} 
+                            onChange={e => setSoloFacturas(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-xs font-semibold text-gray-700">Solo Facturas / NIT</span>
+                    </label>
                 </div>
             </div>
 
@@ -127,7 +146,12 @@ export default function VentasPage() {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-gray-900 text-sm">Ticket #{venta._id.slice(-6).toUpperCase()}</span>
-                                                {isAnulado && <span className="text-[10px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-lg uppercase">Anulado</span>}
+                                                {(venta.cliente?.nit || venta.cliente?.es_factura) && (
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-lg uppercase border border-indigo-200">
+                                                        FACTURA
+                                                    </span>
+                                                )}
+                                                {isAnulado && <span className="text-[10px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-lg uppercase border border-red-200">Anulado</span>}
                                             </div>
                                             <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
                                                 <span className="flex items-center gap-1"><CalendarDays size={12} /> {new Date(venta.created_at).toLocaleString()}</span>
@@ -203,8 +227,15 @@ export default function VentasPage() {
                                                     </div>
                                                 </div>
 
-                                                {!isAnulado && (
-                                                    <div className="mt-6 flex justify-end">
+                                                <div className="mt-6 flex justify-end gap-3">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setPrintSale(venta); setTimeout(() => window.print(), 150); }}
+                                                        className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all"
+                                                    >
+                                                        <Receipt size={16} />
+                                                        Reimprimir
+                                                    </button>
+                                                    {!isAnulado && (
                                                         <button
                                                             onClick={(e) => handleAnular(venta._id, e)}
                                                             disabled={anularMut.isPending}
@@ -213,8 +244,8 @@ export default function VentasPage() {
                                                             {anularMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
                                                             Anular Venta
                                                         </button>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -280,6 +311,10 @@ export default function VentasPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+            {/* Hidden Ticket Wrapper for Re-printing */}
+            <div className="print-only">
+                {printSale && <TicketPrinter sale={printSale} tenantName={user?.tenant_id || "Mi Tienda"} />}
+            </div>
         </div>
     );
 }

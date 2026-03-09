@@ -436,18 +436,40 @@ export default function POSPage() {
                                             exit={{ height: 0, opacity: 0 }}
                                             className="grid grid-cols-2 gap-1 mt-1.5 overflow-hidden"
                                         >
-                                            <input value={cliente.nit} onChange={e => setCliente({ nit: e.target.value.replace(/\D/g, '') })}
+                                            <input 
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={cliente.nit} 
+                                                onChange={e => setCliente({ nit: e.target.value.replace(/\D/g, '') })}
+                                                onKeyDown={e => {
+                                                    // Allow backspace, delete, tab, escape, enter, arrows
+                                                    if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+                                                    // Prevent any non-digit char
+                                                    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                                                }}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
-                                                placeholder="NIT" />
+                                                placeholder="NIT" 
+                                            />
                                             <input value={cliente.email} onChange={e => setCliente({ email: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Email" />
                                             <input value={cliente.razon_social} onChange={e => setCliente({ razon_social: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Razón Social" />
-                                            <input value={cliente.celular} onChange={e => setCliente({ celular: e.target.value.replace(/\D/g, '') })}
+                                            <input 
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={cliente.celular} 
+                                                onChange={e => setCliente({ celular: e.target.value.replace(/\D/g, '') })}
+                                                onKeyDown={e => {
+                                                    if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+                                                    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                                                }}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
-                                                placeholder="Celular" />
+                                                placeholder="Celular" 
+                                            />
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
