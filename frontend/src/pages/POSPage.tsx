@@ -722,17 +722,27 @@ export default function POSPage() {
                                         </div>
                                     </>
                                 )}
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-500 font-medium text-sm">Total a cobrar:</span>
-                                    <span className="text-lg font-black font-mono text-gray-900">Bs. {fmt(totalVal)}</span>
+                                <div className="border-t border-gray-100 mt-2 pt-2 flex flex-col gap-1.5">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block text-left">Formas de Pago</span>
+                                    {pagos.map((p, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-xs">
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                {METODO_META[p.metodo]?.icon}
+                                                <span className="capitalize">{p.metodo.toLowerCase()}</span>
+                                            </div>
+                                            <span className="font-bold text-gray-900 font-mono">Bs. {fmt(p.monto)}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-500 font-medium text-sm">Efectivo recibido:</span>
+
+                                <div className="flex justify-between items-center border-t border-gray-100 pt-2">
+                                    <span className="text-gray-500 font-medium text-sm">Total pagado:</span>
                                     <span className="text-lg font-black font-mono text-green-600">Bs. {fmt(cubierto)}</span>
                                 </div>
+
                                 {cambioVal > 0 && (
-                                    <div className="flex justify-between items-center pt-3 mt-1 border-t border-gray-200">
-                                        <span className="text-gray-900 font-bold text-sm">Cambio a dar:</span>
+                                    <div className="flex justify-between items-center bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 mt-1">
+                                        <span className="text-amber-700 font-bold text-xs uppercase">Cambio a dar:</span>
                                         <span className="text-xl font-black font-mono text-amber-600">Bs. {fmt(cambioVal)}</span>
                                     </div>
                                 )}
