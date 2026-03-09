@@ -120,7 +120,7 @@ function App() {
 
                 {/* Historial de Ventas (Tickets) */}
                 <Route path="/ventas" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF}>
                     <VentasPage />
                   </ProtectedRoute>
                 } />
