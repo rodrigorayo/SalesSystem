@@ -49,18 +49,27 @@ async def get_inventario(
 
     result = []
     for entry in entries:
-        product = await Product.get(entry.producto_id)
-        if product:
-            result.append(InventarioItem(
-                inventario_id=str(entry.id),
-                producto_id=str(product.id),
-                producto_nombre=product.descripcion,
-                precio=product.precio_venta,
-                precio_sucursal=entry.precio_sucursal,
-                image_url=product.image_url,
-                sucursal_id=entry.sucursal_id,
-                cantidad=entry.cantidad,
-            ))
+        prod_id = str(entry.producto_id).strip()
+        if not prod_id or prod_id.lower() == "none" or prod_id == "null":
+            continue
+            
+        try:
+            product = await Product.get(prod_id)
+            if product:
+                result.append(InventarioItem(
+                    inventario_id=str(entry.id),
+                    producto_id=str(product.id),
+                    producto_nombre=product.descripcion,
+                    precio=product.precio_venta,
+                    precio_sucursal=entry.precio_sucursal,
+                    image_url=product.image_url,
+                    sucursal_id=entry.sucursal_id,
+                    cantidad=entry.cantidad,
+                ))
+        except Exception:
+            # Skip invalid ObjectId or missing product cleanly
+            pass
+            
     return result
 
 
