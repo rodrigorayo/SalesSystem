@@ -67,6 +67,7 @@ export default function Layout({ children }: LayoutProps) {
             // CAJERO / USER
             return [
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
+                { icon: RotateCcw, label: 'Ventas (Tickets)', path: '/ventas' },
                 { icon: Warehouse, label: 'Inventario', path: '/inventario' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
             ];
