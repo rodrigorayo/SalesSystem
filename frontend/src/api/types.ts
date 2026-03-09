@@ -113,6 +113,7 @@ export interface InventoryLog {
 export interface PedidoItem {
     producto_id: string;
     producto_nombre: string;
+    descripcion?: string;
     cantidad: number;
     precio_mayorista: number;
 }

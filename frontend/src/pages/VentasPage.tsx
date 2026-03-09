@@ -166,7 +166,7 @@ export default function VentasPage() {
                                         <div className="text-right">
                                             <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total Pagado</div>
                                             <div className={`text-xl font-black ${isAnulado ? 'text-gray-400 line-through' : 'text-gray-900'} `}>
-                                                ${parseFloat(venta.total.toString()).toFixed(2)}
+                                                Bs. {parseFloat(venta.total.toString()).toFixed(2)}
                                             </div>
                                         </div>
                                         <div className="text-gray-300">
@@ -199,15 +199,15 @@ export default function VentasPage() {
                                                         <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-50 last:border-0 pb-2 last:pb-0">
                                                             <div className="flex items-center gap-2 text-gray-800">
                                                                 <span className="font-semibold text-gray-900">{it.cantidad}x</span>
-                                                                {it.descripcion || 'Producto'} <span className="text-gray-400 text-xs">(${(it.precio_unitario || 0).toFixed(2)})</span>
+                                                                {it.descripcion || 'Producto'} <span className="text-gray-400 text-xs">(Bs. {(it.precio_unitario || 0).toFixed(2)})</span>
                                                             </div>
-                                                            <div className="font-medium text-gray-900">${(it.subtotal || 0).toFixed(2)}</div>
+                                                            <div className="font-medium text-gray-900">Bs. {(it.subtotal || 0).toFixed(2)}</div>
                                                         </div>
                                                     ))}
                                                     {venta.descuento && (
                                                         <div className="flex justify-between items-center text-sm pt-2 text-indigo-600 font-medium border-t border-gray-100">
                                                             <span>Descuento Aplicado ({venta.descuento.nombre || venta.descuento.tipo})</span>
-                                                            <span>- ${(venta.descuento.valor || 0).toFixed(2)}</span>
+                                                            <span>- Bs. {(venta.descuento.valor || 0).toFixed(2)}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -221,7 +221,7 @@ export default function VentasPage() {
                                                         {venta.pagos.map((p, idx) => (
                                                             <div key={idx} className="flex justify-between items-center text-sm">
                                                                 <span className="text-gray-600 capitalize bg-white border border-gray-200 px-2 py-0.5 rounded-md text-xs font-medium">{p.metodo}</span>
-                                                                <span className="font-medium font-mono text-gray-900">${p.monto.toFixed(2)}</span>
+                                                                <span className="font-medium font-mono text-gray-900">Bs. {p.monto.toFixed(2)}</span>
                                                             </div>
                                                         ))}
                                                     </div>

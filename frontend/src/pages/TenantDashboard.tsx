@@ -194,7 +194,7 @@ export default function TenantDashboard() {
                         <div className="p-3 bg-white/20 rounded-2xl"><DollarSign size={24} /></div>
                         <span className="text-indigo-100 font-medium">Ventas Hoy</span>
                     </div>
-                    <h3 className="text-4xl font-black mb-1">${(stats?.total_sales ?? 0).toFixed(2)}</h3>
+                    <h3 className="text-4xl font-black mb-1">Bs. {(stats?.total_sales ?? 0).toFixed(2)}</h3>
                     <p className="text-indigo-100/80 text-sm">Actualizado hace un momento</p>
                 </div>
                 <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all">
@@ -240,7 +240,7 @@ export default function TenantDashboard() {
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">{product.descripcion}</h4>
                                         <p className="text-sm text-gray-400">
-                                            <span className="font-semibold text-gray-700">${product.precio_venta.toFixed(2)}</span>
+                                            <span className="font-semibold text-gray-700">Bs. {product.precio_venta.toFixed(2)}</span>
                                             {product.codigo_corto && <span className="ml-2 font-mono text-xs">{product.codigo_corto}</span>}
                                         </p>
                                     </div>

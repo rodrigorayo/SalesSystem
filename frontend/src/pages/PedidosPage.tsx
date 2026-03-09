@@ -134,7 +134,7 @@ export default function PedidosPage() {
                                     <div className="flex items-center gap-4">
                                         <div className="text-right">
                                             <div className="text-xs text-gray-400">Total</div>
-                                            <div className="font-bold text-gray-900">${(pedido.total_mayorista || 0).toFixed(2)}</div>
+                                            <div className="font-bold text-gray-900">Bs. {(pedido.total_mayorista || 0).toFixed(2)}</div>
                                         </div>
                                         <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${cfg.bg} ${cfg.border} ${cfg.color}`}>
                                             {cfg.label}
@@ -158,10 +158,10 @@ export default function PedidosPage() {
                                                 <tbody className="divide-y divide-gray-50">
                                                     {pedido.items.map((item, i) => (
                                                         <tr key={i} className="text-gray-800">
-                                                            <td className="py-1.5">{item.producto_nombre}</td>
+                                                            <td className="py-1.5">{item.descripcion || item.producto_nombre || 'Producto Desconocido'}</td>
                                                             <td className="py-1.5 text-center">{item.cantidad}</td>
-                                                            <td className="py-1.5 text-right">${(item.precio_mayorista || 0).toFixed(2)}</td>
-                                                            <td className="py-1.5 text-right font-medium">${(item.cantidad * (item.precio_mayorista || 0)).toFixed(2)}</td>
+                                                            <td className="py-1.5 text-right">Bs. {(item.precio_mayorista || 0).toFixed(2)}</td>
+                                                            <td className="py-1.5 text-right font-medium">Bs. {(item.cantidad * (item.precio_mayorista || 0)).toFixed(2)}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
