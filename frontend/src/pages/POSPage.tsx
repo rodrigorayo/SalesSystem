@@ -209,32 +209,6 @@ export default function POSPage() {
     return (
         <div className="flex h-full bg-gray-100 overflow-hidden">
 
-            {/* ── Success Toast ── */}
-            <AnimatePresence>
-                {success && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.8, y: 12 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.8, y: 12 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                            className="bg-white rounded-3xl shadow-2xl px-12 py-10 flex flex-col items-center gap-4 border border-white/80"
-                        >
-                            <motion.div
-                                initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }}
-                                className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center shadow-inner"
-                            >
-                                <CheckCircle2 size={44} className="text-green-500" strokeWidth={2} />
-                            </motion.div>
-                            <div className="text-center">
-                                <p className="text-2xl font-black text-gray-900 mb-1">¡Venta Finalizada!</p>
-                                <p className="text-sm text-gray-400">Ticket registrado con éxito</p>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
 
             {/* ════════════════ LEFT — Product Catalog ════════════════ */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
