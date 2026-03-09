@@ -8,6 +8,11 @@ import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
+const formatDate = (dateStr: string) => {
+    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+    return new Date(isoStr).toLocaleString();
+};
+
 export default function InventarioPage() {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
@@ -274,7 +279,7 @@ export default function InventarioPage() {
                                         return (
                                             <tr key={mov._id} className="hover:bg-gray-50/50 transition-colors">
                                                 <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-[11px]">
-                                                    {new Date(mov.created_at).toLocaleString()}
+                                                    {formatDate(mov.created_at)}
                                                 </td>
                                                 <td className="px-3 py-2 font-semibold text-gray-900">
                                                     {mov.producto_nombre}

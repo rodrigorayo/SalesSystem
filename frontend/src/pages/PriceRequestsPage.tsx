@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSolicitudesPrecio, responderSolicitudPrecio } from '../api/api';
 import { Tag, Check, X, Loader2, MessageSquare, Clock, MapPin } from 'lucide-react';
 
+const formatDate = (dateStr: string) => {
+    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+    return new Date(isoStr).toLocaleString();
+};
+
 export default function PriceRequestsPage() {
     const queryClient = useQueryClient();
     const [filterEstado, setFilterEstado] = useState<string>('PENDIENTE');
@@ -96,7 +101,7 @@ export default function PriceRequestsPage() {
 
                                 <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
                                     <Clock size={10} />
-                                    <span>Solicitado el {new Date(req.created_at).toLocaleString()} por {req.solicitado_nombre}</span>
+                                    <span>Solicitado el {formatDate(req.created_at)} por {req.solicitado_nombre}</span>
                                 </div>
 
                                 {req.motivo_rechazo && (

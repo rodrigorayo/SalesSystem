@@ -10,6 +10,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TicketPrinter } from '../components/TicketPrinter';
 import type { Sale } from '../api/types';
 
+const formatDate = (dateStr: string) => {
+    // Si la fecha no termina en Z, se asume UTC para forzar la compensación horaria 
+    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+    return new Date(isoStr).toLocaleString();
+};
+
 export default function VentasPage() {
     const qc = useQueryClient();
     const { user, role } = useAuthStore();
@@ -154,7 +160,7 @@ export default function VentasPage() {
                                                 {isAnulado && <span className="text-[10px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-lg uppercase border border-red-200">Anulado</span>}
                                             </div>
                                             <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
-                                                <span className="flex items-center gap-1"><CalendarDays size={12} /> {new Date(venta.created_at).toLocaleString()}</span>
+                                                <span className="flex items-center gap-1"><CalendarDays size={12} /> {formatDate(venta.created_at)}</span>
                                                 <span>•</span>
                                                 <span className="flex items-center gap-1"><ScrollText size={12} /> Cajero: {venta.cashier_name}</span>
                                             </div>
@@ -235,7 +241,7 @@ export default function VentasPage() {
                                                         <Receipt size={16} />
                                                         Reimprimir
                                                     </button>
-                                                    {!isAnulado && (
+                                                    {!isAnulado && role !== 'CAJERO' && (
                                                         <button
                                                             onClick={(e) => handleAnular(venta._id, e)}
                                                             disabled={anularMut.isPending}

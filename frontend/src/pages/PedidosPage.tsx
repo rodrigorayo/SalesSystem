@@ -12,6 +12,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 type TabType = 'todos' | 'CREADO' | 'ACEPTADO' | 'DESPACHADO' | 'RECIBIDO' | 'CANCELADO';
 
+const formatDate = (dateStr: string) => {
+    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+    return new Date(isoStr).toLocaleDateString();
+};
+
 const ESTADO = {
     CREADO: { label: 'Pendiente', color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-300', icon: Clock },
     ACEPTADO: { label: 'Aceptado', color: 'text-indigo-800', bg: 'bg-indigo-50', border: 'border-indigo-300', icon: CheckSquare },
@@ -127,7 +132,7 @@ export default function PedidosPage() {
                                         <div>
                                             <div className="font-semibold text-sm text-gray-900">{sNombre}</div>
                                             <div className="text-xs text-gray-500">
-                                                {new Date(pedido.created_at).toLocaleDateString()} · {pedido.items.length} producto(s)
+                                                {formatDate(pedido.created_at)} · {pedido.items.length} producto(s)
                                             </div>
                                         </div>
                                     </div>

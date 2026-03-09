@@ -19,6 +19,11 @@ import { useLocalStorage } from 'usehooks-ts';
 
 const fmt = (n?: number) => `Bs. ${(n || 0).toFixed(2)}`;
 
+const formatDate = (dateStr: string, opts?: Intl.DateTimeFormatOptions) => {
+    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+    return new Date(isoStr).toLocaleString('es-BO', opts);
+};
+
 function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
     const headers = [
         'Fecha apertura', 'Fecha cierre', 'Cajero', 'Estado',
@@ -29,8 +34,8 @@ function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
         'Cierre físico', 'Diferencia', 'Notas cierre',
     ];
     const rows = sesiones.map(s => [
-        new Date(s.abierta_at).toLocaleString('es-BO'),
-        s.cerrada_at ? new Date(s.cerrada_at).toLocaleString('es-BO') : '',
+        formatDate(s.abierta_at),
+        s.cerrada_at ? formatDate(s.cerrada_at) : '',
         s.cajero_name,
         s.estado,
         s.num_transacciones,
@@ -139,7 +144,7 @@ function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen
                     )}
                     {sesion.notas_cierre && <span className="italic">"{sesion.notas_cierre}"</span>}
                     {sesion.cerrada_at && (
-                        <span>Cerrada: <strong>{new Date(sesion.cerrada_at).toLocaleString('es-BO')}</strong></span>
+                        <span>Cerrada: <strong>{formatDate(sesion.cerrada_at)}</strong></span>
                     )}
                 </div>
 
@@ -184,7 +189,7 @@ function SessionTable({ resumen, categoriasGlobal }: { resumen: ResumenCaja | un
                         return (
                             <tr key={m._id} className={isDigital ? 'bg-indigo-50/20' : ''}>
                                 <td className="px-3 py-1.5 font-mono text-[11px] text-gray-400">
-                                    {new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    {formatDate(m.fecha, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                 </td>
                                 <td className="px-3 py-1.5"><SubtipoBadge subtipo={m.subtipo} /></td>
                                 <td className="px-3 py-1.5 text-gray-700">
@@ -287,9 +292,9 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                                         className="hover:bg-gray-50 cursor-pointer transition-colors"
                                         onClick={() => setExpanded(isOpen ? null : s.id)}>
                                         <td className="px-3 py-2.5 font-mono text-[11px] text-gray-500 whitespace-nowrap">
-                                            {new Date(s.abierta_at).toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                            {formatDate(s.abierta_at, { day: '2-digit', month: '2-digit', year: '2-digit' })}
                                             {' '}
-                                            <span className="text-gray-400">{new Date(s.abierta_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            <span className="text-gray-400">{formatDate(s.abierta_at, { hour: '2-digit', minute: '2-digit' })}</span>
                                         </td>
                                         <td className="px-3 py-2.5 font-medium text-gray-700">{s.cajero_name}</td>
                                         <td className="px-3 py-2.5">
@@ -466,7 +471,7 @@ export default function CajaPage() {
                         <p className={`text-2xl font-black font-mono ${tab === 'historial' ? 'text-gray-900' : 'text-white'}`}>{sesion ? fmt(saldoActual) : '—'}</p>
                         {sesion && (
                             <p className={`text-[10px] mt-0.5 ${tab === 'historial' ? 'text-gray-400' : 'text-gray-500'}`}>
-                                Abierta {new Date(sesion.abierta_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                Abierta {formatDate(sesion.abierta_at || new Date().toISOString(), { hour: '2-digit', minute: '2-digit' })}
                                 {' '}· {sesion.cajero_name}
                             </p>
                         )}
@@ -605,7 +610,7 @@ export default function CajaPage() {
                                                 <tr key={m._id} className={`transition-colors ${isDigital ? 'bg-indigo-50/30 hover:bg-indigo-50/60' : 'hover:bg-gray-50'
                                                     }`}>
                                                     <td className="px-3 py-1.5 font-mono text-[11px] text-gray-400">
-                                                        {new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        {formatDate(m.fecha, { hour: '2-digit', minute: '2-digit' })}
                                                     </td>
                                                     <td className="px-3 py-1.5">
                                                         <SubtipoBadge subtipo={m.subtipo} />
