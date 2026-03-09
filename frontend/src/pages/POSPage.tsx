@@ -760,6 +760,36 @@ export default function POSPage() {
                             <h3 className="text-xl font-black text-gray-900 mb-1">¡Venta Exitosa!</h3>
                             <p className="text-sm text-gray-500 mb-6">El pago ha sido registrado en caja correctamente.</p>
 
+                            {/* Resumen de Pago */}
+                            <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 flex flex-col gap-2.5">
+                                {lastSale.pagos.map((p, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-sm">
+                                        <div className="flex items-center gap-2 text-gray-600">
+                                            {METODO_META[p.metodo as MetodoPago]?.icon}
+                                            <span className="capitalize">{p.metodo.toLowerCase()}</span>
+                                        </div>
+                                        <span className="font-bold text-gray-900">Bs. {fmt(p.monto)}</span>
+                                    </div>
+                                ))}
+                                <div className="border-t border-gray-200 my-1 pt-2 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Pagado</span>
+                                    <span className="text-base font-black text-indigo-600">Bs. {fmt(lastSale.pagos.reduce((acc, p) => acc + p.monto, 0))}</span>
+                                </div>
+                                {(() => {
+                                    const totalPagado = lastSale.pagos.reduce((acc, p) => acc + p.monto, 0);
+                                    const cambioEntregado = totalPagado - lastSale.total;
+                                    if (cambioEntregado > 0.01) {
+                                        return (
+                                            <div className="flex justify-between items-center text-amber-600 font-bold bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
+                                                <span className="text-xs uppercase">Cambio:</span>
+                                                <span className="text-lg font-black font-mono">Bs. {fmt(cambioEntregado)}</span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
+
                             <div className="flex flex-col gap-3 w-full">
                                 <button 
                                     onClick={() => window.print()} 
