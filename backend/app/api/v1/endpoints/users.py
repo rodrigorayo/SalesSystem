@@ -83,6 +83,10 @@ async def create_cajero(
     if await User.find_one({"username": re.compile(f"^{username_lower}$", re.IGNORECASE)}):
         raise HTTPException(status_code=400, detail="Username already exists")
 
+    email_lower = data.email.lower()
+    if await User.find_one({"email": re.compile(f"^{email_lower}$", re.IGNORECASE)}):
+        raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado")
+
     # Strict injection from JWT — client cannot override this
     sucursal_id = current_user.sucursal_id  # None if ADMIN_MATRIZ (matrix-level)
 

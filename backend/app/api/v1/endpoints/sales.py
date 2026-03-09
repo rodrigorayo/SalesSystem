@@ -356,6 +356,10 @@ async def get_sales(
             raise HTTPException(status_code=403, detail="Cannot view sales of another branch")
         filters.append(Sale.sucursal_id == current_user.sucursal_id)
 
+    # Cashiers can ONLY see their own generated sales
+    if current_user.role == UserRole.CAJERO:
+        filters.append(Sale.cashier_id == str(current_user.id))
+
     sales = await Sale.find(*filters).sort(-Sale.created_at).skip(skip).limit(limit).to_list()
     return sales
 
