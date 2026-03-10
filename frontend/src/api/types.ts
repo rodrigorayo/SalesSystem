@@ -244,7 +244,13 @@ export interface Sale {
     pagos: PagoItem[];
     descuento?: { nombre?: string; tipo: string; valor: number };
     cliente_id?: string;
-    cliente?: { nit?: string; razon_social?: string; email?: string; es_factura: boolean };
+    cliente?: {
+        nit?: string;
+        razon_social?: string;
+        email?: string;
+        telefono?: string;
+        es_factura: boolean;
+    };
     cashier_id: string;
     cashier_name: string;
     anulada: boolean;

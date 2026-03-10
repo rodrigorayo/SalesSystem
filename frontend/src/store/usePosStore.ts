@@ -21,7 +21,7 @@ export interface ClienteData {
     nit: string;
     razon_social: string;
     email: string;
-    celular: string;
+    telefono: string;
     es_factura: boolean;
 }
 
@@ -78,7 +78,7 @@ interface PosState {
     reset: () => void;
 }
 
-const DEFAULT_CLIENTE: ClienteData = { nit: '', razon_social: '', email: '', celular: '', es_factura: false };
+const DEFAULT_CLIENTE: ClienteData = { nit: '', razon_social: '', email: '', telefono: '', es_factura: false };
 const DEFAULT_PENDING: PosState['pendingPago'] = { metodo: 'EFECTIVO', monto: '' };
 const DEFAULT_DESC: PosState['descuento'] = { tipo: 'MONTO', valor: '', nombre: '' };
 

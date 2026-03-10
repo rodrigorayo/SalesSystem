@@ -17,9 +17,16 @@ class SubtipoMovimiento(str, Enum):
     VENTA_EFECTIVO  = "VENTA_EFECTIVO"  # efectivo recibido por venta POS
     VENTA_QR        = "VENTA_QR"        # cobro por QR (no ingresa al cajón)
     VENTA_TARJETA   = "VENTA_TARJETA"   # cobro por tarjeta (no ingresa al cajón)
+    INGRESO_EFECTIVO= "INGRESO_EFECTIVO"# ingreso manual de efectivo (fondo, venta externa)
+    INGRESO_QR      = "INGRESO_QR"      # ingreso manual por QR
+    INGRESO_TARJETA = "INGRESO_TARJETA" # ingreso manual por Tarjeta
     CAMBIO          = "CAMBIO"          # cambio devuelto al cliente (egreso)
     GASTO           = "GASTO"           # gasto manual del cajero
     AJUSTE          = "AJUSTE"          # corrección manual
+    # Nuevos ingresos manuales
+    INGRESO_EFECTIVO = "INGRESO_EFECTIVO"
+    INGRESO_QR       = "INGRESO_QR"
+    INGRESO_TARJETA  = "INGRESO_TARJETA"
 
 
 def _coerce_decimal128(v: Any) -> float:

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     getCajaSesionActiva, abrirCaja, cerrarCaja,
     getResumenCaja, getMovimientos, registrarGasto,
+    registrarIngreso,
     getCategoriasGasto, createCategoriaGasto,
     getHistorialCaja,
 } from '../api/api';
@@ -25,7 +26,7 @@ export interface CajaSesion {
 export interface CajaMovimiento {
     _id: string;
     sesion_id: string;
-    subtipo: 'APERTURA' | 'VENTA_EFECTIVO' | 'VENTA_QR' | 'VENTA_TARJETA' | 'CAMBIO' | 'GASTO' | 'AJUSTE';
+    subtipo: 'APERTURA' | 'VENTA_EFECTIVO' | 'VENTA_QR' | 'VENTA_TARJETA' | 'CAMBIO' | 'GASTO' | 'AJUSTE' | 'INGRESO_EFECTIVO' | 'INGRESO_QR' | 'INGRESO_TARJETA';
     tipo: 'INGRESO' | 'EGRESO';
     monto: number;
     descripcion: string;
@@ -58,6 +59,10 @@ export interface ResumenCaja {
     total_tarjeta: number;
     // other
     total_ajustes?: number;
+    // manual income
+    total_ingresos_efectivo: number;
+    total_ingresos_qr: number;
+    total_ingresos_tarjeta: number;
     // grand total
     total_ventas_general: number;
     num_transacciones: number;
@@ -101,6 +106,12 @@ export interface GastoIn {
     monto: number;
     descripcion: string;
     categoria_id?: string;
+}
+
+export interface IngresoIn {
+    monto: number;
+    descripcion: string;
+    metodo: 'EFECTIVO' | 'QR' | 'TARJETA';
 }
 
 export interface CategoriaGastoIn {
@@ -165,7 +176,18 @@ export function useRegistrarGasto() {
         mutationFn: registrarGasto,
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['caja-movimientos'] });
-            qc.invalidateQueries({ queryKey: ['caja-resumen'] });
+            qc.invalidateQueries({ queryKey: ['caja-sesion'] }); // para actualizar saldos
+        },
+    });
+}
+
+export function useRegistrarIngreso() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: registrarIngreso,
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['caja-movimientos'] });
+            qc.invalidateQueries({ queryKey: ['caja-sesion'] });
         },
     });
 }

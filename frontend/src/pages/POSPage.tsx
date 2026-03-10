@@ -142,7 +142,13 @@ export default function POSPage() {
                 items: items.map(i => ({ producto_id: i.product._id, cantidad: i.quantity, precio: i.precio })),
                 pagos: pagos.map(p => ({ metodo: p.metodo, monto: p.monto })),
                 descuento: descuento.valor ? { nombre: descuento.nombre, tipo: descuento.tipo, valor: parseFloat(descuento.valor) } : undefined,
-                cliente: cliente.es_factura || cliente.nit ? cliente : undefined,
+                cliente: cliente.es_factura || cliente.nit ? {
+                    nit: cliente.nit || undefined,
+                    razon_social: cliente.razon_social || undefined,
+                    email: cliente.email || undefined,
+                    telefono: cliente.telefono || undefined,
+                    es_factura: cliente.es_factura,
+                } : undefined,
             },
         }),
         onSuccess: (data) => {
@@ -424,7 +430,7 @@ export default function POSPage() {
                             <div className="px-3 py-1.5">
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                     <input type="checkbox" checked={cliente.es_factura}
-                                        onChange={e => setCliente({ es_factura: e.target.checked })}
+                                        onChange={e => setCliente({ ...cliente, es_factura: e.target.checked })}
                                         className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 shrink-0" />
                                     <span className="text-[11px] text-gray-600 font-medium">Solicitar factura (NIT)</span>
                                 </label>
@@ -441,7 +447,7 @@ export default function POSPage() {
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
                                                 value={cliente.nit} 
-                                                onChange={e => setCliente({ nit: e.target.value.replace(/\D/g, '') })}
+                                                onChange={e => setCliente({ ...cliente, nit: e.target.value.replace(/\D/g, '') })}
                                                 onKeyDown={e => {
                                                     // Allow backspace, delete, tab, escape, enter, arrows
                                                     if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
@@ -451,18 +457,18 @@ export default function POSPage() {
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="NIT" 
                                             />
-                                            <input value={cliente.email} onChange={e => setCliente({ email: e.target.value })}
+                                            <input value={cliente.email} onChange={e => setCliente({ ...cliente, email: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Email" />
-                                            <input value={cliente.razon_social} onChange={e => setCliente({ razon_social: e.target.value })}
+                                            <input value={cliente.razon_social} onChange={e => setCliente({ ...cliente, razon_social: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Razón Social" />
                                             <input 
                                                 type="text"
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
-                                                value={cliente.celular} 
-                                                onChange={e => setCliente({ celular: e.target.value.replace(/\D/g, '') })}
+                                                value={cliente.telefono} 
+                                                onChange={e => setCliente({ ...cliente, telefono: e.target.value.replace(/\D/g, '') })}
                                                 onKeyDown={e => {
                                                     if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
                                                     if (!/^[0-9]$/.test(e.key)) e.preventDefault();

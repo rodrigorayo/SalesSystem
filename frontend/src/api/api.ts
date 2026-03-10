@@ -16,7 +16,7 @@ import type {
     PriceChangeRequest, PriceRequestCreate,
 } from './types';
 import type {
-    CajaSesion, CajaMovimiento as CM, CajaGastoCategoria,
+    CajaSesion, CajaMovimiento, CajaGastoCategoria,
     ResumenCaja, CajaSesionResumen, AbrirCajaIn, CerrarCajaIn, GastoIn, CategoriaGastoIn,
 } from '../hooks/useCaja';
 
@@ -331,15 +331,17 @@ export const getCajaSesionActiva = () =>
 export const getHistorialCaja = () =>
     client<CajaSesionResumen[]>('/caja/sesiones');
 export const abrirCaja = (data: AbrirCajaIn) =>
-    client<CajaSesion>('/caja/sesion/abrir', { body: data });
+    client<CajaSesion>('/caja/sesion/abrir', { method: 'POST', body: data });
 export const cerrarCaja = (sesionId: string, data: CerrarCajaIn) =>
-    client<CajaSesion>(`/caja/sesion/${sesionId}/cerrar`, { body: data });
+    client<CajaSesion>(`/caja/sesion/${sesionId}/cerrar`, { method: 'POST', body: data });
 export const getResumenCaja = (sesionId: string) =>
     client<ResumenCaja>(`/caja/sesion/${sesionId}/resumen`);
 export const getMovimientos = () =>
-    client<CM[]>('/caja/movimientos');
+    client<CajaMovimiento[]>('/caja/movimientos');
 export const registrarGasto = (data: GastoIn) =>
-    client<CM>('/caja/gastos', { body: data });
+    client<CajaMovimiento>('/caja/gastos', { method: 'POST', body: data });
+export const registrarIngreso = (data: { monto: number; descripcion: string; metodo: string }) =>
+    client('/caja/ingresos', { method: 'POST', body: data });
 export const getCategoriasGasto = () =>
     client<CajaGastoCategoria[]>('/caja/categorias-gasto');
 export const createCategoriaGasto = (data: CategoriaGastoIn) =>

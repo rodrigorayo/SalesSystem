@@ -41,6 +41,16 @@ class GastoIn(BaseModel):
     descripcion:  str
     categoria_id: Optional[str] = None
 
+class IngresoIn(BaseModel):
+    monto:        float
+    metodo:       str
+    descripcion:  str
+
+class IngresoIn(BaseModel):
+    monto:       float
+    descripcion: str
+    metodo:      str  # "EFECTIVO", "QR", "TARJETA"
+
 class CategoriaGastoIn(BaseModel):
     nombre:      str
     descripcion: Optional[str] = None
@@ -60,10 +70,14 @@ class ResumenCaja(BaseModel):
     # ── Digital channels ─────────────────────────────────────────────────────
     total_qr:              float
     total_tarjeta:         float
-    # ── Grand total (all methods) ─────────────────────────────────────────────
-    total_ventas_general:  float   # sum of all payment methods across all sales
+    total_ventas_general:  float
+    # ── Manual Income ────────────────────────────────────────────────────────
+    total_ingresos_efectivo: float = 0.0
+    total_ingresos_qr:       float = 0.0
+    total_ingresos_tarjeta:  float = 0.0
+    # ── Utils ────────────────────────────────────────────────────────────────
     num_transacciones:     int
-    movimientos:           list
+    movimientos:           List[dict]
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,10 +107,11 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
     for s in sesiones:
         movs = await CajaMovimiento.find(CajaMovimiento.sesion_id == str(s.id)).to_list()
         ef   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
+        ef_ing = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
         cc   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.CAMBIO)
         gs   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.GASTO)
         aj   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.AJUSTE)
-        saldo = float(s.monto_inicial) + ef - cc - gs + aj
+        saldo = float(s.monto_inicial) + ef + ef_ing - cc - gs + aj
 
         # Digital totals from sales during this session
         cerrada_at = s.cerrada_at or datetime.utcnow()
@@ -107,8 +122,8 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
             Sale.created_at  <= cerrada_at,
             Sale.anulada     == False,
         ).to_list()
-        total_qr      = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "QR")
-        total_tarjeta = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "TARJETA")
+        total_qr      = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "QR") + sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_QR)
+        total_tarjeta = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "TARJETA") + sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
         total_ventas  = sum(float(p.monto) for sale in sales for p in (sale.pagos or []))
 
         result.append({
@@ -216,11 +231,16 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
     ).sort("+fecha").to_list()
 
     total_ventas_ef = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
+    total_ingresos_ef = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
     total_cambio    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.CAMBIO)
     total_gastos    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.GASTO)
     total_ajustes   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.AJUSTE)
+    
+    total_ingresos_qr = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
+    total_ingresos_tj = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
+
     monto_inicial   = float(sesion.monto_inicial)
-    saldo_calculado = monto_inicial + total_ventas_ef - total_cambio - total_gastos + total_ajustes
+    saldo_calculado = monto_inicial + total_ventas_ef + total_ingresos_ef - total_cambio - total_gastos + total_ajustes
 
     # ── Sales made during this session (for digital channel totals) ───────────
     cerrada_at = sesion.cerrada_at or datetime.utcnow()
@@ -247,6 +267,8 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
             else:
                 total_efectivo_sales += v
 
+    total_qr += sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
+    total_tarjeta += sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
     total_ventas_general = total_qr + total_tarjeta + total_efectivo_sales
     num_transacciones    = len(sales_in_session)
 
@@ -263,6 +285,9 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
         total_qr               = total_qr,
         total_tarjeta          = total_tarjeta,
         total_ventas_general   = total_ventas_general,
+        total_ingresos_efectivo = total_ingresos_ef,
+        total_ingresos_qr       = total_ingresos_qr,
+        total_ingresos_tarjeta  = total_ingresos_tj,
         num_transacciones      = num_transacciones,
         movimientos            = [m.model_dump(mode="json") for m in movimientos],
     )
@@ -290,6 +315,39 @@ async def registrar_gasto(body: GastoIn, current_user: User = Depends(get_curren
         monto       = float(body.monto),
         descripcion = body.descripcion,
         categoria_id= body.categoria_id,
+    )
+    await mov.create()
+    return mov
+
+
+# ─── Ingresos Manuales ────────────────────────────────────────────────────────
+
+@router.post("/ingresos")
+async def registrar_ingreso(body: IngresoIn, current_user: User = Depends(get_current_active_user)):
+    tenant_id   = current_user.tenant_id or "default"
+    sucursal_id = current_user.sucursal_id or "CENTRAL"
+
+    sesion = await _get_active_session(tenant_id, sucursal_id)
+    if not sesion:
+        raise HTTPException(status_code=400, detail="No hay una sesión de caja abierta. Abrí la caja primero.")
+
+    subtipo = SubtipoMovimiento.INGRESO_EFECTIVO
+    metodo_upper = body.metodo.upper()
+    if metodo_upper == "QR":
+        subtipo = SubtipoMovimiento.INGRESO_QR
+    elif metodo_upper == "TARJETA":
+        subtipo = SubtipoMovimiento.INGRESO_TARJETA
+
+    mov = CajaMovimiento(
+        tenant_id   = tenant_id,
+        sucursal_id = sucursal_id,
+        sesion_id   = str(sesion.id),
+        cajero_id   = str(current_user.id),
+        cajero_name = current_user.full_name or current_user.username,
+        subtipo     = subtipo,
+        tipo        = "INGRESO",
+        monto       = float(body.monto),
+        descripcion = body.descripcion,
     )
     await mov.create()
     return mov

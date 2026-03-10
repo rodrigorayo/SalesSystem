@@ -43,10 +43,11 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
             </div>
 
             {/* Datos del Cliente (si los hay) */}
-            {(c?.razon_social || c?.nit || c?.email) && (
+            {(c?.razon_social || c?.nit || c?.email || c?.telefono) && (
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '5px 0', marginBottom: '10px', fontSize: '11px' }}>
                     {c.razon_social && <p style={{ margin: '2px 0' }}>Señor(es): {c.razon_social}</p>}
                     {c.nit && <p style={{ margin: '2px 0' }}>NIT/CI: {c.nit}</p>}
+                    {c.telefono && <p style={{ margin: '2px 0' }}>Celular: {c.telefono}</p>}
                     {c.email && <p style={{ margin: '2px 0' }}>Email: {c.email}</p>}
                 </div>
             )}

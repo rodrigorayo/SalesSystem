@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     useSesionActiva, useAbrirCaja, useCerrarCaja,
-    useMovimientos, useRegistrarGasto,
+    useMovimientos, useRegistrarGasto, useRegistrarIngreso,
     useCategoriasGasto, useCrearCategoriaGasto,
     useResumenCaja, useHistorialCaja,
     type CajaGastoCategoria, type CajaSesionResumen, type ResumenCaja,
@@ -350,6 +350,7 @@ export default function CajaPage() {
     const abrirMut = useAbrirCaja();
     const cerrarMut = useCerrarCaja();
     const gastoMut = useRegistrarGasto();
+    const ingresoMut = useRegistrarIngreso();
     const catMut = useCrearCategoriaGasto();
 
     const { data: resumen } = useResumenCaja(sesion?._id);
@@ -359,7 +360,7 @@ export default function CajaPage() {
     const [kpiOpen, setKpiOpen] = useLocalStorage<boolean>('caja-kpi-open', true);
 
     // ── Modal state ───────────────────────────────────────────────────────
-    type ModalType = 'abrir' | 'gasto' | 'cierre' | 'categoria' | null;
+    type ModalType = 'abrir' | 'gasto' | 'ingreso' | 'cierre' | 'categoria' | null;
     const [modal, setModal] = useState<ModalType>(null);
     const closeModal = () => setModal(null);
 
@@ -371,9 +372,18 @@ export default function CajaPage() {
     const [gastoDesc, setGastoDesc] = useState('');
     const [gastoCategId, setGastoCategId] = useState('');
 
+    // ingreso manual
+    const [ingresoMonto, setIngresoMonto] = useState('');
+    const [ingresoDesc, setIngresoDesc] = useState('');
+    const [ingresoMetodo, setIngresoMetodo] = useState<'EFECTIVO' | 'QR' | 'TARJETA'>('EFECTIVO');
+
     // cierre
-    const [montoFisico, setMontoFisico] = useState('');
     const [notasCierre, setNotasCierre] = useState('');
+    // Denominaciones (Calculadora de cierre)
+    const [billetes, setBilletes] = useState<Record<string, number>>({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
+    const [monedas, setMonedas] = useState<Record<string, number>>({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
+    const totalFisicoCalculado = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
+        Object.entries(monedas).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0);
 
     // nueva categoría
     const [catNombre, setCatNombre] = useState('');
@@ -385,8 +395,8 @@ export default function CajaPage() {
         ? resumen.monto_inicial + resumen.total_efectivo_ventas - resumen.total_cambio - resumen.total_gastos + (resumen.total_ajustes || 0)
         : 0;
 
-    const diferencia = montoFisico !== ''
-        ? parseFloat(montoFisico) - (resumen?.saldo_calculado ?? 0)
+    const diferencia = (totalFisicoCalculado > 0 || modal === 'cierre')
+        ? totalFisicoCalculado - (resumen?.saldo_calculado ?? 0)
         : null;
 
     // ── Handlers ──────────────────────────────────────────────────────────
@@ -409,16 +419,28 @@ export default function CajaPage() {
         });
     };
 
+    const handleIngreso = () => {
+        if (!ingresoMonto || !ingresoDesc) return;
+        ingresoMut.mutate({
+            monto: parseFloat(ingresoMonto),
+            descripcion: ingresoDesc,
+            metodo: ingresoMetodo,
+        }, {
+            onSuccess: () => { setIngresoMonto(''); setIngresoDesc(''); setIngresoMetodo('EFECTIVO'); closeModal(); },
+        });
+    };
+
     const handleCierre = () => {
-        if (!sesion || montoFisico === '') return;
+        if (!sesion || totalFisicoCalculado === 0) return;
         cerrarMut.mutate({
             sesionId: sesion._id,
-            data: { monto_fisico_contado: parseFloat(montoFisico), notas: notasCierre || undefined },
+            data: { monto_fisico_contado: totalFisicoCalculado, notas: notasCierre || undefined },
         }, {
-            onSuccess: () => { 
-                setMontoFisico(''); 
-                setNotasCierre(''); 
-                closeModal(); 
+            onSuccess: () => {
+                setBilletes({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
+                setMonedas({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
+                setNotasCierre('');
+                closeModal();
                 setTab('historial');
             },
         });
@@ -485,6 +507,10 @@ export default function CajaPage() {
                                 </button>
                             ) : (
                                 <>
+                                    <button onClick={() => setModal('ingreso')}
+                                        className="flex items-center gap-1.5 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-300 border border-green-500/30 rounded-lg font-bold text-xs transition-all active:scale-95">
+                                        <Plus size={13} /> Ingreso
+                                    </button>
                                     <button onClick={() => setModal('gasto')}
                                         className="flex items-center gap-1.5 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-lg font-bold text-xs transition-all active:scale-95">
                                         <MinusCircle size={13} /> Gasto
@@ -531,23 +557,23 @@ export default function CajaPage() {
                         {/* Cash drawer */}
                         <div className="grid grid-cols-4 gap-2">
                             <StatCard label="Inicial" value={resumen.monto_inicial} color="border-blue-200 bg-blue-50 text-blue-800" />
-                            <StatCard label="Ef. recibido" value={resumen.total_efectivo_ventas} color="border-green-200 bg-green-50 text-green-800" />
+                            <StatCard label="Ef. Recibido (+Ingresos)" value={resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0)} color="border-green-200 bg-green-50 text-green-800" />
                             <StatCard label="Cambio" value={resumen.total_cambio} color="border-amber-200 bg-amber-50 text-amber-800" />
                             <StatCard label="Gastos" value={resumen.total_gastos} color="border-red-200 bg-red-50 text-red-800" />
                         </div>
                         {/* Digital channels + grand total */}
                         <div className="grid grid-cols-4 gap-2">
                             <div className="rounded-xl p-2.5 border border-sky-200 bg-sky-50 text-sky-800">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">QR</p>
+                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">QR (+Ingresos)</p>
                                 <p className="text-sm font-black font-mono">{fmt(resumen.total_qr)}</p>
                             </div>
                             <div className="rounded-xl p-2.5 border border-purple-200 bg-purple-50 text-purple-800">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Tarjeta</p>
+                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Tarjeta (+Ingresos)</p>
                                 <p className="text-sm font-black font-mono">{fmt(resumen.total_tarjeta)}</p>
                             </div>
                             <div className="rounded-xl p-2.5 border border-gray-200 bg-gray-100 text-gray-600">
                                 <p className="text-[10px] font-semibold opacity-60 mb-0.5">Ajustes</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_ajustes)}</p>
+                                <p className="text-sm font-black font-mono">{fmt(resumen.total_ajustes || 0)}</p>
                             </div>
                             <div className="rounded-xl p-2.5 border-2 border-indigo-200 bg-indigo-50 text-indigo-900 border-dashed">
                                 <p className="text-[10px] font-semibold opacity-60 mb-0.5">Calculado {sesion?.estado === 'CERRADA' ? '(Final)' : '(Actual)'}</p>
@@ -730,6 +756,55 @@ export default function CajaPage() {
                                 </>
                             )}
 
+                            {/* ── INGRESO ── */}
+                            {modal === 'ingreso' && (
+                                <>
+                                    <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mb-4">
+                                        <Plus size={22} className="text-green-600" />
+                                    </div>
+                                    <h2 className="text-xl font-black mb-1">Registrar Ingreso</h2>
+                                    <p className="text-sm text-gray-400 mb-5">Ingreso de dinero a caja (ej. sencillo, ventas sin inventario).</p>
+
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Método de pago</label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['EFECTIVO', 'QR', 'TARJETA'].map(m => (
+                                                    <button key={m}
+                                                        onClick={() => setIngresoMetodo(m as any)}
+                                                        className={`py-2 rounded-xl text-xs font-bold transition-colors border ${ingresoMetodo === m
+                                                                ? 'bg-green-100 border-green-300 text-green-700'
+                                                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                                                            }`}
+                                                    >
+                                                        {m}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Descripción</label>
+                                            <input type="text" autoFocus
+                                                className="w-full bg-gray-50 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-300 text-gray-900"
+                                                placeholder="Ej: Cambio (sencillo) o Venta Manual..."
+                                                value={ingresoDesc} onChange={e => setIngresoDesc(e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto (Bs.)</label>
+                                            <input type="number" step="0.01"
+                                                className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-green-300 text-gray-900"
+                                                placeholder="0.00"
+                                                value={ingresoMonto} onChange={e => setIngresoMonto(e.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <button onClick={handleIngreso} disabled={!ingresoMonto || !ingresoDesc || ingresoMut.isPending}
+                                        className="w-full mt-5 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-sm disabled:opacity-50 transition-colors">
+                                        {ingresoMut.isPending ? 'Guardando...' : 'Registrar Ingreso'}
+                                    </button>
+                                </>
+                            )}
+
                             {/* ── CIERRE DE CAJA ── */}
                             {modal === 'cierre' && (
                                 <>
@@ -746,8 +821,12 @@ export default function CajaPage() {
                                             <span className="font-mono font-bold text-gray-700">+ {fmt(resumen?.monto_inicial)}</span>
                                         </div>
                                         <div className="flex justify-between text-gray-500">
-                                            <span>Efectivo recibido</span>
+                                            <span>Efectivo por ventas</span>
                                             <span className="font-mono font-bold text-green-600">+ {fmt(resumen?.total_efectivo_ventas)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-gray-500">
+                                            <span>Ingresos manuales (Ef.)</span>
+                                            <span className="font-mono font-bold text-green-600">+ {fmt(resumen?.total_ingresos_efectivo)}</span>
                                         </div>
                                         <div className="flex justify-between text-gray-500">
                                             <span>Cambio entregado</span>
@@ -763,25 +842,67 @@ export default function CajaPage() {
                                         </div>
                                     </div>
 
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Efectivo contado físicamente (Bs.)</label>
-                                    <input type="number" step="0.01" autoFocus
-                                        className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-400 mb-2 text-gray-900"
-                                        placeholder="0.00" value={montoFisico} onChange={e => setMontoFisico(e.target.value)} />
 
-                                    {diferencia !== null && (
+                                    {/* ==== Calculadora de Billetes y Monedas ==== */}
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        {/* Billetes */}
+                                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Billetes (Cant.)</h3>
+                                            <div className="space-y-1">
+                                                {Object.entries(billetes).sort((a, b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                    <div key={`b-${val}`} className="flex items-center justify-between group">
+                                                        <span className="text-[11px] font-bold text-gray-500 w-12 text-right">Bs {val}</span>
+                                                        <input
+                                                            type="number" min="0"
+                                                            className="w-16 ml-2 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono transition-all focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+                                                            value={cant || ''}
+                                                            placeholder="0"
+                                                            onChange={e => setBilletes(prev => ({ ...prev, [val]: parseInt(e.target.value) || 0 }))}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Monedas */}
+                                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Monedas (Cant.)</h3>
+                                            <div className="space-y-1">
+                                                {Object.entries(monedas).sort((a, b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                    <div key={`m-${val}`} className="flex items-center justify-between group">
+                                                        <span className="text-[11px] font-bold text-gray-500 w-12 text-right">Bs {val}</span>
+                                                        <input
+                                                            type="number" min="0"
+                                                            className="w-16 ml-2 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono transition-all focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+                                                            value={cant || ''}
+                                                            placeholder="0"
+                                                            onChange={e => setMonedas(prev => ({ ...prev, [val]: parseInt(e.target.value) || 0 }))}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex justify-between items-center mb-4">
+                                        <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Efectivo Físico Contado</span>
+                                        <span className="text-2xl font-black font-mono text-indigo-900">Bs. {fmt(totalFisicoCalculado)}</span>
+                                    </div>
+
+                                    {diferencia !== null && totalFisicoCalculado > 0 && (
                                         <p className={`text-sm font-bold mb-3 text-center ${Math.abs(diferencia) < 0.01 ? 'text-green-600' : diferencia > 0 ? 'text-blue-600' : 'text-red-500'}`}>
                                             {Math.abs(diferencia) < 0.01
                                                 ? '✓ Cuadra perfecto'
                                                 : diferencia > 0
-                                                    ? `↑ Sobrante: ${fmt(diferencia)}`
-                                                    : `↓ Faltante: ${fmt(Math.abs(diferencia))}`}
+                                                    ? `↑ Sobrante en caja: ${fmt(diferencia)}`
+                                                    : `↓ Faltante en caja: ${fmt(Math.abs(diferencia))}`}
                                         </p>
                                     )}
 
                                     {(() => {
-                                        const requiereJustificacion = diferencia !== null && diferencia < -0.01;
+                                        // Tolerancia de 0.50 centavos
+                                        const requiereJustificacion = diferencia !== null && diferencia < -0.50;
                                         const notasAceptables = notasCierre && notasCierre.length >= 10;
-                                        const btnDisabled = montoFisico === '' || cerrarMut.isPending || (requiereJustificacion && !notasAceptables);
+                                        const btnDisabled = totalFisicoCalculado === 0 || cerrarMut.isPending || (requiereJustificacion && !notasAceptables);
 
                                         return (
                                             <>
@@ -789,7 +910,7 @@ export default function CajaPage() {
                                                     {requiereJustificacion ? 'Justificación Obligatoria' : 'Notas (opcional)'}
                                                 </label>
                                                 <textarea
-                                                    className={`w-full bg-gray-50 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 mb-5 resize-none h-20 
+                                                    className={`w-full bg-gray-50 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 mb-5 resize-none h-20
                                                         ${requiereJustificacion ? 'border border-red-300 focus:ring-red-400 text-red-900 bg-red-50 placeholder-red-300' : 'focus:ring-indigo-300 text-gray-900'}`}
                                                     placeholder={requiereJustificacion ? "Explica detalladamente por qué falta dinero..." : "Observaciones..."}
                                                     value={notasCierre} onChange={e => setNotasCierre(e.target.value)}
@@ -798,7 +919,7 @@ export default function CajaPage() {
                                                 <button onClick={handleCierre} disabled={btnDisabled}
                                                     className={`w-full py-3 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50
                                                         ${requiereJustificacion && !notasAceptables ? 'bg-red-400' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
-                                                    {cerrarMut.isPending ? 'Cerrando...' : requiereJustificacion && !notasAceptables ? 'Justificación requerida' : 'Confirmar Cierre'}
+                                                    {cerrarMut.isPending ? 'Cerrando...' : requiereJustificacion && !notasAceptables ? 'Justificación requerida (Faltante)' : 'Confirmar Cierre y Arqueo'}
                                                 </button>
                                             </>
                                         );
