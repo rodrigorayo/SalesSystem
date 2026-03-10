@@ -23,10 +23,6 @@ class SubtipoMovimiento(str, Enum):
     CAMBIO          = "CAMBIO"          # cambio devuelto al cliente (egreso)
     GASTO           = "GASTO"           # gasto manual del cajero
     AJUSTE          = "AJUSTE"          # corrección manual
-    # Nuevos ingresos manuales
-    INGRESO_EFECTIVO = "INGRESO_EFECTIVO"
-    INGRESO_QR       = "INGRESO_QR"
-    INGRESO_TARJETA  = "INGRESO_TARJETA"
 
 
 def _coerce_decimal128(v: Any) -> float:
