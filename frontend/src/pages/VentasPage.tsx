@@ -194,6 +194,9 @@ export default function VentasPage() {
                                                 {venta.cliente.email && (
                                                     <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Correo</span><span className="text-gray-600">{venta.cliente.email}</span></div>
                                                 )}
+                                                {venta.cliente.telefono && (
+                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Celular</span><span className="text-gray-600 font-medium">{venta.cliente.telefono}</span></div>
+                                                )}
                                             </div>
                                         )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
