@@ -33,6 +33,7 @@ class ClienteIn(BaseModel):
     nit: Optional[str] = None
     razon_social: Optional[str] = None
     email: Optional[str] = None
+    telefono: Optional[str] = None
     es_factura: bool = False
 
 
