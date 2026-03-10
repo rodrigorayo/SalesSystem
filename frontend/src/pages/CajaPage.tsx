@@ -690,7 +690,9 @@ export default function CajaPage() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
                             transition={{ duration: 0.2, ease: "easeOut" }}
-                            className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative"
+                            className={`bg-white rounded-3xl w-full p-8 shadow-2xl relative transition-all duration-300 ${
+                                modal === 'cierre' ? 'max-w-5xl' : 'max-w-md'
+                            }`}
                         >
                             <button onClick={closeModal} className="absolute top-5 right-5 text-gray-300 hover:text-gray-600 transition-colors">
                                 <X size={20} />
@@ -815,7 +817,7 @@ export default function CajaPage() {
 
                             {/* ── CIERRE DE CAJA ── */}
                             {modal === 'cierre' && (
-                                <div className="max-w-4xl w-full mx-auto">
+                                <div className="w-full mx-auto">
                                     <div className="flex items-center gap-4 mb-6">
                                         <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center">
                                             <Lock size={22} className="text-indigo-600" />
