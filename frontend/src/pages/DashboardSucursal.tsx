@@ -26,7 +26,7 @@ export default function DashboardSucursal() {
     const stockBajo = inv.filter(i => i.cantidad <= 5);
 
     return (
-        <div className="max-w-7xl mx-auto p-4 space-y-4">
+        <div className="max-w-7xl mx-auto px-3 py-4 md:p-4 space-y-4 pb-20 md:pb-4">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Mi Sucursal</h1>

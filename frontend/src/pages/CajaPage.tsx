@@ -474,7 +474,7 @@ export default function CajaPage() {
     // UI
     // ─────────────────────────────────────────────────────────────────────
     return (
-        <div className="p-4 space-y-3 h-full flex flex-col overflow-y-auto">
+        <div className="px-3 md:p-4 py-4 space-y-3 h-full flex flex-col overflow-y-auto pb-20 md:pb-4">
 
             {/* ── Tabs de Navegación (Estilo Navegador) ── */}
             <div className="flex gap-1 pl-0 relative z-10 w-full mb-0">
@@ -563,14 +563,14 @@ export default function CajaPage() {
                         className="space-y-2 overflow-hidden mb-2 mt-2"
                     >
                         {/* Cash drawer */}
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             <StatCard label="Inicial" value={resumen.monto_inicial} color="border-blue-200 bg-blue-50 text-blue-800" />
                             <StatCard label="Ef. Recibido (+Ingresos)" value={resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0)} color="border-green-200 bg-green-50 text-green-800" />
                             <StatCard label="Cambio" value={resumen.total_cambio} color="border-amber-200 bg-amber-50 text-amber-800" />
                             <StatCard label="Gastos" value={resumen.total_gastos} color="border-red-200 bg-red-50 text-red-800" />
                         </div>
                         {/* Digital channels + grand total */}
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             <div className="rounded-xl p-2.5 border border-sky-200 bg-sky-50 text-sky-800">
                                 <p className="text-[10px] font-semibold opacity-60 mb-0.5">QR (+Ingresos)</p>
                                 <p className="text-sm font-black font-mono">{fmt(resumen.total_qr)}</p>
@@ -682,16 +682,16 @@ export default function CajaPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        className="fixed inset-0 z-[100] flex items-end md:items-center justify-center md:p-4 bg-black/60 backdrop-blur-sm"
                     >
                         <motion.div
                             key="caja-modal-content"
-                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
-                            className={`bg-white rounded-3xl w-full p-8 shadow-2xl relative transition-all duration-300 ${
-                                modal === 'cierre' ? 'max-w-5xl' : 'max-w-md'
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 40 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            className={`bg-white w-full md:rounded-3xl rounded-t-3xl p-6 md:p-8 shadow-2xl relative overflow-y-auto max-h-[92vh] md:max-h-[90vh] transition-all duration-300 ${
+                                modal === 'cierre' ? 'md:max-w-5xl' : 'md:max-w-md'
                             }`}
                         >
                             <button onClick={closeModal} className="absolute top-5 right-5 text-gray-300 hover:text-gray-600 transition-colors">

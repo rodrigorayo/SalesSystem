@@ -66,6 +66,7 @@ export default function POSPage() {
     const [lastSale, setLastSale] = useState<Sale | null>(null);
     const [confirmSale, setConfirmSale] = useState(false);
     const [panelOpen, setPanelOpen] = useLocalStorage('pos-panel-open', true); // factura+pagos+totals visible
+    const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
 
     const { data: products = [], isLoading: loadingP } = useQuery({ queryKey: ['products'], queryFn: getProducts });
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
@@ -213,11 +214,38 @@ export default function POSPage() {
     }
 
     return (
-        <div className="flex h-full bg-gray-100 overflow-hidden">
+        <div className="flex flex-col md:flex-row h-full bg-gray-100 overflow-hidden">
+
+            {/* Mobile Tab Switcher (only on small screens) */}
+            <div className="md:hidden shrink-0 flex border-b border-gray-200 bg-white">
+                <button
+                    onClick={() => setMobileTab('catalog')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-colors border-b-2 ${
+                        mobileTab === 'catalog' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'
+                    }`}
+                >
+                    <Search size={16} /> Catálogo
+                </button>
+                <button
+                    onClick={() => setMobileTab('cart')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-colors border-b-2 relative ${
+                        mobileTab === 'cart' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'
+                    }`}
+                >
+                    <ShoppingCart size={16} /> Carrito
+                    {items.length > 0 && (
+                        <span className="absolute top-2 right-6 w-4 h-4 bg-indigo-600 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                            {items.length}
+                        </span>
+                    )}
+                </button>
+            </div>
 
 
             {/* ════════════════ LEFT — Product Catalog ════════════════ */}
-            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div className={`flex-1 flex-col overflow-hidden min-w-0 ${
+                mobileTab === 'catalog' ? 'flex' : 'hidden md:flex'
+            }`}>
 
                 {/* Search + stats */}
                 <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 shrink-0">
@@ -320,7 +348,9 @@ export default function POSPage() {
               • Only the ITEMS section has flex-1 + overflow-y-auto → it scrolls
               • Every other section (factura, pagos, totals, button) uses shrink-0 → never scrolls away
             */}
-            <div className="w-[380px] bg-white border-l border-gray-200 flex flex-col overflow-hidden shadow-xl">
+            <div className={`md:w-[380px] w-full md:flex flex-col overflow-hidden shadow-xl bg-white border-l border-gray-200 ${
+                mobileTab === 'cart' ? 'flex' : 'hidden md:flex'
+            }`}>
 
                 {/* ── Header ── (shrink-0) */}
                 <div className="shrink-0 px-3 py-2 border-b border-gray-100 flex items-center gap-2">
