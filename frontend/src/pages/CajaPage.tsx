@@ -379,11 +379,18 @@ export default function CajaPage() {
 
     // cierre
     const [notasCierre, setNotasCierre] = useState('');
+    const [conteoDetallado, setConteoDetallado] = useState(true);
+    const [montoFisicoManual, setMontoFisicoManual] = useState('');
+
     // Denominaciones (Calculadora de cierre)
     const [billetes, setBilletes] = useState<Record<string, number>>({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
     const [monedas, setMonedas] = useState<Record<string, number>>({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
+    
+    // El "Total" final depende de si es detallado o manual
     const totalFisicoCalculado = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
         Object.entries(monedas).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0);
+
+    const totalFisicoFinal = conteoDetallado ? totalFisicoCalculado : (parseFloat(montoFisicoManual) || 0);
 
     // nueva categoría
     const [catNombre, setCatNombre] = useState('');
@@ -395,8 +402,8 @@ export default function CajaPage() {
         ? resumen.monto_inicial + resumen.total_efectivo_ventas - resumen.total_cambio - resumen.total_gastos + (resumen.total_ajustes || 0)
         : 0;
 
-    const diferencia = (totalFisicoCalculado > 0 || modal === 'cierre')
-        ? totalFisicoCalculado - (resumen?.saldo_calculado ?? 0)
+    const diferencia = (totalFisicoFinal > 0 || modal === 'cierre')
+        ? totalFisicoFinal - (resumen?.saldo_calculado ?? 0)
         : null;
 
     // ── Handlers ──────────────────────────────────────────────────────────
@@ -431,14 +438,15 @@ export default function CajaPage() {
     };
 
     const handleCierre = () => {
-        if (!sesion || totalFisicoCalculado === 0) return;
+        if (!sesion || totalFisicoFinal === 0) return;
         cerrarMut.mutate({
             sesionId: sesion._id,
-            data: { monto_fisico_contado: totalFisicoCalculado, notas: notasCierre || undefined },
+            data: { monto_fisico_contado: totalFisicoFinal, notas: notasCierre || undefined },
         }, {
             onSuccess: () => {
                 setBilletes({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
                 setMonedas({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
+                setMontoFisicoManual('');
                 setNotasCierre('');
                 closeModal();
                 setTab('historial');
@@ -807,124 +815,208 @@ export default function CajaPage() {
 
                             {/* ── CIERRE DE CAJA ── */}
                             {modal === 'cierre' && (
-                                <>
-                                    <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4">
-                                        <Lock size={22} className="text-indigo-600" />
-                                    </div>
-                                    <h2 className="text-xl font-black mb-1">Cierre de Caja</h2>
-                                    <p className="text-sm text-gray-400 mb-4">Verificá el arqueo antes de cerrar.</p>
-
-                                    {/* Resumen automático */}
-                                    <div className="bg-gray-50 rounded-2xl p-4 text-sm space-y-2 mb-4 border border-gray-100">
-                                        <div className="flex justify-between text-gray-500">
-                                            <span>Monto inicial</span>
-                                            <span className="font-mono font-bold text-gray-700">+ {fmt(resumen?.monto_inicial)}</span>
+                                <div className="max-w-4xl w-full mx-auto">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center">
+                                            <Lock size={22} className="text-indigo-600" />
                                         </div>
-                                        <div className="flex justify-between text-gray-500">
-                                            <span>Efectivo por ventas</span>
-                                            <span className="font-mono font-bold text-green-600">+ {fmt(resumen?.total_efectivo_ventas)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-gray-500">
-                                            <span>Ingresos manuales (Ef.)</span>
-                                            <span className="font-mono font-bold text-green-600">+ {fmt(resumen?.total_ingresos_efectivo)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-gray-500">
-                                            <span>Cambio entregado</span>
-                                            <span className="font-mono font-bold text-amber-600">- {fmt(resumen?.total_cambio)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-gray-500">
-                                            <span>Total gastos</span>
-                                            <span className="font-mono font-bold text-red-500">- {fmt(resumen?.total_gastos)}</span>
-                                        </div>
-                                        <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900">
-                                            <span>Saldo calculado</span>
-                                            <span className="font-mono">{fmt(resumen?.saldo_calculado)}</span>
+                                        <div>
+                                            <h2 className="text-xl font-black mb-0.5 text-gray-900 text-left">Cierre de Caja</h2>
+                                            <p className="text-sm text-gray-400 text-left">Verificá los montos y realizá el arqueo físico.</p>
                                         </div>
                                     </div>
 
-
-                                    {/* ==== Calculadora de Billetes y Monedas ==== */}
-                                    <div className="grid grid-cols-2 gap-4 mb-4">
-                                        {/* Billetes */}
-                                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Billetes (Cant.)</h3>
-                                            <div className="space-y-1">
-                                                {Object.entries(billetes).sort((a, b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
-                                                    <div key={`b-${val}`} className="flex items-center justify-between group">
-                                                        <span className="text-[11px] font-bold text-gray-500 w-12 text-right">Bs {val}</span>
-                                                        <input
-                                                            type="number" min="0"
-                                                            className="w-16 ml-2 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono transition-all focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
-                                                            value={cant || ''}
-                                                            placeholder="0"
-                                                            onChange={e => setBilletes(prev => ({ ...prev, [val]: parseInt(e.target.value) || 0 }))}
-                                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                                        
+                                        {/* COLUMNA IZQUIERDA: RESUMEN ESPERADO */}
+                                        <div className="space-y-4">
+                                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-indigo-400 rounded-full" />
+                                                Saldo Esperado (Sistema)
+                                            </h3>
+                                            
+                                            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-gray-400 font-medium">Fondo Inicial</span>
+                                                    <span className="font-mono font-bold text-gray-600">{fmt(resumen?.monto_inicial)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-gray-400 font-medium">Ventas en Efectivo</span>
+                                                    <span className="font-mono font-bold text-green-600">+{fmt(resumen?.total_efectivo_ventas)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg">
+                                                    <span className="font-medium">Ingresos Manuales</span>
+                                                    <span className="font-mono font-bold">+{fmt(resumen?.total_ingresos_efectivo)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-gray-400 font-medium">Cambio Entregado</span>
+                                                    <span className="font-mono font-bold text-amber-600">-{fmt(resumen?.total_cambio)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-gray-400 font-medium">Gastos Registrados</span>
+                                                    <span className="font-mono font-bold text-red-500">-{fmt(resumen?.total_gastos)}</span>
+                                                </div>
+                                                
+                                                <div className="pt-4 border-t border-dashed border-gray-100">
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="text-xs font-black text-gray-900 uppercase">Deben haber:</span>
+                                                        <span className="text-3xl font-black font-mono text-gray-900 tracking-tighter">
+                                                            {fmt(resumen?.saldo_calculado)}
+                                                        </span>
                                                     </div>
-                                                ))}
+                                                </div>
+                                            </div>
+
+                                            {/* KPI ADICIONALES (Solo lectura) */}
+                                            <div className="grid grid-cols-2 gap-3 opacity-60">
+                                                <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Ventas QR</p>
+                                                    <p className="text-sm font-bold font-mono text-gray-600">{fmt(resumen?.total_qr)}</p>
+                                                </div>
+                                                <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Ventas Tarjeta</p>
+                                                    <p className="text-sm font-bold font-mono text-gray-600">{fmt(resumen?.total_tarjeta)}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                        {/* Monedas */}
-                                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Monedas (Cant.)</h3>
-                                            <div className="space-y-1">
-                                                {Object.entries(monedas).sort((a, b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
-                                                    <div key={`m-${val}`} className="flex items-center justify-between group">
-                                                        <span className="text-[11px] font-bold text-gray-500 w-12 text-right">Bs {val}</span>
-                                                        <input
-                                                            type="number" min="0"
-                                                            className="w-16 ml-2 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono transition-all focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
-                                                            value={cant || ''}
-                                                            placeholder="0"
-                                                            onChange={e => setMonedas(prev => ({ ...prev, [val]: parseInt(e.target.value) || 0 }))}
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex justify-between items-center mb-4">
-                                        <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Efectivo Físico Contado</span>
-                                        <span className="text-2xl font-black font-mono text-indigo-900">Bs. {fmt(totalFisicoCalculado)}</span>
-                                    </div>
-
-                                    {diferencia !== null && totalFisicoCalculado > 0 && (
-                                        <p className={`text-sm font-bold mb-3 text-center ${Math.abs(diferencia) < 0.01 ? 'text-green-600' : diferencia > 0 ? 'text-blue-600' : 'text-red-500'}`}>
-                                            {Math.abs(diferencia) < 0.01
-                                                ? '✓ Cuadra perfecto'
-                                                : diferencia > 0
-                                                    ? `↑ Sobrante en caja: ${fmt(diferencia)}`
-                                                    : `↓ Faltante en caja: ${fmt(Math.abs(diferencia))}`}
-                                        </p>
-                                    )}
-
-                                    {(() => {
-                                        // Tolerancia de 0.50 centavos
-                                        const requiereJustificacion = diferencia !== null && diferencia < -0.50;
-                                        const notasAceptables = notasCierre && notasCierre.length >= 10;
-                                        const btnDisabled = totalFisicoCalculado === 0 || cerrarMut.isPending || (requiereJustificacion && !notasAceptables);
-
-                                        return (
-                                            <>
-                                                <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${requiereJustificacion ? 'text-red-500' : 'text-gray-500'}`}>
-                                                    {requiereJustificacion ? 'Justificación Obligatoria' : 'Notas (opcional)'}
-                                                </label>
-                                                <textarea
-                                                    className={`w-full bg-gray-50 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 mb-5 resize-none h-20
-                                                        ${requiereJustificacion ? 'border border-red-300 focus:ring-red-400 text-red-900 bg-red-50 placeholder-red-300' : 'focus:ring-indigo-300 text-gray-900'}`}
-                                                    placeholder={requiereJustificacion ? "Explica detalladamente por qué falta dinero..." : "Observaciones..."}
-                                                    value={notasCierre} onChange={e => setNotasCierre(e.target.value)}
-                                                />
-
-                                                <button onClick={handleCierre} disabled={btnDisabled}
-                                                    className={`w-full py-3 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50
-                                                        ${requiereJustificacion && !notasAceptables ? 'bg-red-400' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
-                                                    {cerrarMut.isPending ? 'Cerrando...' : requiereJustificacion && !notasAceptables ? 'Justificación requerida (Faltante)' : 'Confirmar Cierre y Arqueo'}
+                                        {/* COLUMNA DERECHA: CONTEO FÍSICO */}
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                                    Conteo Físico
+                                                </h3>
+                                                
+                                                {/* Toggle Modo */}
+                                                <button 
+                                                    onClick={() => setConteoDetallado(!conteoDetallado)}
+                                                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full transition-all"
+                                                >
+                                                    {conteoDetallado ? 'Ingreso Directo' : 'Desglosar Billetes'}
                                                 </button>
-                                            </>
-                                        );
-                                    })()}
-                                </>
+                                            </div>
+
+                                            <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 relative overflow-hidden">
+                                                
+                                                {conteoDetallado ? (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        {/* Billetes */}
+                                                        <div>
+                                                            <span className="text-[9px] font-black text-gray-400 uppercase block mb-3 pl-1">Billetes</span>
+                                                            <div className="space-y-2">
+                                                                {Object.entries(billetes).sort((a,b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                                    <div key={`b-${val}`} className="flex items-center gap-2 group">
+                                                                        <span className="text-[10px] font-bold text-gray-400 w-6">Bs.{val}</span>
+                                                                        <input 
+                                                                            type="number" min="0" placeholder="0"
+                                                                            className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
+                                                                            value={cant || ''}
+                                                                            onChange={e => setBilletes(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
+                                                                        />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        {/* Monedas */}
+                                                        <div>
+                                                            <span className="text-[9px] font-black text-gray-400 uppercase block mb-3 pl-1">Monedas</span>
+                                                            <div className="space-y-2">
+                                                                {Object.entries(monedas).sort((a,b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                                    <div key={`m-${val}`} className="flex items-center gap-2 group">
+                                                                        <span className="text-[10px] font-bold text-gray-400 w-7">Bs.{val}</span>
+                                                                        <input 
+                                                                            type="number" min="0" placeholder="0"
+                                                                            className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
+                                                                            value={cant || ''}
+                                                                            onChange={e => setMonedas(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
+                                                                        />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-8 text-center">
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase block mb-2">Total Efectivo Físico</label>
+                                                        <div className="relative inline-block w-48">
+                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
+                                                            <input 
+                                                                type="number" step="0.01" autoFocus
+                                                                className="w-full bg-white border-2 border-indigo-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-indigo-950 focus:border-indigo-500 outline-none transition-all placeholder-indigo-200"
+                                                                placeholder="0.00"
+                                                                value={montoFisicoManual}
+                                                                onChange={e => setMontoFisicoManual(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
+                                                    <span className="text-xs font-black text-gray-900 uppercase">Total en Físico:</span>
+                                                    <span className="text-2xl font-black font-mono text-green-600">
+                                                        {fmt(totalFisicoFinal)}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* DIFERENCIA Y ANALISIS */}
+                                            {totalFisicoFinal > 0 && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                    className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-green-50 border-green-100 text-green-800' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-100 text-blue-800' : 'bg-red-50 border-red-100 text-red-800'}`}
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            {Math.abs(diferencia ?? 0) < 0.50 ? <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> : <RefreshCw size={14} className="animate-spin" />}
+                                                            <span className="text-xs font-bold uppercase tracking-tight">Resultado del Arqueo</span>
+                                                        </div>
+                                                        <span className="text-lg font-black font-mono">
+                                                            {Math.abs(diferencia ?? 0) < 0.50 ? 'OK' : fmt(Math.abs(diferencia ?? 0))}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10px] opacity-70 mt-1 font-medium">
+                                                        {Math.abs(diferencia ?? 0) < 0.50 ? 'El monto coincide con el sistema (margen 0.50c).' : (diferencia ?? 0) > 0 ? 'Hay más dinero físico de lo que reporta el sistema.' : 'Falta dinero físico respecto al reporte del sistema.'}
+                                                    </p>
+                                                </motion.div>
+                                            )}
+
+                                            {/* NOTAS Y CONFIRMACIÓN */}
+                                            {(() => {
+                                                const requiereJustificacion = diferencia !== null && diferencia < -0.50;
+                                                const notasAceptables = notasCierre && notasCierre.trim().length >= 10;
+                                                const btnDisabled = totalFisicoFinal === 0 || cerrarMut.isPending || (requiereJustificacion && !notasAceptables);
+
+                                                return (
+                                                    <div className="pt-2">
+                                                        <label className={`block text-[10px] font-black uppercase mb-1.5 ${requiereJustificacion ? 'text-red-600' : 'text-gray-400'}`}>
+                                                            {requiereJustificacion ? 'Justificación Obligatoria' : 'Observaciones Adicionales'}
+                                                        </label>
+                                                        <textarea 
+                                                            className={`w-full rounded-2xl p-3 text-sm outline-none focus:ring-2 resize-none h-20 transition-all
+                                                                ${requiereJustificacion 
+                                                                    ? 'bg-red-50 border border-red-200 text-red-900 placeholder-red-300 focus:ring-red-400' 
+                                                                    : 'bg-white border border-gray-200 text-gray-900 focus:ring-indigo-300'}`}
+                                                            placeholder={requiereJustificacion ? "Explica a qué se debe el faltante de dinero..." : "Opcional: Detalles sobre el cierre..."}
+                                                            value={notasCierre} onChange={e => setNotasCierre(e.target.value)}
+                                                        />
+                                                        
+                                                        <button 
+                                                            onClick={handleCierre} 
+                                                            disabled={btnDisabled}
+                                                            className={`w-full mt-4 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2
+                                                                ${requiereJustificacion && !notasAceptables 
+                                                                    ? 'bg-red-400 text-white cursor-not-allowed' 
+                                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
+                                                        >
+                                                            {cerrarMut.isPending ? <RefreshCw className="animate-spin" size={18} /> : (requiereJustificacion && !notasAceptables) ? 'Falta justificación' : 'Confirmar y Cerrar Caja'}
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
                             )}
 
                             {/* ── NUEVA CATEGORÍA DE GASTO ── */}
