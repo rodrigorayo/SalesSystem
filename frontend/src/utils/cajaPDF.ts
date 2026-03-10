@@ -74,7 +74,7 @@ export function generarPDFSesion(
     doc.setTextColor(...C.white);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('Choco-Sys — Reporte de Caja', margin, 11);
+    doc.text('Taboada System — Reporte de Caja', margin, 11);
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
@@ -272,7 +272,7 @@ export function generarPDFSesion(
         doc.setFontSize(7);
         doc.setTextColor(...C.gray);
         doc.setFont('helvetica', 'normal');
-        doc.text('Choco-Sys — Documento de uso interno', margin, pageH - 7);
+        doc.text('Taboada System — Documento de uso interno', margin, pageH - 7);
         doc.text(`Página ${p} de ${totalPages}`, W - margin, pageH - 7, { align: 'right' });
     }
 
