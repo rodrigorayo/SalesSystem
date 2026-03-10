@@ -93,7 +93,7 @@ export default function Layout({ children }: LayoutProps) {
                         <Menu size={20} />
                     </button>
                     <div className={cn("flex items-center overflow-hidden transition-all duration-300", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100")}>
-                        <img src="/logoTaboada.png" alt="Taboada System" className="h-7 w-auto object-contain" />
+                        <span className="text-base font-bold tracking-tight whitespace-nowrap">Taboada System</span>
                     </div>
                 </div>
 
