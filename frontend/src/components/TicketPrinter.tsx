@@ -30,14 +30,14 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
     return (
         <div className="print-only" style={{ width: '80mm', margin: '0 auto', fontSize: '12px', fontFamily: 'monospace', color: '#000', padding: '10px' }}>
             {sale.anulada && (
-                <div className="watermark-anulada">ANU<br/>LADA</div>
+                <div className="watermark-anulada">ANULADA</div>
             )}
             
             {/* Cabecera */}
             <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <h2 style={{ fontSize: '16px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{tenantName}</h2>
-                <h3 style={{ fontSize: '14px', margin: '0 0 5px 0', fontWeight: 'bold' }}>
-                    {isFactura ? 'FACTURA' : 'RECIBO DE VENTA'}
+                <h3 style={{ fontSize: '13px', margin: '0 0 5px 0', fontWeight: 'bold' }}>
+                    {isFactura ? 'SOLICITUD DE FACTURA' : 'RECIBO DE VENTA'}
                 </h3>
                 {sale.sucursal_id && sale.sucursal_id !== 'CENTRAL' && (
                     <p style={{ margin: '2px 0', fontSize: '10px' }}>Sucursal: {sale.sucursal_id}</p>

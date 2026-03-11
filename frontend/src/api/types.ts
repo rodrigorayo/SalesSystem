@@ -254,6 +254,7 @@ export interface Sale {
     cashier_id: string;
     cashier_name: string;
     anulada: boolean;
+    factura_emitida?: boolean;
     created_at: string;
 }
 

@@ -47,6 +47,7 @@ class Sale(Document):
     cashier_id: str
     cashier_name: str
     anulada: bool = False
+    factura_emitida: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

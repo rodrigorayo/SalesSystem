@@ -322,6 +322,8 @@ export const getSaleStatsToday = (sucursal_id?: string) => {
     return client<{ today_sales: number; transaction_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
 };
 export const anularSale = (id: string) => client<Sale>(`/sales/${id}/anular`, { method: 'PATCH' });
+export const toggleFacturaEmitida = (id: string, emitida: boolean) => 
+    client<Sale>(`/sales/${id}/factura?emitida=${emitida}`, { method: 'PATCH' });
 
 
 // ─── Caja ─────────────────────────────────────────────────────────────────

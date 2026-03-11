@@ -448,3 +448,27 @@ async def anular_sale(
     await sale.save()
     
     return sale
+
+
+# ─── PATCH /sales/{sale_id}/factura ───────────────────────────────────────────
+
+@router.patch("/sales/{sale_id}/factura", response_model=Sale)
+async def toggle_factura_emitida(
+    sale_id: str,
+    emitida: bool,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Toggles the factura_emitida status of a sale.
+    """
+    sale = await Sale.get(sale_id)
+    if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
+        raise HTTPException(status_code=404, detail="Sale not found")
+        
+    if current_user.role == UserRole.ADMIN_SUCURSAL and sale.sucursal_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="Solo puedes editar ventas de tu propia sucursal")
+        
+    sale.factura_emitida = emitida
+    await sale.save()
+    
+    return sale

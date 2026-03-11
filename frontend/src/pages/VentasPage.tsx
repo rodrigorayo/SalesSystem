@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSales, anularSale, getSucursales } from '../api/api';
+import { getSales, anularSale, getSucursales, toggleFacturaEmitida } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import {
     Receipt, Loader2, ChevronRight, ChevronDown,
@@ -54,6 +54,12 @@ export default function VentasPage() {
             qc.invalidateQueries({ queryKey: ['inventario'] });
         },
         onError: (err: any) => alert(err.message || 'Error al anular la venta.')
+    });
+
+    const facturaMut = useMutation({
+        mutationFn: ({ id, emitida }: { id: string, emitida: boolean }) => toggleFacturaEmitida(id, emitida),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['sales-history'] }),
+        onError: (err: any) => alert(err.message || 'Error al actualizar el estado de la factura.')
     });
 
     const handleAnular = (id: string, e: React.MouseEvent) => {
@@ -184,18 +190,37 @@ export default function VentasPage() {
                                 {isOpen && (
                                     <div className="p-4 border-t border-gray-100 bg-gray-50/50">
                                         {venta.cliente && (venta.cliente.razon_social || venta.cliente.nit || venta.cliente.email) && (
-                                            <div className="mb-4 bg-white border border-gray-200 rounded-xl p-3 flex flex-wrap gap-6 text-sm">
-                                                {venta.cliente.razon_social && (
-                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Cliente</span><span className="font-bold text-gray-900">{venta.cliente.razon_social}</span></div>
-                                                )}
-                                                {venta.cliente.nit && (
-                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">NIT / CI</span><span className="font-mono font-medium text-gray-800">{venta.cliente.nit}</span></div>
-                                                )}
-                                                {venta.cliente.email && (
-                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Correo</span><span className="text-gray-600">{venta.cliente.email}</span></div>
-                                                )}
-                                                {venta.cliente.telefono && (
-                                                    <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Celular</span><span className="text-gray-600 font-medium">{venta.cliente.telefono}</span></div>
+                                            <div className="mb-4 bg-white border border-gray-200 rounded-xl p-3 flex flex-wrap gap-6 text-sm items-center justify-between">
+                                                <div className="flex flex-wrap gap-6">
+                                                    {venta.cliente.razon_social && (
+                                                        <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Cliente</span><span className="font-bold text-gray-900">{venta.cliente.razon_social}</span></div>
+                                                    )}
+                                                    {venta.cliente.nit && (
+                                                        <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">NIT / CI</span><span className="font-mono font-medium text-gray-800">{venta.cliente.nit}</span></div>
+                                                    )}
+                                                    {venta.cliente.email && (
+                                                        <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Correo</span><span className="text-gray-600">{venta.cliente.email}</span></div>
+                                                    )}
+                                                    {venta.cliente.telefono && (
+                                                        <div><span className="text-gray-400 font-semibold text-[10px] uppercase tracking-wider block mb-0.5">Celular</span><span className="text-gray-600 font-medium">{venta.cliente.telefono}</span></div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Botón confirmación de factura emitida si solicitó Módulo Impuestos */}
+                                                {(venta.cliente.nit || venta.cliente.es_factura) && (
+                                                    <div className="bg-gray-50 border border-gray-100 p-2.5 rounded-xl flex items-center gap-3 shadow-inner">
+                                                        <span className="text-xs font-bold text-gray-700 uppercase tracking-widest flex items-center gap-1.5"><Receipt size={14} className="text-indigo-500" /> Factura Entregada</span>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); facturaMut.mutate({ id: venta._id, emitida: !venta.factura_emitida }); }}
+                                                            disabled={facturaMut.isPending || isAnulado}
+                                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${venta.factura_emitida ? 'bg-indigo-600' : 'bg-gray-300'} ${(facturaMut.isPending || isAnulado) && 'opacity-50 cursor-not-allowed'}`}
+                                                        >
+                                                            <span className={`${venta.factura_emitida ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out`} />
+                                                        </button>
+                                                        <span className={`text-xs font-black ${venta.factura_emitida ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                                            {venta.factura_emitida ? 'SÍ' : 'NO'}
+                                                        </span>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
