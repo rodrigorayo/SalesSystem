@@ -41,7 +41,7 @@ async def get_general_reports(
         }
     ]
     
-    kpis_cursor = await SaleItem.motor_collection.aggregate(kpis_pipeline).to_list(length=1)
+    kpis_cursor = await SaleItem.get_motor_collection().aggregate(kpis_pipeline).to_list(length=1)
     kpis = kpis_cursor[0] if kpis_cursor else {"total_ventas": 0, "total_productos": 0, "ganancia": 0}
     if "_id" in kpis:
         del kpis["_id"]
@@ -71,7 +71,7 @@ async def get_general_reports(
         },
         {"$sort": {"total_ventas": -1}}
     ]
-    ventas_por_sucursal = await SaleItem.motor_collection.aggregate(sucursal_pipeline).to_list(length=100)
+    ventas_por_sucursal = await SaleItem.get_motor_collection().aggregate(sucursal_pipeline).to_list(length=100)
     
     # ─── 3. Top Productos Mas Vendidos ────────────────────────────────────────────
     top_products_pipeline = [
@@ -101,7 +101,7 @@ async def get_general_reports(
         {"$sort": {"cantidad_vendida": -1}},
         {"$limit": 10}
     ]
-    top_productos = await SaleItem.motor_collection.aggregate(top_products_pipeline).to_list(length=10)
+    top_productos = await SaleItem.get_motor_collection().aggregate(top_products_pipeline).to_list(length=10)
     
     # ─── 4. Evolucion Diaria ──────────────────────────────────────────────────────
     diaria_pipeline = [
@@ -128,7 +128,7 @@ async def get_general_reports(
         },
         {"$sort": {"fecha": 1}}
     ]
-    evolucion_diaria = await SaleItem.motor_collection.aggregate(diaria_pipeline).to_list(length=100)
+    evolucion_diaria = await SaleItem.get_motor_collection().aggregate(diaria_pipeline).to_list(length=100)
     
     return {
         "kpis": kpis,
