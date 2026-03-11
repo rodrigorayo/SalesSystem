@@ -18,6 +18,7 @@ import DashboardSucursal from './pages/DashboardSucursal';
 import VentasPage from './pages/VentasPage';
 import ControlQRPage from './pages/ControlQRPage';
 import PriceRequestsPage from './pages/PriceRequestsPage';
+import ReportsPage from './pages/ReportsPage';
 import { useAuthStore } from './store/authStore';
 import { Toaster } from 'sonner';
 
@@ -85,6 +86,13 @@ function App() {
                 <Route path="/dashboard" element={
                   <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
                     <TenantDashboard />
+                  </ProtectedRoute>
+                } />
+
+                {/* Reportes/Analytics */}
+                <Route path="/reportes" element={
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                    <ReportsPage />
                   </ProtectedRoute>
                 } />
 

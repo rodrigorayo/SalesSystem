@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     LayoutDashboard, Wallet, ShoppingBag, LogOut,
     Tag, Store, Package, ClipboardList, Warehouse, Users,
-    Menu, Percent, RotateCcw, X, QrCode
+    Menu, Percent, RotateCcw, X, QrCode, BarChart3
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -41,6 +41,7 @@ export default function Layout({ children }: LayoutProps) {
         } else if (['ADMIN_MATRIZ', 'ADMIN'].includes(role ?? '')) {
             return [
                 { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+                { icon: BarChart3, label: 'Reportes', path: '/reportes' },
                 { icon: Store, label: 'Sucursales', path: '/sucursales' },
                 { icon: Package, label: 'Catálogo', path: '/catalogo' },
                 { icon: Warehouse, label: 'Inventario', path: '/inventario' },

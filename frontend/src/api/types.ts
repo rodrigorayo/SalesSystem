@@ -236,6 +236,30 @@ export interface QRInfo {
     confirmado_por?: string;
 }
 
+export interface ReportStats {
+    kpis: {
+        total_ventas: number;
+        total_productos: number;
+        ganancia: number;
+    };
+    por_sucursal: {
+        sucursal: string;
+        total_ventas: number;
+        ganancia: number;
+    }[];
+    top_productos: {
+        producto: string;
+        cantidad_vendida: number;
+        total_ventas: number;
+        ganancia: number;
+    }[];
+    evolucion_diaria: {
+        fecha: string;
+        total_ventas: number;
+        ganancia: number;
+    }[];
+}
+
 export interface Sale {
     _id: string;
     tenant_id: string;

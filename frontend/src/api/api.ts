@@ -13,7 +13,7 @@ import type {
     Sucursal, SucursalCreate,
     InventarioItem, AjusteInventario, InventoryLog,
     PedidoInterno, PedidoCreate,
-    PriceChangeRequest, PriceRequestCreate,
+    PriceChangeRequest, PriceRequestCreate, ReportStats
 } from './types';
 import type {
     CajaSesion, CajaMovimiento, CajaGastoCategoria,
@@ -30,6 +30,10 @@ export const updateTenant = (id: string, data: TenantUpdate) => client<Tenant>(`
 export const deleteTenant = (id: string) => client<{message: string}>(`/tenants/${id}`, { method: 'DELETE' });
 export const getTenantStats = () =>
     client<{ total_sales: number; active_products: number; active_employees: number }>('/tenants/stats');
+
+// ─── Analytics / Reports ──────────────────────────────────────────────────
+export const getGeneralReports = (days: number = 30) => 
+    client<ReportStats>(`/reports/general?days=${days}`);
 
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');
