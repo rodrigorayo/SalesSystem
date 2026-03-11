@@ -29,6 +29,10 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
 
     return (
         <div className="print-only" style={{ width: '80mm', margin: '0 auto', fontSize: '12px', fontFamily: 'monospace', color: '#000', padding: '10px' }}>
+            {sale.anulada && (
+                <div className="watermark-anulada">ANU<br/>LADA</div>
+            )}
+            
             {/* Cabecera */}
             <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <h2 style={{ fontSize: '16px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{tenantName}</h2>
@@ -151,6 +155,21 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
                             width: 80mm;
                             margin: 0;
                             padding: 0;
+                        }
+                        .watermark-anulada {
+                            position: absolute !important;
+                            top: 50% !important;
+                            left: 50% !important;
+                            transform: translate(-50%, -50%) rotate(-45deg) !important;
+                            font-size: 3rem !important;
+                            font-weight: 900 !important;
+                            color: transparent !important;
+                            -webkit-text-stroke: 2px #000 !important;
+                            z-index: 9999 !important;
+                            pointer-events: none !important;
+                            white-space: nowrap !important;
+                            text-transform: uppercase !important;
+                            opacity: 0.6 !important;
                         }
                     }
                     @media screen {
