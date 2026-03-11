@@ -16,6 +16,7 @@ import UsersPage from './pages/UsersPage';
 import DescuentosPage from './pages/DescuentosPage';
 import DashboardSucursal from './pages/DashboardSucursal';
 import VentasPage from './pages/VentasPage';
+import ControlQRPage from './pages/ControlQRPage';
 import PriceRequestsPage from './pages/PriceRequestsPage';
 import { useAuthStore } from './store/authStore';
 import { Toaster } from 'sonner';
@@ -122,6 +123,13 @@ function App() {
                 <Route path="/ventas" element={
                   <ProtectedRoute allowedRoles={ALL_STAFF}>
                     <VentasPage />
+                  </ProtectedRoute>
+                } />
+
+                {/* Control QR */}
+                <Route path="/qr-control" element={
+                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                    <ControlQRPage />
                   </ProtectedRoute>
                 } />
 

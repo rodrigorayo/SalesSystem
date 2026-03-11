@@ -227,6 +227,15 @@ export interface PagoItem {
     monto: number;
 }
 
+export interface QRInfo {
+    banco?: string;
+    referencia?: string;
+    monto_transferido?: number;
+    confirmado: boolean;
+    confirmado_at?: string;
+    confirmado_por?: string;
+}
+
 export interface Sale {
     _id: string;
     tenant_id: string;
@@ -251,6 +260,7 @@ export interface Sale {
         telefono?: string;
         es_factura: boolean;
     };
+    qr_info?: QRInfo;
     cashier_id: string;
     cashier_name: string;
     anulada: boolean;

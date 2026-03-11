@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     LayoutDashboard, Wallet, ShoppingBag, LogOut,
     Tag, Store, Package, ClipboardList, Warehouse, Users,
-    Menu, Percent, RotateCcw, X
+    Menu, Percent, RotateCcw, X, QrCode
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -51,6 +51,7 @@ export default function Layout({ children }: LayoutProps) {
                 { icon: Tag, label: 'Categorías', path: '/categories' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
+                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
             ];
         } else if (role === 'ADMIN_SUCURSAL') {
             return [
@@ -63,6 +64,7 @@ export default function Layout({ children }: LayoutProps) {
                 { icon: Percent, label: 'Descuentos', path: '/descuentos' },
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
+                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
             ];
         } else {
             // CAJERO / USER
@@ -71,6 +73,7 @@ export default function Layout({ children }: LayoutProps) {
                 { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
                 { icon: Warehouse, label: 'Inventario', path: '/inventario' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
+                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
             ];
         }
     };

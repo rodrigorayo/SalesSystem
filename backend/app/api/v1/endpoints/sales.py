@@ -208,6 +208,11 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
     pagos = [PagoItem(metodo=p.metodo, monto=p.monto) for p in sale_in.pagos]
     cliente_snap = ClienteInfo(**sale_in.cliente.model_dump()) if sale_in.cliente else None
 
+    # Initialize empty QR Info if QR was used as payment method
+    has_qr = any(p.metodo == "QR" for p in pagos)
+    from app.models.sale import QRInfo
+    qr_init = QRInfo() if has_qr else None
+
     sale = Sale(
         tenant_id=tenant_id,
         sucursal_id=sucursal_id,
@@ -217,6 +222,7 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
         descuento=sale_in.descuento,
         cliente_id=sale_in.cliente_id,
         cliente=cliente_snap,
+        qr_info=qr_init,
         cashier_id=str(current_user.id),
         cashier_name=current_user.full_name or current_user.username,
     )
@@ -469,6 +475,45 @@ async def toggle_factura_emitida(
         raise HTTPException(status_code=403, detail="Solo puedes editar ventas de tu propia sucursal")
         
     sale.factura_emitida = emitida
+    await sale.save()
+    
+    return sale
+
+
+# ─── PATCH /sales/{sale_id}/qr ────────────────────────────────────────────────
+
+class QRInfoUpdate(BaseModel):
+    banco: str
+    referencia: str
+    monto_transferido: float
+
+@router.patch("/sales/{sale_id}/qr", response_model=Sale)
+async def update_qr_info(
+    sale_id: str,
+    qr_data: QRInfoUpdate,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Updates the QR payment tracking info (Bank, Reference, Amount) and marks it as confirmed.
+    """
+    sale = await Sale.get(sale_id)
+    if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
+        raise HTTPException(status_code=404, detail="Sale not found")
+        
+    if current_user.role == UserRole.ADMIN_SUCURSAL and sale.sucursal_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="Solo puedes confirmar pagos de tu propia sucursal")
+        
+    if not sale.qr_info:
+        from app.models.sale import QRInfo
+        sale.qr_info = QRInfo()
+        
+    sale.qr_info.banco = qr_data.banco
+    sale.qr_info.referencia = qr_data.referencia
+    sale.qr_info.monto_transferido = qr_data.monto_transferido
+    sale.qr_info.confirmado = True
+    sale.qr_info.confirmado_at = datetime.utcnow()
+    sale.qr_info.confirmado_por = current_user.full_name or current_user.username
+    
     await sale.save()
     
     return sale

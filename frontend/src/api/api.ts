@@ -324,6 +324,8 @@ export const getSaleStatsToday = (sucursal_id?: string) => {
 export const anularSale = (id: string) => client<Sale>(`/sales/${id}/anular`, { method: 'PATCH' });
 export const toggleFacturaEmitida = (id: string, emitida: boolean) => 
     client<Sale>(`/sales/${id}/factura?emitida=${emitida}`, { method: 'PATCH' });
+export const updateQRInfo = (id: string, qrData: { banco: string; referencia: string; monto_transferido: number }) => 
+    client<Sale>(`/sales/${id}/qr`, { method: 'PATCH', body: qrData });
 
 
 // ─── Caja ─────────────────────────────────────────────────────────────────

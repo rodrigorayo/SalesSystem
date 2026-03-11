@@ -35,6 +35,15 @@ class ClienteInfo(BaseModel):
     es_factura: bool = False
 
 
+class QRInfo(BaseModel):
+    banco: Optional[str] = None
+    referencia: Optional[str] = None
+    monto_transferido: Optional[float] = None
+    confirmado: bool = False
+    confirmado_at: Optional[datetime] = None
+    confirmado_por: Optional[str] = None
+
+
 class Sale(Document):
     tenant_id: str
     sucursal_id: str = "CENTRAL"
@@ -44,6 +53,7 @@ class Sale(Document):
     descuento: Optional[DescuentoInfo] = None
     cliente_id: Optional[str] = None  # Ref to Clientes collection
     cliente: Optional[ClienteInfo] = None
+    qr_info: Optional[QRInfo] = None
     cashier_id: str
     cashier_name: str
     anulada: bool = False
