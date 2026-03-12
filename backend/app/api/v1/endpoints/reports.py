@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from app.auth import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.sale_item import SaleItem
-from app.models.tenant import Tenant
+from app.models.sucursal import Sucursal
 from datetime import datetime, timedelta
 
 router = APIRouter()
@@ -90,14 +90,14 @@ async def get_general_reports(
     ]
     ventas_por_sucursal_raw = await SaleItem.get_pymongo_collection().aggregate(sucursal_pipeline).to_list(length=100)
     
-    # Resolver nombres en Python para evitar problemas de tipos ObjectId vs String
-    todos_los_tenants = await Tenant.find_all().to_list()
-    map_tenants = {str(t.id): t.name for t in todos_los_tenants}
+    # Resolver nombres en Python usando el modelo Sucursal (no Tenant)
+    todas_sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
+    map_sucursales = {str(s.id): s.nombre for s in todas_sucursales}
     
     ventas_por_sucursal = []
     for reg in ventas_por_sucursal_raw:
         sid = reg.get("sucursal_id_raw")
-        reg["sucursal"] = map_tenants.get(str(sid), str(sid))
+        reg["sucursal"] = map_sucursales.get(str(sid), str(sid))
         
         # Opcional, limpiar
         if "sucursal_id_raw" in reg:
