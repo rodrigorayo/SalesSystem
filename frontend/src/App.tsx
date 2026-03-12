@@ -91,7 +91,7 @@ function App() {
 
                 {/* Reportes/Analytics */}
                 <Route path="/reportes" element={
-                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
                     <ReportsPage />
                   </ProtectedRoute>
                 } />
