@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 from app.auth import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.sale_item import SaleItem
+from app.models.tenant import Tenant
 from datetime import datetime, timedelta
 
 router = APIRouter()
@@ -70,29 +71,15 @@ async def get_general_reports(
         },
         {
             "$group": {
-                "_id": {"$toObjectId": "$sucursal_id"}, # cast to ObjectId for lookup
+                "_id": "$sucursal_id",
                 "total_ventas": {"$sum": "$subtotal"},
                 "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
                 "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
             }
         },
         {
-            "$lookup": {
-                "from": "tenants",
-                "localField": "_id",
-                "foreignField": "_id",
-                "as": "sucursal_info"
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$sucursal_info",
-                "preserveNullAndEmptyArrays": True
-            }
-        },
-        {
             "$project": {
-                "sucursal": {"$ifNull": ["$sucursal_info.name", {"$toString": "$_id"}]},
+                "sucursal_id_raw": "$_id",
                 "total_ventas": 1,
                 "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
                 "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
@@ -101,7 +88,22 @@ async def get_general_reports(
         },
         {"$sort": {"total_ventas": -1}}
     ]
-    ventas_por_sucursal = await SaleItem.get_pymongo_collection().aggregate(sucursal_pipeline).to_list(length=100)
+    ventas_por_sucursal_raw = await SaleItem.get_pymongo_collection().aggregate(sucursal_pipeline).to_list(length=100)
+    
+    # Resolver nombres en Python para evitar problemas de tipos ObjectId vs String
+    todos_los_tenants = await Tenant.find_all().to_list()
+    map_tenants = {str(t.id): t.name for t in todos_los_tenants}
+    
+    ventas_por_sucursal = []
+    for reg in ventas_por_sucursal_raw:
+        sid = reg.get("sucursal_id_raw")
+        reg["sucursal"] = map_tenants.get(str(sid), str(sid))
+        
+        # Opcional, limpiar
+        if "sucursal_id_raw" in reg:
+            del reg["sucursal_id_raw"]
+            
+        ventas_por_sucursal.append(reg)
     
     # ─── 3. Top Productos Mas Vendidos ────────────────────────────────────────────
     top_products_pipeline = [
