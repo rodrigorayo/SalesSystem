@@ -7,6 +7,7 @@ import {
     AlertTriangle, ShoppingBag, Store, Layers, Building2, Wallet, FileText
 } from 'lucide-react';
 import DailyReportView from '../components/DailyReportView';
+import FinancialDetailView from '../components/FinancialDetailView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell
@@ -20,7 +21,7 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'financial_detail' | 'canales' | 'fuerza_ventas' | 'daily';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
@@ -66,7 +67,7 @@ export default function ReportsPage() {
                     <p className="text-gray-500 mt-2 text-sm">Resumen de ventas y cálculo de ganancias del sistema.</p>
                 </div>
                 
-                {activeTab !== 'daily' && esMatriz && (
+                {activeTab !== 'daily' && activeTab !== 'financial_detail' && esMatriz && (
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-200 w-fit print:hidden">
                         {[7, 15, 30, 90].map(d => (
                             <button 
@@ -89,6 +90,7 @@ export default function ReportsPage() {
                     { id: 'general', label: 'Visión General', icon: <TrendingUp size={16} />, hidden: !esMatriz },
                     { id: 'sucursales', label: 'Rendimiento Sucursales', icon: <Store size={16} />, hidden: !esMatriz },
                     { id: 'finanzas', label: 'Finanzas y Márgenes', icon: <Wallet size={16} />, hidden: !esMatriz },
+                    { id: 'financial_detail', label: 'Detalle de Utilidades', icon: <DollarSign size={16} />, hidden: !esMatriz },
                     { id: 'daily', label: 'Reporte de Jornada', icon: <FileText size={16} /> },
                 ].filter(t => !t.hidden).map((tab) => (
                     <button
@@ -108,6 +110,8 @@ export default function ReportsPage() {
 
             {activeTab === 'daily' ? (
                 <DailyReportView />
+            ) : activeTab === 'financial_detail' ? (
+                <FinancialDetailView />
             ) : (
                 <>
                     {isLoading ? (

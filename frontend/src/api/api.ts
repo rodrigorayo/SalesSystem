@@ -41,6 +41,15 @@ export const getDailyReport = (date: string, sucursal_id?: string) => {
     return client<any>(`/reports/daily-report?${params.toString()}`);
 };
 
+export const getFinancialReport = (startDate: string, endDate: string, sucursal_id: string = 'all') => {
+    const params = new URLSearchParams({ 
+        start_date: startDate, 
+        end_date: endDate,
+        sucursal_id: sucursal_id
+    });
+    return client<any[]>(`/reports/financial-report?${params.toString()}`);
+};
+
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');
 export const createSucursal = (data: SucursalCreate) => client<Sucursal>('/sucursales', { body: data });

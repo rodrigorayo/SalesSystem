@@ -296,3 +296,86 @@ async def get_daily_report(
         "items_vendidos": items_list,
         "balance_neto": (ventas_por_metodo["EFECTIVO"] - total_gastos) # Balance de caja física solo efectivo
     }
+
+@router.get("/financial-report")
+async def get_financial_report(
+    start_date: str, # YYYY-MM-DD
+    end_date: str,   # YYYY-MM-DD
+    sucursal_id: Optional[str] = "all", 
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns a financial detail report for General Admins.
+    Shows Público, Fábrica, Margen 15%, Margen Retail and Margen Total.
+    """
+    if current_user.role not in [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ]:
+        raise HTTPException(status_code=403, detail="Acceso denegado. Solo administradores generales pueden ver este reporte.")
+        
+    tenant_id = current_user.tenant_id or "default"
+    
+    try:
+        s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        e_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    s_dt = datetime.combine(s_dt, time.min)
+    e_dt = datetime.combine(e_dt, time.max)
+
+    match_filter = {
+        "tenant_id": tenant_id,
+        "sale_date": {"$gte": s_dt, "$lte": e_dt}
+    }
+    
+    if sucursal_id and sucursal_id != "all":
+        match_filter["sucursal_id"] = sucursal_id
+
+    pipeline = [
+        {"$match": match_filter},
+        {
+            "$group": {
+                "_id": {
+                    "fecha": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date" } },
+                    "sucursal_id": "$sucursal_id"
+                },
+                "total_publico": {"$sum": "$subtotal"},
+                "total_fabrica": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+            }
+        },
+        {
+            "$project": {
+                "fecha": "$_id.fecha",
+                "sucursal_id": "$_id.sucursal_id",
+                "total_publico": 1,
+                "total_fabrica": 1,
+                # Margen 15% (Distribuidor) = 15% del costo de fabrica
+                "margen_distribuidor": {"$multiply": ["$total_fabrica", 0.15]},
+                # Margen Utilidad (Retail) = Venta al publico - (Costo fabrica + Margen Distribuidor)
+                "margen_retail": {"$subtract": ["$total_publico", {"$multiply": ["$total_fabrica", 1.15]}]},
+                "_id": 0
+            }
+        },
+        {
+            "$project": {
+                "fecha": 1,
+                "sucursal_id": 1,
+                "total_publico": 1,
+                "total_fabrica": 1,
+                "margen_distribuidor": 1,
+                "margen_retail": 1,
+                "margen_total": {"$add": ["$margen_distribuidor", "$margen_retail"]}
+            }
+        },
+        {"$sort": {"fecha": 1, "sucursal_id": 1}}
+    ]
+
+    results = await SaleItem.get_pymongo_collection().aggregate(pipeline).to_list(length=2000)
+
+    # Resolve sucursal names
+    todas_sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
+    map_sucursales = {str(s.id): s.nombre for s in todas_sucursales}
+    
+    for r in results:
+        r["sucursal_nombre"] = map_sucursales.get(r["sucursal_id"], r["sucursal_id"])
+
+    return results
