@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSales, getSucursales, updateQRInfo } from '../api/api';
 import { useAuthStore } from '../store/authStore';
+import Pagination from '../components/Pagination';
 import { 
     QrCode, Search, CheckCircle2, Clock, CalendarDays, Loader2, 
-    Building2, ChevronLeft, ChevronRight 
+    Building2
 } from 'lucide-react';
 import type { Sale } from '../api/types';
 import { clsx } from 'clsx';
@@ -250,28 +251,14 @@ export default function ControlQRPage() {
                     </div>
 
                     {/* Pagination UI */}
-                    {ventasRes && ventasRes.pages > 1 && (
-                        <div className="flex items-center justify-between border-t border-gray-100 pt-6">
-                            <p className="text-xs text-gray-500 font-medium">
-                                Mostrando página <span className="text-gray-900 font-bold">{ventasRes.page}</span> de <span className="text-gray-900 font-bold">{ventasRes.pages}</span> ({ventasRes.total} resultados)
-                            </p>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                    className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors text-gray-600"
-                                >
-                                    <ChevronLeft size={16} />
-                                </button>
-                                <button
-                                    onClick={() => setPage(p => Math.min(ventasRes.pages, p + 1))}
-                                    disabled={page === ventasRes.pages}
-                                    className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors text-gray-600"
-                                >
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </div>
+                    {ventasRes && (
+                        <Pagination 
+                            currentPage={page}
+                            totalPages={ventasRes.pages}
+                            onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                            totalItems={ventasRes.total}
+                            itemsPerPage={limit}
+                        />
                     )}
                 </>
             )}
