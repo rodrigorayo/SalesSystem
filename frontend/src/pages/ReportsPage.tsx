@@ -207,7 +207,7 @@ export default function ReportsPage() {
                             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
                                 <Store size={18} className="text-blue-500" /> Desempeño por Sucursal
                             </h3>
-                            <div className="flex-1 min-h-[400px] w-full">
+                            <div className="flex-1 h-[400px] w-full">
                                 {reporte.por_sucursal.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={reporte.por_sucursal} margin={{top: 20, right: 30, left: 20, bottom: 60}}>
@@ -216,7 +216,7 @@ export default function ReportsPage() {
                                             <YAxis tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
                                             <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} formatter={(val: any) => `Bs. ${Number(val).toFixed(2)}`} />
                                             <Legend iconType="circle" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', paddingTop: '20px'}} />
-                                            <Bar dataKey="total_ventas" name="Venta Total al Público" fill="#indigo-300" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                            <Bar dataKey="total_ventas" name="Venta Total al Público" fill="#818cf8" radius={[4, 4, 0, 0]} maxBarSize={50} />
                                             <Bar dataKey="ganancia_matriz" name="Ganancia Matriz Exclusiva" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
                                             <Bar dataKey="ganancia_sucursal" name="Margen Retenido Sucursal" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
                                         </BarChart>
