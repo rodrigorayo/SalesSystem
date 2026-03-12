@@ -304,14 +304,14 @@ export default function VentasPage() {
                             <button
                                 onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
                                 disabled={page === 1}
-                                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors text-gray-600"
                             >
                                 <ChevronLeft size={16} />
                             </button>
                             <button
                                 onClick={() => { setPage(p => Math.min(ventasRes.pages, p + 1)); window.scrollTo(0, 0); }}
                                 disabled={page === ventasRes.pages}
-                                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors text-gray-600"
                             >
                                 <ChevronRight size={16} />
                             </button>
