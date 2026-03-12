@@ -78,7 +78,7 @@ async def get_general_reports(
         },
         {
             "$lookup": {
-                "from": "Tenant",
+                "from": "tenants",
                 "localField": "_id",
                 "foreignField": "_id",
                 "as": "sucursal_info"
