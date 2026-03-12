@@ -42,9 +42,6 @@ export default function ReportsPage() {
         );
     }
 
-    // Colors for pie charts
-    const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6 pb-20 md:pb-8">
             {/* ── Header ─────────────────────────────────────────────── */}
