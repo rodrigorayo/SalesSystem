@@ -240,23 +240,27 @@ export interface ReportStats {
     kpis: {
         total_ventas: number;
         total_productos: number;
-        ganancia: number;
+        ganancia_matriz: number;
+        ganancia_sucursal: number;
     };
     por_sucursal: {
         sucursal: string;
         total_ventas: number;
-        ganancia: number;
+        ganancia_matriz: number;
+        ganancia_sucursal: number;
     }[];
     top_productos: {
         producto: string;
         cantidad_vendida: number;
         total_ventas: number;
-        ganancia: number;
+        ganancia_matriz: number;
+        ganancia_sucursal: number;
     }[];
     evolucion_diaria: {
         fecha: string;
         total_ventas: number;
-        ganancia: number;
+        ganancia_matriz: number;
+        ganancia_sucursal: number;
     }[];
 }
 

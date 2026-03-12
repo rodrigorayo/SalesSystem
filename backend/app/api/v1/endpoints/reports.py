@@ -24,6 +24,7 @@ async def get_general_reports(
     start_date = datetime.utcnow() - timedelta(days=days)
     
     # ─── 1. KPIs Generales ────────────────────────────────────────────────────────
+    # Según CSV estimado: Fábrica = ~72%, Distribuidor = ~85% del PVP final
     kpis_pipeline = [
         {
             "$match": {
@@ -36,13 +37,26 @@ async def get_general_reports(
                 "_id": None,
                 "total_ventas": {"$sum": "$subtotal"},
                 "total_productos": {"$sum": "$cantidad"},
-                "ganancia": {"$sum": {"$multiply": ["$subtotal", 0.15]}}
+                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
+                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
+            }
+        },
+        {
+            "$project": {
+                "total_ventas": 1,
+                "total_productos": 1,
+                # Ganancia Matriz = (Precio Distribuidor) - (Costo Fabrica)
+                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
+                # Ganancia Sucursal = (Precio Final) - (Precio Distribuidor)
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]}
             }
         }
     ]
     
     kpis_cursor = await SaleItem.get_pymongo_collection().aggregate(kpis_pipeline).to_list(length=1)
-    kpis = kpis_cursor[0] if kpis_cursor else {"total_ventas": 0, "total_productos": 0, "ganancia": 0}
+    kpis = kpis_cursor[0] if kpis_cursor else {
+        "total_ventas": 0, "total_productos": 0, "ganancia_matriz": 0, "ganancia_sucursal": 0
+    }
     if "_id" in kpis:
         del kpis["_id"]
         
@@ -56,16 +70,32 @@ async def get_general_reports(
         },
         {
             "$group": {
-                "_id": "$sucursal_id",
+                "_id": {"$toObjectId": "$sucursal_id"}, # cast to ObjectId for lookup
                 "total_ventas": {"$sum": "$subtotal"},
-                "ganancia": {"$sum": {"$multiply": ["$subtotal", 0.15]}}
+                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
+                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "Tenant",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "sucursal_info"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$sucursal_info",
+                "preserveNullAndEmptyArrays": True
             }
         },
         {
             "$project": {
-                "sucursal": "$_id",
+                "sucursal": {"$ifNull": ["$sucursal_info.name", {"$toString": "$_id"}]},
                 "total_ventas": 1,
-                "ganancia": 1,
+                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
                 "_id": 0
             }
         },
@@ -86,7 +116,8 @@ async def get_general_reports(
                 "_id": "$descripcion",
                 "cantidad_vendida": {"$sum": "$cantidad"},
                 "total_ventas": {"$sum": "$subtotal"},
-                "ganancia": {"$sum": {"$multiply": ["$subtotal", 0.15]}}
+                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
+                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
             }
         },
         {
@@ -94,7 +125,8 @@ async def get_general_reports(
                 "producto": "$_id",
                 "cantidad_vendida": 1,
                 "total_ventas": 1,
-                "ganancia": 1,
+                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
                 "_id": 0
             }
         },
@@ -115,14 +147,16 @@ async def get_general_reports(
             "$group": {
                 "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date" } },
                 "total_ventas": {"$sum": "$subtotal"},
-                "ganancia": {"$sum": {"$multiply": ["$subtotal", 0.15]}}
+                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
+                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
             }
         },
         {
             "$project": {
                 "fecha": "$_id",
                 "total_ventas": 1,
-                "ganancia": 1,
+                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
                 "_id": 0
             }
         },
