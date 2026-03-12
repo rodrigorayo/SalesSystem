@@ -25,12 +25,18 @@ export default function ReportsPage() {
     const { role } = useAuthStore();
     const [days, setDays] = useState(30);
     const [activeTab, setActiveTab] = useState<TabType>('general');
+    const [selectedSucursal, setSelectedSucursal] = useState<string>('all');
 
     const { data: reporte, isLoading, isError } = useQuery({
         queryKey: ['reports', days],
         queryFn: () => getGeneralReports(days),
         enabled: ['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '')
     });
+
+    const sucursalNames = reporte ? Array.from(new Set(reporte.por_sucursal.map(s => s.sucursal))) : [];
+    const filteredSucursales = reporte?.por_sucursal.filter(s => 
+        selectedSucursal === 'all' || s.sucursal === selectedSucursal
+    ) || [];
 
     if (!['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '')) {
         return (
@@ -204,13 +210,38 @@ export default function ReportsPage() {
                     ========================================================= */}
                     {activeTab === 'sucursales' && (
                         <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 flex flex-col">
-                            <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
-                                <Store size={18} className="text-blue-500" /> Desempeño por Sucursal
-                            </h3>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                                    <Store size={18} className="text-blue-500" /> Desempeño por Sucursal
+                                </h3>
+                                
+                                <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
+                                    <button 
+                                        onClick={() => setSelectedSucursal('all')}
+                                        className={cn(
+                                            "px-3 py-1 text-xs font-bold rounded-lg transition-all",
+                                            selectedSucursal === 'all' ? "bg-white text-indigo-600 shadow-sm border border-indigo-100" : "text-gray-500 hover:text-gray-900"
+                                        )}>
+                                        Todas
+                                    </button>
+                                    {sucursalNames.map(name => (
+                                        <button 
+                                            key={name}
+                                            onClick={() => setSelectedSucursal(name)}
+                                            className={cn(
+                                                "px-3 py-1 text-xs font-bold rounded-lg transition-all",
+                                                selectedSucursal === name ? "bg-white text-indigo-600 shadow-sm border border-indigo-100" : "text-gray-500 hover:text-gray-900"
+                                            )}>
+                                            {name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="w-full mt-4">
-                                {reporte.por_sucursal.length > 0 ? (
+                                {filteredSucursales.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={400}>
-                                        <BarChart data={reporte.por_sucursal} margin={{top: 20, right: 30, left: 20, bottom: 60}}>
+                                        <BarChart data={filteredSucursales} margin={{top: 20, right: 30, left: 20, bottom: 60}}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                                             <XAxis dataKey="sucursal" tick={{fontSize: 12, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} angle={-45} textAnchor="end" />
                                             <YAxis tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
