@@ -4,7 +4,9 @@ from app.auth import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.sale_item import SaleItem
 from app.models.sucursal import Sucursal
-from datetime import datetime, timedelta
+from app.models.sale import Sale
+from app.models.caja import CajaMovimiento, SubtipoMovimiento
+from datetime import datetime, timedelta, time
 
 router = APIRouter()
 
@@ -171,4 +173,126 @@ async def get_general_reports(
         "por_sucursal": ventas_por_sucursal,
         "top_productos": top_productos,
         "evolucion_diaria": evolucion_diaria
+    }
+
+@router.get("/daily-report")
+async def get_daily_report(
+    date: str, # YYYY-MM-DD
+    sucursal_id: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns a detailed daily report for a specific branch.
+    Accessible by Matriz admins (for any branch) or Branch admins (only for their branch).
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    # Permission check
+    target_sucursal = sucursal_id
+    if current_user.role == UserRole.ADMIN_SUCURSAL:
+        target_sucursal = current_user.sucursal_id
+    elif not target_sucursal:
+         # For general admins, if no sucursal is provided, they might want a global daily report or it might be an error.
+         # Let's assume they MUST provide one or we take a default one like "CENTRAL".
+         target_sucursal = "CENTRAL"
+
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    
+    start_dt = datetime.combine(dt, time.min)
+    end_dt = datetime.combine(dt, time.max)
+
+    # 1. Sales summary (Pagos)
+    sales = await Sale.find(
+        Sale.tenant_id == tenant_id,
+        Sale.sucursal_id == target_sucursal,
+        Sale.created_at >= start_dt,
+        Sale.created_at <= end_dt
+    ).to_list()
+
+    ventas_por_metodo = {"EFECTIVO": 0.0, "QR": 0.0, "TARJETA": 0.0, "TRANSFERENCIA": 0.0}
+    total_ventas = 0.0
+    total_descuentos = 0.0
+    anuladas_count = 0
+    anuladas_monto = 0.0
+    
+    for s in sales:
+        if s.anulada:
+            anuladas_count += 1
+            anuladas_monto += s.total
+            continue
+            
+        total_ventas += s.total
+        if s.descuento:
+            total_descuentos += s.descuento.valor
+            
+        for p in s.pagos:
+            metodo = p.metodo.upper()
+            if metodo in ventas_por_metodo:
+                ventas_por_metodo[metodo] += p.monto
+            else:
+                ventas_por_metodo[metodo] = ventas_por_metodo.get(metodo, 0) + p.monto
+
+    # 2. Expenses (Gastos) from CajaMovimiento
+    movimientos = await CajaMovimiento.find(
+        CajaMovimiento.tenant_id == tenant_id,
+        CajaMovimiento.sucursal_id == target_sucursal,
+        CajaMovimiento.fecha >= start_dt,
+        CajaMovimiento.fecha <= end_dt
+    ).to_list()
+
+    total_gastos = 0.0
+    gastos_list = []
+    
+    for m in movimientos:
+        if m.tipo == "EGRESO" and m.subtipo == SubtipoMovimiento.GASTO:
+            total_gastos += m.monto
+            gastos_list.append({
+                "descripcion": m.descripcion,
+                "monto": m.monto,
+                "cajero": m.cajero_name,
+                "hora": m.fecha.strftime("%H:%M")
+            })
+
+    # 3. Simple inventory items sold count
+    items_vendidos_pipeline = [
+        {
+            "$match": {
+                "tenant_id": tenant_id,
+                "sucursal_id": target_sucursal,
+                "sale_date": {"$gte": start_dt, "$lte": end_dt}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$descripcion",
+                "cantidad": {"$sum": "$cantidad"},
+                "subtotal": {"$sum": "$subtotal"}
+            }
+        },
+        {"$sort": {"cantidad": -1}}
+    ]
+    items_summary = await SaleItem.get_pymongo_collection().aggregate(items_vendidos_pipeline).to_list(length=100)
+    items_list = [{"producto": i["_id"], "cantidad": i["cantidad"], "total": i["subtotal"]} for i in items_summary]
+
+    return {
+        "fecha": date,
+        "sucursal_id": target_sucursal,
+        "resumen_ventas": {
+            "total_bruto": total_ventas,
+            "total_descuentos": total_descuentos,
+            "por_metodo": ventas_por_metodo,
+            "anuladas": {
+                "cantidad": anuladas_count,
+                "monto": anuladas_monto
+            }
+        },
+        "gastos": {
+            "total": total_gastos,
+            "detalle": gastos_list
+        },
+        "items_vendidos": items_list,
+        "balance_neto": (ventas_por_metodo["EFECTIVO"] - total_gastos) # Balance de caja física solo efectivo
     }

@@ -57,6 +57,7 @@ export default function Layout({ children }: LayoutProps) {
         } else if (role === 'ADMIN_SUCURSAL') {
             return [
                 { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard-sucursal' },
+                { icon: BarChart3, label: 'Reportes', path: '/reportes' },
                 { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
                 { icon: Package, label: 'Catálogo', path: '/catalogo' },
                 { icon: ClipboardList, label: 'Pedidos', path: '/pedidos' },

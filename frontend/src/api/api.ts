@@ -35,6 +35,12 @@ export const getTenantStats = () =>
 export const getGeneralReports = (days: number = 30) => 
     client<ReportStats>(`/reports/general?days=${days}`);
 
+export const getDailyReport = (date: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ date });
+    if (sucursal_id) params.append('sucursal_id', sucursal_id);
+    return client<any>(`/reports/daily-report?${params.toString()}`);
+};
+
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');
 export const createSucursal = (data: SucursalCreate) => client<Sucursal>('/sucursales', { body: data });
