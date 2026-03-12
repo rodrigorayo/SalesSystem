@@ -17,7 +17,7 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-const formatBs = (num: number) => `Bs. ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas';
 
@@ -136,7 +136,7 @@ export default function ReportsPage() {
                                     <div className="flex items-center gap-3 mb-4 text-orange-500">
                                         <ShoppingBag size={20} /> <span className="font-bold uppercase tracking-wider text-xs text-gray-400">Items Entregados</span>
                                     </div>
-                                    <h2 className="text-3xl font-black mb-1 text-gray-900">{reporte.kpis.total_productos.toLocaleString()}</h2>
+                                    <h2 className="text-3xl font-black mb-1 text-gray-900">{(reporte.kpis.total_productos || 0).toLocaleString()}</h2>
                                     <p className="text-xs text-gray-400 font-medium">Unidades físicas procesadas.</p>
                                 </div>
                             </div>
@@ -247,12 +247,12 @@ export default function ReportsPage() {
                                         </div>
                                         <div className="flex justify-between text-red-500 border-b pb-4">
                                             <span>(-) Costo de Mercadería Vendida (Fábrica)</span>
-                                            <span>{formatBs((reporte.kpis.total_ventas) - (reporte.kpis.ganancia_matriz + reporte.kpis.ganancia_sucursal))}</span>
+                                            <span>{formatBs((reporte.kpis.total_ventas || 0) - ((reporte.kpis.ganancia_matriz || 0) + (reporte.kpis.ganancia_sucursal || 0)))}</span>
                                         </div>
                                         
                                         <div className="flex justify-between font-bold text-indigo-700 text-base pt-2">
                                             <span>(=) Margen Bruto Global</span>
-                                            <span>{formatBs(reporte.kpis.ganancia_matriz + reporte.kpis.ganancia_sucursal)}</span>
+                                            <span>{formatBs((reporte.kpis.ganancia_matriz || 0) + (reporte.kpis.ganancia_sucursal || 0))}</span>
                                         </div>
 
                                         <div className="my-6 border-t border-gray-100"></div>
@@ -277,9 +277,9 @@ export default function ReportsPage() {
                                             <PieChart>
                                                 <Pie
                                                     data={[
-                                                        { name: 'Costo Fábrica (Producción)', value: reporte.kpis.total_ventas - (reporte.kpis.ganancia_matriz + reporte.kpis.ganancia_sucursal) },
-                                                        { name: 'Utilidad Matriz (Logística)', value: reporte.kpis.ganancia_matriz },
-                                                        { name: 'Utilidad Sucursal (Retail)', value: reporte.kpis.ganancia_sucursal }
+                                                        { name: 'Costo Fábrica (Producción)', value: (reporte.kpis.total_ventas || 0) - ((reporte.kpis.ganancia_matriz || 0) + (reporte.kpis.ganancia_sucursal || 0)) },
+                                                        { name: 'Utilidad Matriz (Logística)', value: reporte.kpis.ganancia_matriz || 0 },
+                                                        { name: 'Utilidad Sucursal (Retail)', value: reporte.kpis.ganancia_sucursal || 0 }
                                                     ]}
                                                     cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
                                                 >
