@@ -189,7 +189,7 @@ export default function ReportsPage() {
                                                     </div>
                                                     <div className="truncate min-w-0">
                                                         <p className="font-bold text-sm text-gray-900 truncate" title={prod.producto}>{prod.producto}</p>
-                                                        <p className="text-xs text-gray-500 font-medium">{prod.cantidad_vendida} Unidades • Bruto: Bs. {prod.total_ventas.toFixed(2)}</p>
+                                                        <p className="text-xs text-gray-500 font-medium">{prod.cantidad_vendida} Unidades • Bruto: Bs. {(prod.total_ventas || 0).toFixed(2)}</p>
                                                     </div>
                                                 </div>
                                             </div>
