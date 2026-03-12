@@ -2,7 +2,10 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSales, getSucursales, updateQRInfo } from '../api/api';
 import { useAuthStore } from '../store/authStore';
-import { QrCode, Search, CheckCircle2, Clock, CalendarDays, Loader2, Building2 } from 'lucide-react';
+import { 
+    QrCode, Search, CheckCircle2, Clock, CalendarDays, Loader2, 
+    Building2, ChevronLeft, ChevronRight 
+} from 'lucide-react';
 import type { Sale } from '../api/types';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -37,6 +40,8 @@ export default function ControlQRPage() {
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? '' : (user?.sucursal_id || ''));
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'TODOS' | 'PENDIENTES' | 'CONFIRMADOS'>('PENDIENTES');
+    const [page, setPage] = useState(1);
+    const limit = 12;
     
     // Modal State
     const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -48,28 +53,28 @@ export default function ControlQRPage() {
         enabled: esMatriz
     });
 
-    const { data: ventas = [], isLoading } = useQuery({
-        queryKey: ['sales-history', selectedSucursal],
-        queryFn: () => getSales(selectedSucursal || undefined)
+    const { data: ventasRes, isLoading } = useQuery({
+        queryKey: ['sales-history-qr', selectedSucursal, page],
+        queryFn: () => getSales(selectedSucursal || undefined, page, limit, 'QR')
     });
+
+    const ventasItems = ventasRes?.items || [];
 
     const qrMut = useMutation({
         mutationFn: ({ id, data }: { id: string, data: any }) => updateQRInfo(id, data),
         onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ['sales-history'] });
+            qc.invalidateQueries({ queryKey: ['sales-history-qr'] });
             setSelectedSale(null);
         },
         onError: (err: any) => alert(err.message || 'Error al confirmar QR.')
     });
 
-    // Extract only ventas that have a QR payment
-    const qrSales = useMemo(() => {
-        return ventas.filter(v => v.pagos.some(p => p.metodo === 'QR') && !v.anulada);
-    }, [ventas]);
-
-    // Apply UI Filters
+    // Apply UI Filters on top of what came from server (for status and search)
+    // Note: If we had a lot of data, we'd move status/search to server too.
     const filteredSales = useMemo(() => {
-        return qrSales.filter(v => {
+        return ventasItems.filter(v => {
+            if (v.anulada) return false;
+            
             // Status filter
             const isConfirmed = v.qr_info?.confirmado || false;
             if (filterStatus === 'PENDIENTES' && isConfirmed) return false;
@@ -86,10 +91,9 @@ export default function ControlQRPage() {
             }
             return true;
         });
-    }, [qrSales, filterStatus, searchTerm]);
+    }, [ventasItems, filterStatus, searchTerm]);
 
     const handleOpenModal = (sale: Sale) => {
-        // Find how much was supposedly paid via QR
         const qrPaymentAmount = sale.pagos.find(p => p.metodo === 'QR')?.monto || 0;
         
         setSelectedSale(sale);
@@ -151,7 +155,10 @@ export default function ControlQRPage() {
                     {esMatriz && (
                         <select
                             value={selectedSucursal}
-                            onChange={(e) => setSelectedSucursal(e.target.value)}
+                            onChange={(e) => {
+                                setSelectedSucursal(e.target.value);
+                                setPage(1);
+                            }}
                             className="bg-white border border-gray-200 text-gray-900 text-xs font-semibold rounded-lg px-3 py-1.5 focus:border-indigo-500 outline-none shadow-sm h-[32px]"
                         >
                             <option value="">Todas las Sucursales</option>
@@ -170,76 +177,103 @@ export default function ControlQRPage() {
                     <p className="text-gray-500 font-medium text-sm">No hay pagos por QR {filterStatus === 'PENDIENTES' ? 'pendientes' : 'para mostrar'}.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredSales.map(v => {
-                        const isConfirmed = v.qr_info?.confirmado;
-                        const qrTotal = v.pagos.find(p => p.metodo === 'QR')?.monto || 0;
-                        const sucursalNombre = sucursales.find(s => s._id === v.sucursal_id)?.nombre || v.sucursal_id;
-                        
-                        return (
-                            <div 
-                                key={v._id} 
-                                onClick={() => handleOpenModal(v)}
-                                className={cn(
-                                    "bg-white rounded-2xl border-2 p-4 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg",
-                                    isConfirmed ? "border-emerald-100 shadow-sm" : "border-amber-100 shadow-md"
-                                )}
-                            >
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn(
-                                            "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                                            isConfirmed ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-500"
-                                        )}>
-                                            {isConfirmed ? <CheckCircle2 size={16} /> : <Clock size={16} />}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-gray-900 text-sm">Ticket #{v._id.slice(-6).toUpperCase()}</div>
-                                            <div className="text-[10px] text-gray-500 flex items-center gap-1 font-medium">
-                                                <CalendarDays size={10} /> {formatDate(v.created_at)}
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredSales.map(v => {
+                            const isConfirmed = v.qr_info?.confirmado;
+                            const qrTotal = v.pagos.find(p => p.metodo === 'QR')?.monto || 0;
+                            const sucursalNombre = sucursales.find(s => s._id === v.sucursal_id)?.nombre || v.sucursal_id;
+                            
+                            return (
+                                <div 
+                                    key={v._id} 
+                                    onClick={() => handleOpenModal(v)}
+                                    className={cn(
+                                        "bg-white rounded-2xl border-2 p-4 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg",
+                                        isConfirmed ? "border-emerald-100 shadow-sm" : "border-amber-100 shadow-md"
+                                    )}
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                                                isConfirmed ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-500"
+                                            )}>
+                                                {isConfirmed ? <CheckCircle2 size={16} /> : <Clock size={16} />}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-gray-900 text-sm">Ticket #{v._id.slice(-6).toUpperCase()}</div>
+                                                <div className="text-[10px] text-gray-500 flex items-center gap-1 font-medium">
+                                                    <CalendarDays size={10} /> {formatDate(v.created_at)}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Monto QR</div>
-                                        <div className="font-black text-gray-900 text-lg">Bs. {qrTotal.toFixed(2)}</div>
-                                    </div>
-                                </div>
-                                
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex justify-between items-center py-1.5 border-b border-gray-50">
-                                        <span className="text-gray-500">Cajero</span>
-                                        <span className="font-medium text-gray-900">{v.cashier_name}</span>
+                                        <div className="text-right">
+                                            <div className="text-[10px] font-bold text-gray-400 uppercase">Monto QR</div>
+                                            <div className="font-black text-gray-900 text-lg">Bs. {qrTotal.toFixed(2)}</div>
+                                        </div>
                                     </div>
                                     
-                                    {esMatriz && (
+                                    <div className="space-y-2 text-xs">
                                         <div className="flex justify-between items-center py-1.5 border-b border-gray-50">
-                                            <span className="text-gray-500 flex items-center gap-1"><Building2 size={12}/> Sucursal</span>
-                                            <span className="font-medium text-gray-900">{sucursalNombre}</span>
+                                            <span className="text-gray-500">Cajero</span>
+                                            <span className="font-medium text-gray-900">{v.cashier_name}</span>
                                         </div>
-                                    )}
+                                        
+                                        {esMatriz && (
+                                            <div className="flex justify-between items-center py-1.5 border-b border-gray-50">
+                                                <span className="text-gray-500 flex items-center gap-1"><Building2 size={12}/> Sucursal</span>
+                                                <span className="font-medium text-gray-900">{sucursalNombre}</span>
+                                            </div>
+                                        )}
 
-                                    {isConfirmed ? (
-                                        <div className="bg-emerald-50/50 p-2 rounded-lg mt-2 border border-emerald-100/50">
-                                            <div className="flex justify-between mb-1">
-                                                <span className="text-emerald-700/70 font-semibold text-[10px] uppercase">Banco</span>
-                                                <span className="text-emerald-900 font-bold">{v.qr_info?.banco}</span>
+                                        {isConfirmed ? (
+                                            <div className="bg-emerald-50/50 p-2 rounded-lg mt-2 border border-emerald-100/50">
+                                                <div className="flex justify-between mb-1">
+                                                    <span className="text-emerald-700/70 font-semibold text-[10px] uppercase">Banco</span>
+                                                    <span className="text-emerald-900 font-bold">{v.qr_info?.banco}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-emerald-700/70 font-semibold text-[10px] uppercase">Referencia</span>
+                                                    <span className="text-emerald-900 font-medium truncate max-w-[120px]">{v.qr_info?.referencia}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-emerald-700/70 font-semibold text-[10px] uppercase">Referencia</span>
-                                                <span className="text-emerald-900 font-medium truncate max-w-[120px]">{v.qr_info?.referencia}</span>
+                                        ) : (
+                                            <div className="bg-amber-50 text-amber-700 text-center py-1.5 rounded-lg font-bold border border-amber-200/50 mt-2">
+                                                Pendiente de Confirmación
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-amber-50 text-amber-700 text-center py-1.5 rounded-lg font-bold border border-amber-200/50 mt-2">
-                                            Pendiente de Confirmación
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* Pagination UI */}
+                    {ventasRes && ventasRes.pages > 1 && (
+                        <div className="flex items-center justify-between border-t border-gray-100 pt-6">
+                            <p className="text-xs text-gray-500 font-medium">
+                                Mostrando página <span className="text-gray-900 font-bold">{ventasRes.page}</span> de <span className="text-gray-900 font-bold">{ventasRes.pages}</span> ({ventasRes.total} resultados)
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                    className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setPage(p => Math.min(ventasRes.pages, p + 1))}
+                                    disabled={page === ventasRes.pages}
+                                    className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
                             </div>
-                        )
-                    })}
-                </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Modal */}

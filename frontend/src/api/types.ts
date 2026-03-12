@@ -296,6 +296,13 @@ export interface Sale {
     created_at: string;
 }
 
+export interface SalesPaginated {
+    items: Sale[];
+    total: number;
+    page: number;
+    pages: number;
+}
+
 export interface Cliente {
     _id: string;
     tenant_id: string;

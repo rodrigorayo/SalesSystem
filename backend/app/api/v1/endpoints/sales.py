@@ -45,6 +45,12 @@ class SaleCreate(BaseModel):
     cliente_id: Optional[str] = None
     cliente: Optional[ClienteIn] = None
 
+class SalesPaginated(BaseModel):
+    items: List[Sale]
+    total: int
+    page: int
+    pages: int
+
 
 # ─── POST /ventas ─────────────────────────────────────────────────────────────
 
@@ -339,23 +345,38 @@ async def get_today_stats(
 
 # ─── GET /sales ───────────────────────────────────────────────────────────────
 
-@router.get("/sales", response_model=List[Sale])
+@router.get("/sales", response_model=SalesPaginated)
 async def get_sales(
     sucursal_id: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 100,
+    metodo_pago: Optional[str] = None,
+    solo_facturas: bool = False,
+    page: int = 1,
+    limit: int = 50,
     current_user: User = Depends(get_current_active_user)
 ):
-    """List all sales for the tenant, optionally filtered by sucursal with pagination."""
+    """List all sales for the tenant, optionally filtered by sucursal, payment method or invoice status with pagination."""
     filters = []
     
     # Superadmins bypass primary tenant filter to see everything
     if current_user.role != UserRole.SUPERADMIN:
-        tenant_id = current_user.tenant_id or ""
+        tenant_id = current_user.tenant_id or "default"
         filters.append(Sale.tenant_id == tenant_id)
         
     if sucursal_id:
         filters.append(Sale.sucursal_id == sucursal_id)
+
+    if metodo_pago:
+        # Filter sales where at least one payment method matches
+        filters.append({"pagos.metodo": metodo_pago.upper()})
+
+    if solo_facturas:
+        # Filter sales where customer requested invoice (NIT present or es_factura flag)
+        from beanie.operators import Or
+        filters.append(Or(
+            Sale.cliente.nit != None,
+            Sale.cliente.nit != "",
+            Sale.cliente.es_factura == True
+        ))
         
     # Superadmins / Matriz see all based on filter, Sucursal sees only theirs
     if current_user.role == UserRole.ADMIN_SUCURSAL:
@@ -367,8 +388,19 @@ async def get_sales(
     if current_user.role == UserRole.CAJERO:
         filters.append(Sale.cashier_id == str(current_user.id))
 
-    sales = await Sale.find(*filters).sort(-Sale.created_at).skip(skip).limit(limit).to_list()
-    return sales
+    skip = (page - 1) * limit
+    
+    query = Sale.find(*filters)
+    total = await query.count()
+    sales = await query.sort(-Sale.created_at).skip(skip).limit(limit).to_list()
+    
+    import math
+    return {
+        "items": sales,
+        "total": total,
+        "page": page,
+        "pages": math.ceil(total / limit) if limit > 0 else 1
+    }
 
 
 # ─── PATCH /sales/{sale_id}/anular ────────────────────────────────────────────

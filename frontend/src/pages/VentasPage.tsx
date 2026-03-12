@@ -4,7 +4,8 @@ import { getSales, anularSale, getSucursales, toggleFacturaEmitida } from '../ap
 import { useAuthStore } from '../store/authStore';
 import {
     Receipt, Loader2, ChevronRight, ChevronDown,
-    Search, Ban, CalendarDays, ScrollText, AlertTriangle
+    Search, Ban, CalendarDays, ScrollText, AlertTriangle,
+    ChevronLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TicketPrinter } from '../components/TicketPrinter';
@@ -27,6 +28,8 @@ export default function VentasPage() {
     const [soloFacturas, setSoloFacturas] = useState(false);
     const [expanded, setExpanded] = useState<string | null>(null);
     const [printSale, setPrintSale] = useState<Sale | null>(null);
+    const [page, setPage] = useState(1);
+    const limit = 50;
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
         title: string;
@@ -41,10 +44,12 @@ export default function VentasPage() {
         enabled: esMatriz
     });
 
-    const { data: ventas = [], isLoading } = useQuery({
-        queryKey: ['sales-history', selectedSucursal],
-        queryFn: () => getSales(selectedSucursal || undefined)
+    const { data: ventasRes, isLoading } = useQuery({
+        queryKey: ['sales-history', selectedSucursal, page, soloFacturas],
+        queryFn: () => getSales(selectedSucursal || undefined, page, limit, undefined, soloFacturas)
     });
+
+    const ventas = ventasRes?.items || [];
 
     const anularMut = useMutation({
         mutationFn: anularSale,
@@ -74,10 +79,6 @@ export default function VentasPage() {
     };
 
     const filteredVentas = ventas.filter(v => {
-        if (soloFacturas) {
-            if (!v.cliente?.nit && !v.cliente?.es_factura) return false;
-        }
-
         if (!searchTerm) return true;
         const search = searchTerm.toLowerCase();
         // search by ticket id or partial cashier name
@@ -122,7 +123,10 @@ export default function VentasPage() {
                         <input 
                             type="checkbox" 
                             checked={soloFacturas} 
-                            onChange={e => setSoloFacturas(e.target.checked)}
+                            onChange={e => {
+                                setSoloFacturas(e.target.checked);
+                                setPage(1);
+                            }}
                             className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-xs font-semibold text-gray-700">Solo Facturas / NIT</span>
@@ -139,7 +143,8 @@ export default function VentasPage() {
                     <p className="text-gray-500">No hay ventas registradas.</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <>
+                    <div className="space-y-3">
                     {filteredVentas.map(venta => {
                         const isOpen = expanded === venta._id;
                         const isAnulado = venta.anulada;
@@ -288,6 +293,32 @@ export default function VentasPage() {
                         );
                     })}
                 </div>
+
+                {/* Pagination UI */}
+                {ventasRes && (ventasRes.pages > 1 || ventasRes.total > limit) && (
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-6">
+                        <p className="text-xs text-gray-500 font-medium">
+                            Mostrando página <span className="text-gray-900 font-bold">{ventasRes.page}</span> de <span className="text-gray-900 font-bold">{ventasRes.pages}</span> ({ventasRes.total} resultados)
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+                                disabled={page === 1}
+                                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <button
+                                onClick={() => { setPage(p => Math.min(ventasRes.pages, p + 1)); window.scrollTo(0, 0); }}
+                                disabled={page === ventasRes.pages}
+                                className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+                </>
             )}
 
             {/* Confirmation Modal */}

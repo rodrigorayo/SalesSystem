@@ -9,7 +9,7 @@ import type {
     Category, CategoryCreate,
     Descuento, DescuentoCreate, DescuentoUpdate,
     User, EmployeeCreate,
-    SaleCreate, Sale,
+    SaleCreate, Sale, SalesPaginated,
     Sucursal, SucursalCreate,
     InventarioItem, AjusteInventario, InventoryLog,
     PedidoInterno, PedidoCreate,
@@ -313,11 +313,15 @@ export const createEmployee = (data: EmployeeCreate) =>
 
 // ─── Sales ────────────────────────────────────────────────────────────────
 export const createSale = (data: SaleCreate) => client('/sales', { method: 'POST', body: data });
-export const getSales = (sucursal_id?: string) => {
+export const getSales = (sucursal_id?: string, page: number = 1, limit: number = 50, metodo_pago?: string, solo_facturas?: boolean) => {
     const params = new URLSearchParams();
     if (sucursal_id) params.set('sucursal_id', sucursal_id);
+    if (metodo_pago) params.set('metodo_pago', metodo_pago);
+    if (solo_facturas) params.set('solo_facturas', 'true');
+    params.set('page', String(page));
+    params.set('limit', String(limit));
     const qs = params.toString();
-    return client<Sale[]>(`/sales${qs ? '?' + qs : ''}`);
+    return client<SalesPaginated>(`/sales${qs ? '?' + qs : ''}`);
 };
 export const getSaleStatsToday = (sucursal_id?: string) => {
     const params = new URLSearchParams();
