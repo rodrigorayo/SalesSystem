@@ -6,6 +6,11 @@ import {
     Download
 } from 'lucide-react';
 
+import { 
+    ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+    Tooltip, Legend, PieChart, Pie, Cell
+} from 'recharts';
+
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function FinancialDetailView() {
@@ -121,6 +126,62 @@ export default function FinancialDetailView() {
                         <div className="bg-indigo-600 p-6 rounded-[32px] shadow-xl shadow-indigo-100 text-white">
                             <p className="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Margen Neto Total</p>
                             <h3 className="text-2xl font-black">{formatBs(totals?.margen_total)}</h3>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Area Chart: Evolution */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+                            <h3 className="text-sm font-black text-gray-900 mb-6 flex items-center gap-2">
+                                <TrendingUp size={16} className="text-indigo-500" /> Evolución de Márgenes
+                            </h3>
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={report}>
+                                        <defs>
+                                            <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#818cf8" stopOpacity={0.1}/>
+                                                <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <XAxis dataKey="fecha" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} tickFormatter={(v) => `Bs. ${v}`} />
+                                        <Tooltip 
+                                            contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                                            formatter={(value) => `Bs. ${Number(value).toFixed(2)}`}
+                                        />
+                                        <Legend verticalAlign="top" height={36}/>
+                                        <Area type="monotone" dataKey="margen_total" name="Margen Total" stroke="#818cf8" fillOpacity={1} fill="url(#colorTotal)" strokeWidth={3} />
+                                        <Area type="monotone" dataKey="margen_distribuidor" name="Comisión Matriz" stroke="#10b981" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Pie Chart: Distribution */}
+                        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex flex-col items-center">
+                            <h3 className="text-sm font-black text-gray-900 mb-6 text-center w-full">Distribución del Dinero</h3>
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={[
+                                                { name: 'Costo Fábrica', value: totals?.total_fabrica || 0 },
+                                                { name: 'Utilidad Matriz', value: totals?.margen_distribuidor || 0 },
+                                                { name: 'Utilidad Sucursal', value: totals?.margen_retail || 0 }
+                                            ]}
+                                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                                        >
+                                            <Cell fill="#fca5a5" />
+                                            <Cell fill="#10b981" />
+                                            <Cell fill="#3b82f6" />
+                                        </Pie>
+                                        <Tooltip formatter={(value) => `Bs. ${Number(value).toFixed(2)}`} />
+                                        <Legend verticalAlign="bottom" wrapperStyle={{fontSize: '11px', fontWeight: 'bold'}} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
                     </div>
 

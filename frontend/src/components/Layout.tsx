@@ -103,7 +103,7 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 flex flex-col gap-1">
+                <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1 custom-scrollbar">
                     <p className={cn("text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 transition-all", isCollapsed ? "text-center px-0" : "px-1")}>
                         {isCollapsed ? '•••' : 'Menu'}
                     </p>
@@ -134,11 +134,11 @@ export default function Layout({ children }: LayoutProps) {
                 {/* User Profile / Logout */}
                 <div className="mt-auto pt-4 border-t border-gray-800 flex flex-col gap-2">
                     <div className={cn("flex items-center gap-2 p-1 rounded-xl", isCollapsed ? "justify-center" : "")}>
-                        <img
-                            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                            alt="User"
-                            className="w-8 h-8 rounded-full border-2 border-gray-700 shrink-0"
-                        />
+                        <div className="w-8 h-8 rounded-full border-2 border-gray-700 bg-white/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-white uppercase">
+                                {(user?.username || 'U')[0].toUpperCase()}
+                            </span>
+                        </div>
                         <div className={cn("overflow-hidden transition-all duration-300 flex flex-col justify-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
                             <p className="text-xs font-medium text-white truncate">{user?.username || 'Usuario'}</p>
                             <p className="text-[10px] text-gray-500 truncate">{user?.role || 'Miembro'}</p>
@@ -239,11 +239,9 @@ export default function Layout({ children }: LayoutProps) {
 
                             {/* User */}
                             <div className="flex items-center gap-3 bg-white/5 rounded-xl p-3 mb-2">
-                                <img
-                                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                                    alt="User"
-                                    className="w-10 h-10 rounded-full border-2 border-gray-700"
-                                />
+                                <div className="w-10 h-10 rounded-full border-2 border-gray-700 bg-white/10 flex items-center justify-center shrink-0 text-white font-bold text-lg">
+                                    {(user?.username || 'U')[0].toUpperCase()}
+                                </div>
                                 <div>
                                     <p className="text-sm font-bold text-white">{user?.username || 'Usuario'}</p>
                                     <p className="text-xs text-gray-500">{user?.role || 'Miembro'}</p>

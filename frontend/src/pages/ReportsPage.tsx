@@ -4,13 +4,13 @@ import { getGeneralReports } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     BarChart3, Loader2, DollarSign, Package, TrendingUp, Calendar, 
-    AlertTriangle, ShoppingBag, Store, Layers, Building2, Wallet, FileText
+    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText
 } from 'lucide-react';
 import DailyReportView from '../components/DailyReportView';
 import FinancialDetailView from '../components/FinancialDetailView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-    Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell
+    Tooltip, BarChart, Bar, Legend
 } from 'recharts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -21,7 +21,7 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'financial_detail' | 'canales' | 'fuerza_ventas' | 'daily';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
@@ -67,7 +67,7 @@ export default function ReportsPage() {
                     <p className="text-gray-500 mt-2 text-sm">Resumen de ventas y cálculo de ganancias del sistema.</p>
                 </div>
                 
-                {activeTab !== 'daily' && activeTab !== 'financial_detail' && esMatriz && (
+                {activeTab !== 'daily' && activeTab !== 'finanzas' && esMatriz && (
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-200 w-fit print:hidden">
                         {[7, 15, 30, 90].map(d => (
                             <button 
@@ -89,8 +89,7 @@ export default function ReportsPage() {
                 {[
                     { id: 'general', label: 'Visión General', icon: <TrendingUp size={16} />, hidden: !esMatriz },
                     { id: 'sucursales', label: 'Rendimiento Sucursales', icon: <Store size={16} />, hidden: !esMatriz },
-                    { id: 'finanzas', label: 'Finanzas y Márgenes', icon: <Wallet size={16} />, hidden: !esMatriz },
-                    { id: 'financial_detail', label: 'Detalle de Utilidades', icon: <DollarSign size={16} />, hidden: !esMatriz },
+                    { id: 'finanzas', label: 'Finanzas y Márgenes', icon: <DollarSign size={16} />, hidden: !esMatriz },
                     { id: 'daily', label: 'Reporte de Jornada', icon: <FileText size={16} /> },
                 ].filter(t => !t.hidden).map((tab) => (
                     <button
@@ -110,7 +109,7 @@ export default function ReportsPage() {
 
             {activeTab === 'daily' ? (
                 <DailyReportView />
-            ) : activeTab === 'financial_detail' ? (
+            ) : activeTab === 'finanzas' ? (
                 <FinancialDetailView />
             ) : (
                 <>
@@ -273,71 +272,6 @@ export default function ReportsPage() {
                                 </div>
                             )}
 
-                            {/* =========================================================
-                                TAB: FINANZAS Y MARGENES (ESTADO DE RESULTADOS)
-                            ========================================================= */}
-                            {activeTab === 'finanzas' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="bg-white rounded-3xl p-8 border border-gray-200">
-                                            <h3 className="text-lg font-black text-gray-900 mb-6 border-b pb-4">Estado de Resultados (Simulación)</h3>
-                                            
-                                            <div className="space-y-4 text-sm">
-                                                <div className="flex justify-between font-bold text-gray-900 text-base">
-                                                    <span>(+) Ingresos Brutos (Ventas a Público)</span>
-                                                    <span>{formatBs(reporte.kpis.total_ventas)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-red-500 border-b pb-4">
-                                                    <span>(-) Costo de Mercadería Vendida (Fábrica)</span>
-                                                    <span>{formatBs((reporte.kpis.total_ventas || 0) - ((reporte.kpis.ganancia_matriz || 0) + (reporte.kpis.ganancia_sucursal || 0)))}</span>
-                                                </div>
-                                                
-                                                <div className="flex justify-between font-bold text-indigo-700 text-base pt-2">
-                                                    <span>(=) Margen Bruto Global</span>
-                                                    <span>{formatBs((reporte.kpis.ganancia_matriz || 0) + (reporte.kpis.ganancia_sucursal || 0))}</span>
-                                                </div>
-
-                                                <div className="my-6 border-t border-gray-100"></div>
-                                                
-                                                <h4 className="font-bold text-gray-400 text-xs tracking-wider uppercase mb-2">Distribución de Utilidades</h4>
-                                                <div className="flex justify-between text-emerald-600 font-bold bg-emerald-50 p-3 rounded-xl">
-                                                    <span>🏢 Utilidad retenida matriz (Distribución)</span>
-                                                    <span>{formatBs(reporte.kpis.ganancia_matriz)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-blue-600 font-bold bg-blue-50 p-3 rounded-xl mt-2">
-                                                    <span>🏪 Utilidad retenida local (Sucursales)</span>
-                                                    <span>{formatBs(reporte.kpis.ganancia_sucursal)}</span>
-                                                </div>
-                                            </div>
-                                            <p className="text-[10px] text-gray-400 mt-6 mt-4">Nota: Los costos se infieren en base a la escalera de precios B2B y Distribución según proporciones vigentes (Fábrica~72%, Matriz~13%, Sucursal~15%).</p>
-                                        </div>
-                                        
-                                        <div className="bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center justify-center">
-                                            <h3 className="text-lg font-black text-gray-900 mb-2 text-center w-full">Distribución del Dinero por Venta</h3>
-                                            <div className="w-full mt-6">
-                                                <ResponsiveContainer width="100%" height={300}>
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={[
-                                                                { name: 'Costo Fábrica (Producción)', value: (reporte.kpis.total_ventas || 0) - ((reporte.kpis.ganancia_matriz || 0) + (reporte.kpis.ganancia_sucursal || 0)) },
-                                                                { name: 'Utilidad Matriz (Logística)', value: reporte.kpis.ganancia_matriz || 0 },
-                                                                { name: 'Utilidad Sucursal (Retail)', value: reporte.kpis.ganancia_sucursal || 0 }
-                                                            ]}
-                                                            cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
-                                                        >
-                                                            <Cell fill="#fca5a5" />
-                                                            <Cell fill="#10b981" />
-                                                            <Cell fill="#3b82f6" />
-                                                        </Pie>
-                                                        <Tooltip formatter={(value) => `Bs. ${Number(value).toFixed(2)}`} />
-                                                        <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold'}} />
-                                                    </PieChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             {/* =========================================================
                                 TAB: CANALES Y FUERZA DE VENTAS (PROXIMAS FASES)
