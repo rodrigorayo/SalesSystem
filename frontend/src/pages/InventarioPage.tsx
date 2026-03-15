@@ -155,20 +155,20 @@ export default function InventarioPage() {
                                         <th className="px-3 py-2">Producto</th>
                                         <th className="px-3 py-2 text-center">Stock Físico</th>
                                         <th className="px-3 py-2 text-right">Precio Actual</th>
-                                        <th className="px-3 py-2 text-right">Acciones</th>
+                                        {esAdminSucursal && <th className="px-3 py-2 text-right">Acciones</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {loadingInv ? (
                                         <tr>
-                                            <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                                            <td colSpan={esAdminSucursal ? 4 : 3} className="px-4 py-8 text-center text-gray-400">
                                                 <Loader2 size={32} className="mx-auto animate-spin mb-3 text-indigo-400" />
                                                 <p>Cargando inventario...</p>
                                             </td>
                                         </tr>
                                     ) : filteredInv.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                                            <td colSpan={esAdminSucursal ? 4 : 3} className="px-4 py-8 text-center text-gray-400">
                                                 <Package size={48} className="mx-auto mb-4 opacity-20" />
                                                 <p className="text-base font-medium text-gray-600">No hay stock registrado</p>
                                                 <p className="text-sm mt-1">Realiza un ajuste de inventario para inicializar el stock.</p>
@@ -205,9 +205,9 @@ export default function InventarioPage() {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {esAdminSucursal && (
+                                                {esAdminSucursal && (
+                                                    <td className="px-3 py-2 text-right">
+                                                        <div className="flex items-center justify-end gap-1">
                                                             <button
                                                                 onClick={() => setAdjItem({ id: item.producto_id, name: item.producto_nombre })}
                                                                 className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-indigo-100"
@@ -215,18 +215,18 @@ export default function InventarioPage() {
                                                             >
                                                                 <Scale size={12} />
                                                             </button>
-                                                        )}
-                                                        {esAdminSucursal && (!esMatriz || selectedSucursal !== 'CENTRAL') && (
-                                                            <button
-                                                                onClick={() => setPriceReqItem({ id: item.producto_id, name: item.producto_nombre, currentPrice: item.precio_sucursal ?? item.precio })}
-                                                                className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-amber-100"
-                                                                title="Solicitar Cambio de Precio"
-                                                            >
-                                                                <Tag size={12} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
+                                                            {(!esMatriz || selectedSucursal !== 'CENTRAL') && (
+                                                                <button
+                                                                    onClick={() => setPriceReqItem({ id: item.producto_id, name: item.producto_nombre, currentPrice: item.precio_sucursal ?? item.precio })}
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-amber-100"
+                                                                    title="Solicitar Cambio de Precio"
+                                                                >
+                                                                    <Tag size={12} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))
                                     )}
