@@ -55,8 +55,11 @@ export default function ControlQRPage() {
     });
 
     const { data: ventasRes, isLoading } = useQuery({
-        queryKey: ['sales-history-qr', selectedSucursal, page],
-        queryFn: () => getSales(selectedSucursal || undefined, page, limit, 'QR')
+        queryKey: ['sales-history-qr', selectedSucursal, page, filterStatus],
+        queryFn: () => {
+            const confirmed = filterStatus === 'CONFIRMADOS' ? true : (filterStatus === 'PENDIENTES' ? false : undefined);
+            return getSales(selectedSucursal || undefined, page, limit, 'QR', undefined, confirmed);
+        }
     });
 
     const ventasItems = ventasRes?.items || [];
@@ -76,11 +79,6 @@ export default function ControlQRPage() {
         return ventasItems.filter(v => {
             if (v.anulada) return false;
             
-            // Status filter
-            const isConfirmed = v.qr_info?.confirmado || false;
-            if (filterStatus === 'PENDIENTES' && isConfirmed) return false;
-            if (filterStatus === 'CONFIRMADOS' && !isConfirmed) return false;
-
             // Search filter
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
@@ -92,7 +90,7 @@ export default function ControlQRPage() {
             }
             return true;
         });
-    }, [ventasItems, filterStatus, searchTerm]);
+    }, [ventasItems, searchTerm]);
 
     const handleOpenModal = (sale: Sale) => {
         const qrPaymentAmount = sale.pagos.find(p => p.metodo === 'QR')?.monto || 0;
@@ -144,7 +142,10 @@ export default function ControlQRPage() {
                     {/* Filter Status */}
                     <select
                         value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value as any)}
+                        onChange={(e) => {
+                            setFilterStatus(e.target.value as any);
+                            setPage(1);
+                        }}
                         className="bg-white border border-gray-200 text-gray-900 text-xs font-semibold rounded-lg px-3 py-1.5 focus:border-indigo-500 outline-none shadow-sm h-[32px]"
                     >
                         <option value="TODOS">Todos los Estados</option>

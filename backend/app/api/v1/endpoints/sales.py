@@ -350,6 +350,7 @@ async def get_sales(
     sucursal_id: Optional[str] = None,
     metodo_pago: Optional[str] = None,
     solo_facturas: bool = False,
+    qr_confirmed: Optional[bool] = None,
     page: int = 1,
     limit: int = 50,
     current_user: User = Depends(get_current_active_user)
@@ -368,6 +369,9 @@ async def get_sales(
     if metodo_pago:
         # Filter sales where at least one payment method matches
         filters.append({"pagos.metodo": metodo_pago.upper()})
+
+    if qr_confirmed is not None:
+        filters.append(Sale.qr_info.confirmado == qr_confirmed)
 
     if solo_facturas:
         # Filter sales where customer requested invoice (NIT present or es_factura flag)
