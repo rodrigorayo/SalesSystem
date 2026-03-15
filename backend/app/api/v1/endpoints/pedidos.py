@@ -119,11 +119,16 @@ async def listar_pedidos(
 ):
     """List internal orders. Filtered by sucursal or estado if provided."""
     tenant_id = current_user.tenant_id or ""
-    query = {Inventario.tenant_id: tenant_id}
-
     filters = [PedidoInterno.tenant_id == tenant_id]
-    if sucursal_id:
+
+    # Rol based restrictions
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.CAJERO]:
+        # Branch users can ONLY see their branch orders
+        filters.append(PedidoInterno.sucursal_id == current_user.sucursal_id)
+    elif sucursal_id:
+        # General admins can filter by sucursal or see all
         filters.append(PedidoInterno.sucursal_id == sucursal_id)
+
     if estado:
         filters.append(PedidoInterno.estado == estado)
 
@@ -239,6 +244,10 @@ async def recibir_pedido(
     pedido = await PedidoInterno.get(pedido_id)
     if not pedido or pedido.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Order not found")
+        
+    if current_user.role == UserRole.ADMIN_SUCURSAL and pedido.sucursal_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="Not authorized to receive this order")
+
     if pedido.estado != EstadoPedido.DESPACHADO:
         raise HTTPException(status_code=400, detail="Order must be DESPACHADO before receiving")
 
@@ -323,6 +332,9 @@ async def descargar_pdf_pedido(
     pedido = await PedidoInterno.get(pedido_id)
     if not pedido or pedido.tenant_id != (current_user.tenant_id or ""):
         raise HTTPException(status_code=404, detail="Order not found")
+        
+    if current_user.role == UserRole.ADMIN_SUCURSAL and pedido.sucursal_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this order")
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
