@@ -84,8 +84,8 @@ export default function UsersPage() {
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {paginatedEmployees.map(emp => (
-                            <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start justify-between">
-                            <div className="flex items-center gap-3">
+                            <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start">
+                            <div className="flex items-center gap-3 mr-auto">
                                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
                                     <Users size={20} className="text-blue-600" />
                                 </div>
@@ -94,7 +94,7 @@ export default function UsersPage() {
                                     <p className="text-sm text-gray-500">@{emp.username}</p>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-lg uppercase">Activo</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-lg uppercase self-center">Activo</span>
                         </div>
                     ))}
                     </div>
