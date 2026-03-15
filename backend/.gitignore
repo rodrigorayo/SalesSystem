@@ -44,3 +44,4 @@ env/
 # Project specific
 uvicorn_logs.txt
 logs/
+.vercel

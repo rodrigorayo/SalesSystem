@@ -19,6 +19,7 @@ export default function InventarioPage() {
 
     // Si es matriz/admin puede ver cualquier sucursal (por defecto CENTRAL). Si es sucursal, solo la suya.
     const esMatriz = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN';
+    const esAdminSucursal = esMatriz || user?.role === 'ADMIN_SUCURSAL';
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? 'CENTRAL' : (user?.sucursal_id || 'CENTRAL'));
     const [tab, setTab] = useLocalStorage<'stock' | 'kardex'>('inventario-tab', 'stock');
     const [searchTerm, setSearchTerm] = useLocalStorage('inventario-search', '');
@@ -133,7 +134,7 @@ export default function InventarioPage() {
                         </button>
                     </div>
                 </div>
-                {tab === 'stock' && (
+                {tab === 'stock' && esAdminSucursal && (
                     <button 
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap"
@@ -206,14 +207,16 @@ export default function InventarioPage() {
                                                 </td>
                                                 <td className="px-3 py-2 text-right">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        <button
-                                                            onClick={() => setAdjItem({ id: item.producto_id, name: item.producto_nombre })}
-                                                            className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-indigo-100"
-                                                            title="Ajustar Stock"
-                                                        >
-                                                            <Scale size={12} />
-                                                        </button>
-                                                        {(!esMatriz || selectedSucursal !== 'CENTRAL') && (
+                                                        {esAdminSucursal && (
+                                                            <button
+                                                                onClick={() => setAdjItem({ id: item.producto_id, name: item.producto_nombre })}
+                                                                className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-indigo-100"
+                                                                title="Ajustar Stock"
+                                                            >
+                                                                <Scale size={12} />
+                                                            </button>
+                                                        )}
+                                                        {esAdminSucursal && (!esMatriz || selectedSucursal !== 'CENTRAL') && (
                                                             <button
                                                                 onClick={() => setPriceReqItem({ id: item.producto_id, name: item.producto_nombre, currentPrice: item.precio_sucursal ?? item.precio })}
                                                                 className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-amber-100"
