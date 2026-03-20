@@ -78,7 +78,7 @@ async def get_inventario(
         }
     })
     
-    raw_results = await Inventario.get_motor_collection().aggregate(pipeline).to_list(1)
+    raw_results = await Inventario.aggregate(pipeline).to_list(length=1)
     
     if not raw_results or not raw_results[0].get("metadata"):
         return InventarioPaginated(items=[], total=0, page=page, pages=1)
@@ -407,7 +407,7 @@ async def import_inventory(
         await InventoryLog.insert_many(logs_a_insertar)
         
     if operaciones_inventario:
-        collection = getattr(Inventario, "get_motor_collection", Inventario.get_pymongo_collection)()
+        collection = Inventario.get_settings().motor_collection
         await collection.bulk_write(operaciones_inventario)
         
     return {
@@ -603,7 +603,7 @@ async def sincronizar_inventario_sucursal(
         await InventoryLog.insert_many(logs_a_insertar)
         
     if operaciones_inventario:
-        collection = getattr(Inventario, "get_motor_collection", Inventario.get_pymongo_collection)()
+        collection = Inventario.get_settings().motor_collection
         await collection.bulk_write(operaciones_inventario)
 
     return {
