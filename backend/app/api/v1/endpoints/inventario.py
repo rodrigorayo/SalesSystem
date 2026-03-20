@@ -34,10 +34,11 @@ async def get_inventario(
     
     prod_coll = Product.get_collection_name()
     
-    # 1. Match inventory entries
+    # 1. Match inventory entries and filter out visually invalid objectIds like "None"
     match_stage = {
         "tenant_id": tenant_id,
         "sucursal_id": sucursal_id,
+        "producto_id": {"$regex": "^[a-fA-F0-9]{24}$"}
     }
     
     pipeline = [
