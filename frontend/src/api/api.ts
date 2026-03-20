@@ -195,9 +195,11 @@ export const importProductPrices = async (sucursal_id: string, file: File) => {
 
 
 // ─── Inventario ───────────────────────────────────────────────────────────
-export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: number = 50, search?: string) => {
+export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: number = 50, search?: string, categoria_id?: string, stock_bajo: boolean = false) => {
     const params = new URLSearchParams({ sucursal_id, page: String(page), limit: String(limit) });
     if (search) params.append('search', search);
+    if (categoria_id) params.append('categoria_id', categoria_id);
+    if (stock_bajo) params.append('stock_bajo', 'true');
     return client<{ items: InventarioItem[], total: number, page: number, pages: number }>(`/inventario?${params.toString()}`);
 };
 export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>

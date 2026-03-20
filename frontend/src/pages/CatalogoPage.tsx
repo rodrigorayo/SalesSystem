@@ -97,28 +97,53 @@ export default function CatalogoPage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            {/* Filtros Modernos */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <div className="relative w-full">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={20} />
                     <input
                         type="text"
-                        placeholder="Buscar por nombre o código..."
+                        placeholder="Buscar productos por nombre, código o EAN..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded-xl outline-none transition-all text-sm text-gray-900"
+                        className="w-full pl-12 pr-10 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50 rounded-xl outline-none transition-all text-sm text-gray-900 shadow-inner"
                     />
+                    {searchTerm && (
+                        <button 
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-full hover:bg-gray-100"
+                            title="Limpiar búsqueda"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
                 </div>
-                <div className="sm:w-64">
-                    <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-gray-50 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded-xl outline-none transition-all text-sm appearance-none text-gray-900"
+
+                {/* Relieve Category Pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                    <button
+                        onClick={() => setSelectedCategory('ALL')}
+                        className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            selectedCategory === 'ALL' 
+                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
+                            : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                        }`}
                     >
-                        <option value="ALL">Todas las Categorías</option>
-                        {categories.map(cat => (
-                            <option key={cat._id} value={cat._id}>{cat.name}</option>
-                        ))}
-                    </select>
+                        Todas
+                    </button>
+                    {categories.map(cat => (
+                        <button
+                            key={cat._id}
+                            onClick={() => setSelectedCategory(cat._id!)}
+                            className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                selectedCategory === cat._id 
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
+                                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                            }`}
+                        >
+                            {cat.name}
+                        </button>
+                    ))}
                 </div>
             </div>
 

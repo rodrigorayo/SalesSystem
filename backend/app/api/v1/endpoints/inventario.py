@@ -21,6 +21,8 @@ async def get_inventario(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=2000),
     search: Optional[str] = Query(None, description="Filtrar por nombre del producto"),
+    categoria_id: Optional[str] = Query(None, description="Filtrar por categoría del producto"),
+    stock_bajo: bool = Query(False, description="Solo ver productos con stock <= 5"),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -55,17 +57,24 @@ async def get_inventario(
         {"$unwind": {"path": "$product", "preserveNullAndEmptyArrays": False}}
     ]
     
-    # 3. Apply optional text search on the newly joined product
+    # 3. Apply optional text search and category filter on the newly joined product
+    product_match = {}
     if search and search.strip():
         # Match using regex on product.descripcion or product.codigo_corto
-        pipeline.append({
-            "$match": {
-                "$or": [
-                    {"product.descripcion": {"$regex": search, "$options": "i"}},
-                    {"product.codigo_corto": {"$regex": search, "$options": "i"}}
-                ]
-            }
-        })
+        regex = {"$regex": search.strip(), "$options": "i"}
+        product_match["$or"] = [
+            {"product.descripcion": regex},
+            {"product.codigo_corto": regex}
+        ]
+        
+    if categoria_id:
+        product_match["product.categoria_id"] = categoria_id
+        
+    if product_match:
+        pipeline.append({"$match": product_match})
+        
+    if stock_bajo:
+        pipeline.append({"$match": {"cantidad": {"$lte": 5}}})
         
     # 4. Facet to get both paginated data and the total count in a single roundtrip to DB
     pipeline.append({

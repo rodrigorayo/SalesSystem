@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel } from '../api/api';
+import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
@@ -23,11 +23,18 @@ export default function InventarioPage() {
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? 'CENTRAL' : (user?.sucursal_id || 'CENTRAL'));
     const [tab, setTab] = useLocalStorage<'stock' | 'kardex'>('inventario-tab', 'stock');
     const [searchTerm, setSearchTerm] = useLocalStorage('inventario-search', '');
+    const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+    const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
 
     const { data: sucursales = [] } = useQuery({
         queryKey: ['sucursales'],
         queryFn: getSucursales,
         enabled: esMatriz,
+    });
+
+    const { data: categories = [] } = useQuery({ 
+        queryKey: ['categories'], 
+        queryFn: getCategories 
     });
 
     const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -44,8 +51,8 @@ export default function InventarioPage() {
     const ITEMS_PER_PAGE = 20;
 
     const { data: invData, isLoading: loadingInv } = useQuery({
-        queryKey: ['inventario', selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch],
-        queryFn: () => getInventario(selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch || undefined),
+        queryKey: ['inventario', selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch, selectedCategory, stockBajoOnly],
+        queryFn: () => getInventario(selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch || undefined, selectedCategory === 'ALL' ? undefined : selectedCategory, stockBajoOnly),
         enabled: tab === 'stock'
     });
     
@@ -67,7 +74,7 @@ export default function InventarioPage() {
     useEffect(() => {
         setCurrentPageStock(1);
         setCurrentPageKardex(1);
-    }, [searchTerm, selectedSucursal, tab]);
+    }, [searchTerm, selectedSucursal, tab, selectedCategory, stockBajoOnly]);
 
     const filteredMovs = useMemo(() => {
         if (!debouncedSearch) return movimientos;
@@ -108,44 +115,101 @@ export default function InventarioPage() {
                 )}
             </div>
 
-            {/* Toolbar (Buscador + Tabs) */}
-            <div className="flex flex-col sm:flex-row items-start justify-between gap-3 w-full">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                    <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                        <input
-                            type="text"
-                            placeholder="Buscar producto..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-white text-gray-900 border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg outline-none transition-all text-xs font-medium shadow-sm"
-                        />
+            {/* Toolbar (Buscador + Tabs + Category Pills) */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    {/* Buscador Moderno & Stock Bajo */}
+                    <div className="flex flex-1 w-full gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Buscar productos en inventario..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-11 pr-10 py-2.5 bg-gray-50 border border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50 rounded-xl outline-none transition-all text-sm font-medium shadow-inner text-gray-900"
+                            />
+                            {searchTerm && (
+                                <button 
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+
+                        {tab === 'stock' && (
+                            <button
+                                onClick={() => setStockBajoOnly(!stockBajoOnly)}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                                    stockBajoOnly 
+                                    ? 'bg-red-50 text-red-700 border-red-200 shadow-sm' 
+                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                ⚠️ <span className="hidden sm:inline">Solo Stock Bajo</span>
+                            </button>
+                        )}
                     </div>
-                    <div className="bg-white p-1 rounded-lg shadow-sm border border-gray-100 inline-flex">
-                        <button
-                            onClick={() => setTab('stock')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === 'stock' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                        >
-                            <Warehouse size={14} className={tab === 'stock' ? 'text-indigo-600' : 'text-gray-400'} />
-                            <span>Stock Actual</span>
-                        </button>
-                        <button
-                            onClick={() => setTab('kardex')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === 'kardex' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                        >
-                            <History size={14} className={tab === 'kardex' ? 'text-indigo-600' : 'text-gray-400'} />
-                            <span>Kárdex (Movimientos)</span>
-                        </button>
+
+                    {/* Tabs e Importar */}
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        <div className="bg-gray-50 p-1.5 rounded-xl shadow-inner border border-gray-100 inline-flex flex-1 sm:flex-none">
+                            <button
+                                onClick={() => setTab('stock')}
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'stock' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-gray-900/5' : 'text-gray-500 hover:text-gray-900'}`}
+                            >
+                                <Warehouse size={16} className={tab === 'stock' ? 'text-indigo-600' : 'text-gray-400'} />
+                                <span>Stock Actual</span>
+                            </button>
+                            <button
+                                onClick={() => setTab('kardex')}
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'kardex' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-gray-900/5' : 'text-gray-500 hover:text-gray-900'}`}
+                            >
+                                <History size={16} className={tab === 'kardex' ? 'text-indigo-600' : 'text-gray-400'} />
+                                <span>Kárdex</span>
+                            </button>
+                        </div>
+                        {tab === 'stock' && esAdminSucursal && (
+                            <button 
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap"
+                            >
+                                <FileSpreadsheet size={16} />
+                                Importar Excel
+                            </button>
+                        )}
                     </div>
                 </div>
-                {tab === 'stock' && esAdminSucursal && (
-                    <button 
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap"
-                    >
-                        <FileSpreadsheet size={14} />
-                        Importar Conteo Excel
-                    </button>
+
+                {/* Relieve Category Pills */}
+                {tab === 'stock' && (
+                    <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                        <button
+                            onClick={() => setSelectedCategory('ALL')}
+                            className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                selectedCategory === 'ALL' 
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
+                                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                            }`}
+                        >
+                            Todas
+                        </button>
+                        {categories.map((cat: any) => (
+                            <button
+                                key={cat._id}
+                                onClick={() => setSelectedCategory(cat._id!)}
+                                className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                    selectedCategory === cat._id 
+                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                                }`}
+                            >
+                                {cat.name}
+                            </button>
+                        ))}
+                    </div>
                 )}
             </div>
 
