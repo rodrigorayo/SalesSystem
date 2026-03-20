@@ -7,9 +7,15 @@ import pandas as pd
 import io
 import math
 import uuid
-from pydantic import BaseModel
 from app.schemas.product import ProductCreate, ProductUpdate
 from app.models.product import Product
+from app.models.category import Category
+from app.models.user import User, UserRole
+from app.models.sucursal import Sucursal
+from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
+from app.auth import get_current_active_user
+
+router = APIRouter()
 async def _enrich(product: Product) -> Product:
     """Resolve categoria_nombre for display."""
     if product.categoria_id:
