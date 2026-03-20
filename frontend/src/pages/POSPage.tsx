@@ -29,11 +29,12 @@ const METODO_META: Record<MetodoPago, { icon: React.ReactNode; color: string; bg
 };
 
 function useStockMap(sucursalId: string) {
-    const { data: inv = [] } = useQuery({
+    const { data: invData } = useQuery({
         queryKey: ['inventario', sucursalId],
-        queryFn: () => getInventario(sucursalId),
+        queryFn: () => getInventario(sucursalId, 1, 1000),
         staleTime: 30_000,
     });
+    const inv = invData?.items || [];
     return useMemo(() => {
         const m: Record<string, number> = {};
         for (const i of inv) m[i.producto_id] = i.cantidad;
@@ -68,7 +69,8 @@ export default function POSPage() {
     const [panelOpen, setPanelOpen] = useLocalStorage('pos-panel-open', true); // factura+pagos+totals visible
     const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
 
-    const { data: products = [], isLoading: loadingP } = useQuery({ queryKey: ['products'], queryFn: getProducts });
+    const { data: productsData, isLoading: loadingP } = useQuery({ queryKey: ['products'], queryFn: () => getProducts(1, 1000) });
+    const products = productsData?.items || [];
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
     const { data: stats } = useQuery({ queryKey: ['pos-stats'], queryFn: () => getSaleStatsToday(), refetchInterval: 60_000 });
     const { data: descuentosDisponibles = [], isLoading: loadingD } = useDescuentos();

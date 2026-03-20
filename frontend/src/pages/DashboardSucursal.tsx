@@ -16,11 +16,12 @@ export default function DashboardSucursal() {
         enabled: !!user?.sucursal_id
     });
 
-    const { data: inv = [] } = useQuery({
+    const { data: invData } = useQuery({
         queryKey: ['inventario', user?.sucursal_id],
-        queryFn: () => getInventario(user?.sucursal_id),
+        queryFn: () => getInventario(user?.sucursal_id, 1, 1000),
         enabled: !!user?.sucursal_id
     });
+    const inv = invData?.items || [];
 
     // Productos con stock <= 5 (Alerta)
     const stockBajo = inv.filter(i => i.cantidad <= 5);

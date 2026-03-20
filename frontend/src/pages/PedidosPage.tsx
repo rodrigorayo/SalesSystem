@@ -49,7 +49,8 @@ export default function PedidosPage() {
         queryFn: () => getPedidos(undefined, tab === 'todos' ? undefined : tab),
     });
     const { data: sucursales = [] } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
-    const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: getProducts });
+    const { data: productsData } = useQuery({ queryKey: ['products'], queryFn: () => getProducts(1, 1000) });
+    const products = productsData?.items || [];
 
     const createMut = useMutation({
         mutationFn: createPedido,
