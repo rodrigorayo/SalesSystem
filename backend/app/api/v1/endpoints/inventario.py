@@ -19,7 +19,7 @@ router = APIRouter()
 async def get_inventario(
     sucursal_id: str = "CENTRAL",
     page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=2000),
     search: Optional[str] = Query(None, description="Filtrar por nombre del producto"),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -30,7 +30,7 @@ async def get_inventario(
     tenant_id = current_user.tenant_id or ""
     skip = (page - 1) * limit
     
-    prod_coll = Product.get_motor_collection().name
+    prod_coll = Product.get_collection_name()
     
     # 1. Match inventory entries
     match_stage = {

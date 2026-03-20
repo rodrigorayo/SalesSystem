@@ -28,7 +28,7 @@ async def _enrich(product: Product) -> Product:
 @router.get("/products", response_model=dict)
 async def get_products(
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=2000),
     search: Optional[str] = Query(default=None, description="Filtrar por nombre/descripción"),
     categoria_id: Optional[str] = Query(default=None, description="Filtrar por categoría"),
     current_user: User = Depends(get_current_active_user)
