@@ -24,6 +24,7 @@ export default function InventarioPage() {
     const [tab, setTab] = useLocalStorage<'stock' | 'kardex'>('inventario-tab', 'stock');
     const [searchTerm, setSearchTerm] = useLocalStorage('inventario-search', '');
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+    const [categorySearch, setCategorySearch] = useState('');
     const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
 
     const { data: sucursales = [] } = useQuery({
@@ -36,6 +37,11 @@ export default function InventarioPage() {
         queryKey: ['categories'], 
         queryFn: getCategories 
     });
+
+    const filteredCategories = useMemo(() => {
+        if (!categorySearch) return categories;
+        return categories.filter((c: any) => c.name.toLowerCase().includes(categorySearch.toLowerCase()));
+    }, [categories, categorySearch]);
 
     const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
 
@@ -185,30 +191,53 @@ export default function InventarioPage() {
 
                 {/* Relieve Category Pills */}
                 {tab === 'stock' && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                        <button
-                            onClick={() => setSelectedCategory('ALL')}
-                            className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                selectedCategory === 'ALL' 
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
-                                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                            }`}
-                        >
-                            Todas
-                        </button>
-                        {categories.map((cat: any) => (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:block">Categorías</h3>
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar categoría..."
+                                    value={categorySearch}
+                                    onChange={(e) => setCategorySearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded-lg outline-none transition-all text-xs text-gray-900"
+                                />
+                                {categorySearch && (
+                                    <button 
+                                        onClick={() => setCategorySearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
                             <button
-                                key={cat._id}
-                                onClick={() => setSelectedCategory(cat._id!)}
+                                onClick={() => setSelectedCategory('ALL')}
                                 className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                    selectedCategory === cat._id 
+                                    selectedCategory === 'ALL' 
                                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
                                     : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                                 }`}
                             >
-                                {cat.name}
+                                Todas
                             </button>
-                        ))}
+                            {filteredCategories.map((cat: any) => (
+                                <button
+                                    key={cat._id}
+                                    onClick={() => setSelectedCategory(cat._id!)}
+                                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                        selectedCategory === cat._id 
+                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-100' 
+                                        : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                                >
+                                    {cat.name}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
