@@ -39,6 +39,10 @@ export default function InventarioPage() {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
+    const [currentPageStock, setCurrentPageStock] = useState(1);
+    const [currentPageKardex, setCurrentPageKardex] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+
     const { data: invData, isLoading: loadingInv } = useQuery({
         queryKey: ['inventario', selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch],
         queryFn: () => getInventario(selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch || undefined),
@@ -59,10 +63,6 @@ export default function InventarioPage() {
     const [adjItem, setAdjItem] = useState<{ id: string, name: string } | null>(null);
     const [priceReqItem, setPriceReqItem] = useState<{ id: string, name: string, currentPrice: number } | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    
-    const [currentPageStock, setCurrentPageStock] = useState(1);
-    const [currentPageKardex, setCurrentPageKardex] = useState(1);
-    const ITEMS_PER_PAGE = 20;
 
     useEffect(() => {
         setCurrentPageStock(1);
@@ -73,11 +73,6 @@ export default function InventarioPage() {
         if (!debouncedSearch) return movimientos;
         return movimientos.filter(m => m.producto_nombre?.toLowerCase().includes(debouncedSearch.toLowerCase()));
     }, [movimientos, debouncedSearch]);
-
-    const paginatedMovs = useMemo(() => {
-        const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
-        return filteredMovs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }, [filteredMovs, currentPageKardex]);
 
     const paginatedMovs = useMemo(() => {
         const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
