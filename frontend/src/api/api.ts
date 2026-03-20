@@ -59,7 +59,12 @@ export const deleteSucursal = (id: string) =>
     client<{message: string}>(`/sucursales/${id}`, { method: 'DELETE' });
 
 // ─── Products (Catalog) ───────────────────────────────────────────────────
-export const getProducts = () => client<Product[]>('/products');
+export const getProducts = (page: number = 1, limit: number = 50, search?: string, categoria_id?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.append('search', search);
+    if (categoria_id) params.append('categoria_id', categoria_id);
+    return client<{ items: Product[], total: number, page: number, pages: number }>(`/products?${params.toString()}`);
+};
 export const createProduct = (data: ProductCreate) => client<Product>('/products', { body: data });
 export const updateProduct = (id: string, data: ProductCreate) =>
     client<Product>(`/products/${id}`, { method: 'PUT', body: data });
@@ -190,8 +195,11 @@ export const importProductPrices = async (sucursal_id: string, file: File) => {
 
 
 // ─── Inventario ───────────────────────────────────────────────────────────
-export const getInventario = (sucursal_id = 'CENTRAL') =>
-    client<InventarioItem[]>(`/inventario?sucursal_id=${sucursal_id}`);
+export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: number = 50, search?: string) => {
+    const params = new URLSearchParams({ sucursal_id, page: String(page), limit: String(limit) });
+    if (search) params.append('search', search);
+    return client<{ items: InventarioItem[], total: number, page: number, pages: number }>(`/inventario?${params.toString()}`);
+};
 export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>
     client(`/inventario/ajuste?sucursal_id=${sucursal_id}`, { method: 'POST', body: data });
 export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string) => {

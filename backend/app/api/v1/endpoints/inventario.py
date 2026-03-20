@@ -1,76 +1,112 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from pymongo import UpdateOne
 import pandas as pd
 import io
+import math
 from pydantic import BaseModel
 from app.models.inventario import Inventario
 from app.models.product import Product
 from app.models.user import User, UserRole
 from app.auth import get_current_active_user
+from app.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
 
 router = APIRouter()
 
 
-class InventarioItem(BaseModel):
-    """Inventory entry enriched with product details for display."""
-    inventario_id: str
-    producto_id: str
-    producto_nombre: str
-    precio: float
-    precio_sucursal: Optional[float] = None
-    image_url: Optional[str] = None
-    sucursal_id: str
-    cantidad: int
-
-
-class AjusteInventario(BaseModel):
-    producto_id: str
-    tipo: str      # 'ENTRADA', 'SALIDA', 'AJUSTE'
-    cantidad: int  # Must be positive (absolute value of change)
-    notas: str = ""
-
-
-@router.get("/inventario", response_model=List[InventarioItem])
+@router.get("/inventario", response_model=InventarioPaginated)
 async def get_inventario(
     sucursal_id: str = "CENTRAL",
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    search: Optional[str] = Query(None, description="Filtrar por nombre del producto"),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get inventory for a specific sucursal (or CENTRAL).
-    Automatically scoped to the user's tenant.
+    Get inventory for a specific sucursal.
+    Resolves the fatal N+1 issue by using a MongoDB aggregation pipeline.
     """
     tenant_id = current_user.tenant_id or ""
-    entries = await Inventario.find(
-        Inventario.tenant_id == tenant_id,
-        Inventario.sucursal_id == sucursal_id,
-    ).to_list()
-
+    skip = (page - 1) * limit
+    
+    prod_coll = Product.get_motor_collection().name
+    
+    # 1. Match inventory entries
+    match_stage = {
+        "tenant_id": tenant_id,
+        "sucursal_id": sucursal_id,
+    }
+    
+    pipeline = [
+        {"$match": match_stage},
+        # 2. Lookup the actual product
+        {
+            "$lookup": {
+                "from": prod_coll,
+                "let": {"pid": {"$toObjectId": "$producto_id"}},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": ["$_id", "$$pid"]}}}
+                ],
+                "as": "product"
+            }
+        },
+        # Unwind so we only keep inventory entries that have a valid mapped product
+        {"$unwind": {"path": "$product", "preserveNullAndEmptyArrays": False}}
+    ]
+    
+    # 3. Apply optional text search on the newly joined product
+    if search and search.strip():
+        # Match using regex on product.descripcion or product.codigo_corto
+        pipeline.append({
+            "$match": {
+                "$or": [
+                    {"product.descripcion": {"$regex": search, "$options": "i"}},
+                    {"product.codigo_corto": {"$regex": search, "$options": "i"}}
+                ]
+            }
+        })
+        
+    # 4. Facet to get both paginated data and the total count in a single roundtrip to DB
+    pipeline.append({
+        "$facet": {
+            "metadata": [{"$count": "total"}],
+            "data": [
+                {"$skip": skip},
+                {"$limit": limit}
+            ]
+        }
+    })
+    
+    raw_results = await Inventario.get_motor_collection().aggregate(pipeline).to_list(1)
+    
+    if not raw_results or not raw_results[0].get("metadata"):
+        return InventarioPaginated(items=[], total=0, page=page, pages=1)
+        
+    total = raw_results[0]["metadata"][0]["total"]
+    data = raw_results[0]["data"]
+    
+    # 5. Map the raw aggregation dicts to InventarioItem Pydantic schema
     result = []
-    for entry in entries:
-        prod_id = str(entry.producto_id).strip()
-        if not prod_id or prod_id.lower() == "none" or prod_id == "null":
-            continue
-            
-        try:
-            product = await Product.get(prod_id)
-            if product:
-                result.append(InventarioItem(
-                    inventario_id=str(entry.id),
-                    producto_id=str(product.id),
-                    producto_nombre=product.descripcion,
-                    precio=product.precio_venta,
-                    precio_sucursal=entry.precio_sucursal,
-                    image_url=product.image_url,
-                    sucursal_id=entry.sucursal_id,
-                    cantidad=entry.cantidad,
-                ))
-        except Exception:
-            # Skip invalid ObjectId or missing product cleanly
-            pass
-            
-    return result
+    for entry in data:
+        product_doc = entry["product"]
+        result.append(InventarioItem(
+            inventario_id=str(entry["_id"]),
+            producto_id=str(product_doc["_id"]),
+            producto_nombre=product_doc.get("descripcion", "Desconocido"),
+            precio=product_doc.get("precio_venta", 0.0),
+            precio_sucursal=entry.get("precio_sucursal"),
+            image_url=product_doc.get("image_url"),
+            sucursal_id=entry.get("sucursal_id", "CENTRAL"),
+            cantidad=entry.get("cantidad", 0),
+        ))
+        
+    return InventarioPaginated(
+        items=result,
+        total=total,
+        page=page,
+        pages=math.ceil(total / limit) if limit > 0 else 1
+    )
 
 
 

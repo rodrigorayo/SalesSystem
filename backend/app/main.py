@@ -35,22 +35,12 @@ app = FastAPI(
 
 @app.get("/")
 def index():
-    return {"message": "Welcome to Choco-Sys API - Please see /debug-env for debug info."}
+    return {"message": "Welcome to Choco-Sys API", "docs": "/docs"}
 
-@app.get("/debug-env")
-def debug_env():
-    import os
-    env_vars = dict(os.environ)
-    # Mask some sensitive vars except for the MONGODB_URL which we are debugging
-    for k in list(env_vars.keys()):
-        if "SECRET" in k or "JWT" in k:
-            env_vars[k] = "***MASKED***"
-    
-    return {
-        "status": "Vercel is running the Python code",
-        "MONGODB_URL_CONFIG": settings.MONGODB_URL,
-        "RAW_ENV_VARS": env_vars
-    }
+@app.get("/health")
+def health():
+    """Safe health check — does not expose any environment variables."""
+    return {"status": "ok", "environment": settings.ENVIRONMENT}
 
 # Parse allowed origins from comma-separated env var
 origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]

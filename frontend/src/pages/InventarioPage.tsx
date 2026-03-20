@@ -30,10 +30,24 @@ export default function InventarioPage() {
         enabled: esMatriz,
     });
 
-    const { data: inventario = [], isLoading: loadingInv } = useQuery({
-        queryKey: ['inventario', selectedSucursal],
-        queryFn: () => getInventario(selectedSucursal),
+    const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: invData, isLoading: loadingInv } = useQuery({
+        queryKey: ['inventario', selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch],
+        queryFn: () => getInventario(selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch || undefined),
+        enabled: tab === 'stock'
     });
+    
+    const inventario = invData?.items || [];
+    const totalPagesStock = invData?.pages || 1;
+    const totalItemsStock = invData?.total || 0;
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
         queryKey: ['movimientos', selectedSucursal],
@@ -55,20 +69,15 @@ export default function InventarioPage() {
         setCurrentPageKardex(1);
     }, [searchTerm, selectedSucursal, tab]);
 
-    const filteredInv = useMemo(() => {
-        if (!searchTerm) return inventario;
-        return inventario.filter(i => i.producto_nombre.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [inventario, searchTerm]);
-
     const filteredMovs = useMemo(() => {
-        if (!searchTerm) return movimientos;
-        return movimientos.filter(m => m.producto_nombre?.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [movimientos, searchTerm]);
+        if (!debouncedSearch) return movimientos;
+        return movimientos.filter(m => m.producto_nombre?.toLowerCase().includes(debouncedSearch.toLowerCase()));
+    }, [movimientos, debouncedSearch]);
 
-    const paginatedInv = useMemo(() => {
-        const startIndex = (currentPageStock - 1) * ITEMS_PER_PAGE;
-        return filteredInv.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }, [filteredInv, currentPageStock]);
+    const paginatedMovs = useMemo(() => {
+        const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
+        return filteredMovs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredMovs, currentPageKardex]);
 
     const paginatedMovs = useMemo(() => {
         const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
@@ -166,7 +175,7 @@ export default function InventarioPage() {
                                                 <p>Cargando inventario...</p>
                                             </td>
                                         </tr>
-                                    ) : filteredInv.length === 0 ? (
+                                    ) : inventario.length === 0 ? (
                                         <tr>
                                             <td colSpan={esAdminSucursal ? 4 : 3} className="px-4 py-8 text-center text-gray-400">
                                                 <Package size={48} className="mx-auto mb-4 opacity-20" />
@@ -175,7 +184,7 @@ export default function InventarioPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        paginatedInv.map((item) => (
+                                        inventario.map((item) => (
                                             <tr key={item.producto_id} className="hover:bg-gray-50/50 transition-colors">
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-2">
@@ -233,12 +242,12 @@ export default function InventarioPage() {
                                 </tbody>
                             </table>
                         </div>
-                        {filteredInv.length > ITEMS_PER_PAGE && (
+                        {totalItemsStock > ITEMS_PER_PAGE && (
                             <Pagination 
                                 currentPage={currentPageStock}
-                                totalPages={Math.ceil(filteredInv.length / ITEMS_PER_PAGE)}
+                                totalPages={totalPagesStock}
                                 onPageChange={setCurrentPageStock}
-                                totalItems={filteredInv.length}
+                                totalItems={totalItemsStock}
                                 itemsPerPage={ITEMS_PER_PAGE}
                             />
                         )}

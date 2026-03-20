@@ -20,10 +20,23 @@ export default function CatalogoPage() {
     const [isUpdatePricesModalOpen, setIsUpdatePricesModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-    const { data: products = [], isLoading: loadingProducts } = useQuery({
-        queryKey: ['products'],
-        queryFn: getProducts
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: productsResponse, isLoading: loadingProducts } = useQuery({
+        queryKey: ['products', currentPage, ITEMS_PER_PAGE, debouncedSearch, selectedCategory],
+        queryFn: () => getProducts(currentPage, ITEMS_PER_PAGE, debouncedSearch || undefined, selectedCategory === 'ALL' ? undefined : selectedCategory)
     });
+    
+    const products = productsResponse?.items || [];
+    const totalPages = productsResponse?.pages || 1;
+    const totalItems = productsResponse?.total || 0;
 
     const { data: categories = [] } = useQuery({
         queryKey: ['categories'],
@@ -38,24 +51,10 @@ export default function CatalogoPage() {
         enabled: isEditor
     });
 
-    const filteredProducts = useMemo(() => {
-        return products.filter(p => {
-            const matchesSearch = p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (p.codigo_corto && p.codigo_corto.toLowerCase().includes(searchTerm.toLowerCase()));
-            const matchesCat = selectedCategory === 'ALL' || p.categoria_id === selectedCategory;
-            return matchesSearch && matchesCat;
-        });
-    }, [products, searchTerm, selectedCategory]);
-
     // Reset pagination when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, selectedCategory]);
-
-    const paginatedProducts = useMemo(() => {
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }, [filteredProducts, currentPage]);
+    }, [debouncedSearch, selectedCategory]);
 
     const handleOpenCreate = () => {
         setEditingProduct(null);
@@ -149,7 +148,7 @@ export default function CatalogoPage() {
                                         <p>Cargando catálogo...</p>
                                     </td>
                                 </tr>
-                            ) : filteredProducts.length === 0 ? (
+                            ) : products.length === 0 ? (
                                 <tr>
                                     <td colSpan={isEditor ? 6 : 4} className="px-6 py-12 text-center text-gray-400">
                                         <Package size={48} className="mx-auto mb-4 opacity-20 text-indigo-500" />
@@ -158,7 +157,7 @@ export default function CatalogoPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                paginatedProducts.map((p) => (
+                                products.map((p) => (
                                     <tr key={p._id} className="hover:bg-indigo-50/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -215,12 +214,12 @@ export default function CatalogoPage() {
                     </table>
                 </div>
                 
-                {filteredProducts.length > ITEMS_PER_PAGE && (
+                {totalItems > ITEMS_PER_PAGE && (
                     <Pagination 
                         currentPage={currentPage}
-                        totalPages={Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}
+                        totalPages={totalPages}
                         onPageChange={setCurrentPage}
-                        totalItems={filteredProducts.length}
+                        totalItems={totalItems}
                         itemsPerPage={ITEMS_PER_PAGE}
                     />
                 )}

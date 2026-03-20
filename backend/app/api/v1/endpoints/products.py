@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pymongo import UpdateOne
@@ -8,39 +8,8 @@ import io
 import math
 import uuid
 from pydantic import BaseModel
+from app.schemas.product import ProductCreate, ProductUpdate
 from app.models.product import Product
-from app.models.category import Category
-from app.models.user import User, UserRole
-from app.models.sucursal import Sucursal
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.auth import get_current_active_user
-
-router = APIRouter()
-
-
-class ProductCreate(BaseModel):
-    descripcion: str
-    categoria_id: str
-    precio_venta: float
-    costo_producto: float = 0.0
-    codigo_largo: Optional[str] = None
-    codigo_corto: Optional[str] = None
-    image_url: Optional[str] = None
-    precios_sucursales: Optional[dict[str, float]] = None
-
-
-class ProductUpdate(BaseModel):
-    descripcion: Optional[str] = None
-    categoria_id: Optional[str] = None
-    precio_venta: Optional[float] = None
-    costo_producto: Optional[float] = None
-    codigo_largo: Optional[str] = None
-    codigo_corto: Optional[str] = None
-    image_url: Optional[str] = None
-    is_active: Optional[bool] = None
-    precios_sucursales: Optional[dict[str, float]] = None
-
-
 async def _enrich(product: Product) -> Product:
     """Resolve categoria_nombre for display."""
     if product.categoria_id:
@@ -50,16 +19,39 @@ async def _enrich(product: Product) -> Product:
     return product
 
 
-@router.get("/products", response_model=List[Product])
+@router.get("/products", response_model=dict)
 async def get_products(
-    skip: int = 0,
-    limit: int = 1000,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    search: Optional[str] = Query(default=None, description="Filtrar por nombre/descripción"),
+    categoria_id: Optional[str] = Query(default=None, description="Filtrar por categoría"),
     current_user: User = Depends(get_current_active_user)
 ):
-    if current_user.role == UserRole.SUPERADMIN:
-        products = await Product.find_all().skip(skip).limit(limit).to_list()
-    else:
-        products = await Product.find(Product.tenant_id == current_user.tenant_id).skip(skip).limit(limit).to_list()
+    from beanie.operators import RegEx
+    
+    skip = (page - 1) * limit
+    base_filter = []
+    
+    if current_user.role != UserRole.SUPERADMIN:
+        base_filter.append(Product.tenant_id == current_user.tenant_id)
+
+    if search and search.strip():
+        # Search by description or codigo_corto
+        from beanie.operators import Or
+        base_filter.append(
+            Or(
+                RegEx(Product.descripcion, search, options="i"),
+                RegEx(Product.codigo_corto, search, options="i")
+            )
+        )
+        
+    if categoria_id and categoria_id != "ALL":
+        base_filter.append(Product.categoria_id == categoria_id)
+
+    query = Product.find(*base_filter) if base_filter else Product.find_all()
+    
+    total = await query.count()
+    products = await query.skip(skip).limit(limit).to_list()
         
     p_ids = [str(p.id) for p in products]
     from beanie.operators import In
@@ -80,7 +72,15 @@ async def get_products(
         for p in products:
             p.precios_sucursales = p_map.get(str(p.id), {})
 
-    return [await _enrich(p) for p in products]
+    items = [await _enrich(p) for p in products]
+    
+    import math
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pages": math.ceil(total / limit) if limit > 0 else 1
+    }
 
 
 @router.post("/products", response_model=Product)

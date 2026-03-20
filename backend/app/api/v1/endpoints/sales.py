@@ -15,43 +15,7 @@ from pymongo import ReturnDocument
 router = APIRouter()
 
 
-# ─── Request schemas ──────────────────────────────────────────────────────────
-
-class SaleItemIn(BaseModel):
-    producto_id: str
-    cantidad: int
-    precio_unitario: float = 0.0  # if 0, falls back to product.precio_venta
-    descuento_unitario: float = 0.0
-
-
-class PagoIn(BaseModel):
-    metodo: str                 # 'EFECTIVO' | 'QR' | 'TARJETA'
-    monto: float
-
-
-class ClienteIn(BaseModel):
-    nit: Optional[str] = None
-    razon_social: Optional[str] = None
-    email: Optional[str] = None
-    telefono: Optional[str] = None
-    es_factura: bool = False
-
-
-class SaleCreate(BaseModel):
-    sucursal_id: Optional[str] = None
-    items: List[SaleItemIn]
-    pagos: List[PagoIn] = []        # split payments
-    descuento: Optional[DescuentoInfo] = None
-    cliente_id: Optional[str] = None
-    cliente: Optional[ClienteIn] = None
-
-class SalesPaginated(BaseModel):
-    items: List[Sale]
-    total: int
-    page: int
-    pages: int
-
-
+from app.schemas.sale import SaleItemIn, PagoIn, ClienteIn, SaleCreate, SalesPaginated
 # ─── POST /ventas ─────────────────────────────────────────────────────────────
 
 @router.post("/ventas", response_model=Sale)
@@ -62,12 +26,13 @@ async def create_sale_endpoint(
 ):
     try:
         return await _create_sale_internal(sale_in, current_user)
+    except HTTPException:
+        raise
     except Exception as e:
+        import logging
         import traceback
-        with open("c:/Users/rodri/Desktop/SalesSystem/backend/last_sale_error.txt", "w", encoding="utf-8") as f:
-            f.write(traceback.format_exc())
-            f.write(f"\nPayload entrante: {sale_in.model_dump()}\n")
-        raise e
+        logging.error(f"[create_sale] Unexpected error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno al procesar la venta: {str(e)}")
 
 async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
     """

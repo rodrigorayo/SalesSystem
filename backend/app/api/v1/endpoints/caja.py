@@ -26,59 +26,7 @@ from app.auth import get_current_active_user
 router = APIRouter()
 
 
-# ─── Request / Response schemas ───────────────────────────────────────────────
-
-class AbrirCajaIn(BaseModel):
-    monto_inicial: float
-    sucursal_id:   Optional[str] = None
-
-class CerrarCajaIn(BaseModel):
-    monto_fisico_contado: float
-    notas:                Optional[str] = None
-
-class GastoIn(BaseModel):
-    monto:        float
-    descripcion:  str
-    categoria_id: Optional[str] = None
-
-class IngresoIn(BaseModel):
-    monto:        float
-    metodo:       str
-    descripcion:  str
-
-class IngresoIn(BaseModel):
-    monto:       float
-    descripcion: str
-    metodo:      str  # "EFECTIVO", "QR", "TARJETA"
-
-class CategoriaGastoIn(BaseModel):
-    nombre:      str
-    descripcion: Optional[str] = None
-    icono:       Optional[str] = "receipt"
-
-class ResumenCaja(BaseModel):
-    sesion_id:             str
-    cajero_name:           str
-    abierta_at:            datetime
-    monto_inicial:         float
-    # ── Cash drawer ──────────────────────────────────────────────────────────
-    total_efectivo_ventas: float
-    total_cambio:          float
-    total_gastos:          float
-    total_ajustes:         float = 0.0
-    saldo_calculado:       float
-    # ── Digital channels ─────────────────────────────────────────────────────
-    total_qr:              float
-    total_tarjeta:         float
-    total_ventas_general:  float
-    # ── Manual Income ────────────────────────────────────────────────────────
-    total_ingresos_efectivo: float = 0.0
-    total_ingresos_qr:       float = 0.0
-    total_ingresos_tarjeta:  float = 0.0
-    # ── Utils ────────────────────────────────────────────────────────────────
-    num_transacciones:     int
-    movimientos:           List[dict]
-
+from app.schemas.caja import AbrirCajaIn, CerrarCajaIn, GastoIn, IngresoIn, CategoriaGastoIn, ResumenCaja
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
