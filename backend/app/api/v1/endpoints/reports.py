@@ -56,7 +56,8 @@ async def get_general_reports(
         }
     ]
     
-    kpis_cursor = await SaleItem.get_pymongo_collection().aggregate(kpis_pipeline).to_list(length=1)
+    cursor = SaleItem.get_settings().motor_collection.aggregate(kpis_pipeline)
+    kpis_cursor = await cursor.to_list(length=1)
     kpis = kpis_cursor[0] if kpis_cursor else {
         "total_ventas": 0, "total_productos": 0, "ganancia_matriz": 0, "ganancia_sucursal": 0
     }
@@ -90,7 +91,8 @@ async def get_general_reports(
         },
         {"$sort": {"total_ventas": -1}}
     ]
-    ventas_por_sucursal_raw = await SaleItem.get_pymongo_collection().aggregate(sucursal_pipeline).to_list(length=100)
+    cursor = SaleItem.get_settings().motor_collection.aggregate(sucursal_pipeline)
+    ventas_por_sucursal_raw = await cursor.to_list(length=100)
     
     # Resolver nombres en Python usando el modelo Sucursal (no Tenant)
     todas_sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
@@ -137,7 +139,8 @@ async def get_general_reports(
         {"$sort": {"cantidad_vendida": -1}},
         {"$limit": 10}
     ]
-    top_productos = await SaleItem.get_pymongo_collection().aggregate(top_products_pipeline).to_list(length=10)
+    cursor = SaleItem.get_settings().motor_collection.aggregate(top_products_pipeline)
+    top_productos = await cursor.to_list(length=10)
     
     # ─── 4. Evolucion Diaria ──────────────────────────────────────────────────────
     diaria_pipeline = [
@@ -166,7 +169,8 @@ async def get_general_reports(
         },
         {"$sort": {"fecha": 1}}
     ]
-    evolucion_diaria = await SaleItem.get_pymongo_collection().aggregate(diaria_pipeline).to_list(length=100)
+    cursor = SaleItem.get_settings().motor_collection.aggregate(diaria_pipeline)
+    evolucion_diaria = await cursor.to_list(length=100)
     
     return {
         "kpis": kpis,
@@ -274,7 +278,8 @@ async def get_daily_report(
         },
         {"$sort": {"cantidad": -1}}
     ]
-    items_summary = await SaleItem.get_pymongo_collection().aggregate(items_vendidos_pipeline).to_list(length=100)
+    cursor = SaleItem.get_settings().motor_collection.aggregate(items_vendidos_pipeline)
+    items_summary = await cursor.to_list(length=100)
     items_list = [{"producto": i["_id"], "cantidad": i["cantidad"], "total": i["subtotal"]} for i in items_summary]
 
     return {
@@ -369,7 +374,8 @@ async def get_financial_report(
         {"$sort": {"fecha": 1, "sucursal_id": 1}}
     ]
 
-    results = await SaleItem.get_pymongo_collection().aggregate(pipeline).to_list(length=2000)
+    cursor = SaleItem.get_settings().motor_collection.aggregate(pipeline)
+    results = await cursor.to_list(length=2000)
 
     # Resolve sucursal names
     todas_sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()

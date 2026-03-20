@@ -86,9 +86,9 @@ async def get_inventario(
             ]
         }
     })
-    
-    raw_results = await Inventario.aggregate(pipeline).to_list(length=1)
-    
+    motor_coll = Inventario.get_settings().motor_collection
+    cursor = motor_coll.aggregate(pipeline)
+    raw_results = await cursor.to_list(length=1)
     if not raw_results or not raw_results[0].get("metadata"):
         return InventarioPaginated(items=[], total=0, page=page, pages=1)
         
