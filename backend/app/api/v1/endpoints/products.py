@@ -136,7 +136,7 @@ async def create_product(
                     )
                 )
         if ops:
-            await Inventario.get_settings().motor_collection.bulk_write(ops)
+            await Inventario.get_pymongo_collection().bulk_write(ops)
             
     product.precios_sucursales = data.precios_sucursales or {}
     return await _enrich(product)
@@ -210,7 +210,7 @@ async def update_product(
                     )
                 )
         if ops:
-            await Inventario.get_settings().motor_collection.bulk_write(ops)
+            await Inventario.get_pymongo_collection().bulk_write(ops)
         product.precios_sucursales = precios
     else:
         # Load them to return properly to admin
@@ -393,7 +393,7 @@ async def import_products(
         
     if operaciones_actualizacion:
         # Intenta usar motor_collection
-        collection = Product.get_settings().motor_collection
+        collection = Product.get_pymongo_collection()
         await collection.bulk_write(operaciones_actualizacion)
         
     return {
@@ -681,14 +681,14 @@ async def importacion_global_excel(
         await Product.insert_many(productos_a_insertar)
         
     if operaciones_catalogo:
-        col_prod = Product.get_settings().motor_collection
+        col_prod = Product.get_pymongo_collection()
         await col_prod.bulk_write(operaciones_catalogo)
         
     if logs_inventario:
         await InventoryLog.insert_many(logs_inventario)
         
     if operaciones_inventario:
-        col_inv = Inventario.get_settings().motor_collection
+        col_inv = Inventario.get_pymongo_collection()
         await col_inv.bulk_write(operaciones_inventario)
         
     sucess_msg = [f"Sucursales vinculadas a columnas Excel: {list({k: v for k, v in col_to_sucursal_id.items()}.keys())}"]
@@ -850,7 +850,7 @@ async def import_product_prices(
         actualizados += 1
         
     if operaciones_inventario:
-        col_inv = Inventario.get_settings().motor_collection
+        col_inv = Inventario.get_pymongo_collection()
         await col_inv.bulk_write(operaciones_inventario)
         
     return {
