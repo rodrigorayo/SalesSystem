@@ -177,7 +177,7 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
         computed_total = float(int_part) + 0.5
         
     has_credit = any(p.metodo == "CREDITO" for p in sale_in.pagos)
-    if has_credit and not sale_in.cliente_id:
+    if has_credit and not sale_in.cliente_id and not (sale_in.cliente and sale_in.cliente.razon_social):
         raise HTTPException(status_code=400, detail="Ventas a crédito requieren un cliente registrado")
 
     actual_pagos = [PagoItem(metodo=p.metodo, monto=p.monto) for p in sale_in.pagos if p.metodo != "CREDITO"]
@@ -197,7 +197,7 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
     cliente_snap = ClienteInfo(**sale_in.cliente.model_dump()) if sale_in.cliente else None
 
     # Initialize empty QR Info if QR was used as payment method
-    has_qr = any(p.metodo == "QR" for p in pagos)
+    has_qr = any(p.metodo == "QR" for p in actual_pagos)
     from app.models.sale import QRInfo
     qr_init = QRInfo() if has_qr else None
 
