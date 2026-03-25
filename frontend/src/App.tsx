@@ -113,7 +113,7 @@ function App() {
                 } />
 
                 <Route path="/catalogo" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF}>
                     <CatalogoPage />
                   </ProtectedRoute>
                 } />

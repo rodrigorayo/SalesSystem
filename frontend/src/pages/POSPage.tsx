@@ -590,13 +590,16 @@ export default function POSPage() {
                                             placeholder="0.00" />
                                     </div>
                                     <button onClick={addPago}
-                                        disabled={!pendingPago.monto || parseFloat(pendingPago.monto) <= 0 || ticketCovered || !items.length || (pendingPago.metodo === 'CREDITO' && !cliente.nit && !cliente.razon_social)}
+                                        disabled={!pendingPago.monto || parseFloat(pendingPago.monto) <= 0 || ticketCovered || !items.length || (pendingPago.metodo === 'CREDITO' && (!cliente.razon_social || !cliente.telefono))}
                                         className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shrink-0">
                                         <Plus size={12} /> Agregar
                                     </button>
                                 </div>
-                                {pendingPago.metodo === 'CREDITO' && !cliente.nit && !cliente.razon_social && (
-                                    <p className="text-[10px] text-amber-600 font-bold mb-1.5 bg-amber-50 rounded px-2 py-1">⚠️ El pago a Crédito requiere que asocies un Cliente en la sección de Factura / Cliente.</p>
+                                {pendingPago.metodo === 'CREDITO' && (!cliente.razon_social || !cliente.telefono) && (
+                                    <p className="text-[10px] text-amber-600 font-bold mb-1.5 bg-amber-50 rounded px-2 py-1 flex items-start gap-1">
+                                        <span className="shrink-0 mt-0.5">⚠️</span> 
+                                        <span>El pago a <b>Crédito</b> requiere que registres el <b>Nombre (Razón Social)</b> y el <b>Celular</b> del deudor en la sección de Factura / Cliente para su seguimiento.</span>
+                                    </p>
                                 )}
 
                                 {/* Registered payments */}

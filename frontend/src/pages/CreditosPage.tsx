@@ -132,9 +132,9 @@ export default function CreditosPage() {
                                             <UserIcon size={20} />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-gray-900 leading-tight line-clamp-1">{venta.cliente?.razon_social || 'Desconocido'}</h3>
-                                            <p className="text-xs text-gray-500 flex items-center gap-1 font-mono">
-                                                NIT: {venta.cliente?.nit || 'N/A'}
+                                            <h3 className="font-bold text-gray-900 leading-tight line-clamp-1">{venta.cliente?.razon_social || 'Visita / Desconocido'}</h3>
+                                            <p className="text-xs text-gray-500 flex items-center gap-1 font-mono mt-0.5">
+                                                {venta.cliente?.nit ? `NIT: ${venta.cliente.nit}` : 'Sin NIT'} <span className="text-gray-300">|</span> 📞 {venta.cliente?.telefono || 'Sin Tel.'}
                                             </p>
                                         </div>
                                     </div>
