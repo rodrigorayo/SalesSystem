@@ -70,8 +70,20 @@ export default function Layout({ children }: LayoutProps) {
                 { icon: Wallet, label: 'Caja', path: '/caja' },
                 { icon: QrCode, label: 'Control QR', path: '/qr-control' },
             ];
+        } else if (role === 'SUPERVISOR') {
+            return [
+                { icon: Warehouse, label: 'Inventario', path: '/inventario' },
+                { icon: ClipboardList, label: 'Pedidos', path: '/pedidos' },
+                { icon: Users, label: 'Mi Equipo', path: '/usuarios' },
+                { icon: Package, label: 'Catálogo', path: '/catalogo' },
+                { icon: ShoppingBag, label: 'POS', path: '/pos' },
+                { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
+                { icon: Banknote, label: 'Créditos', path: '/creditos' },
+                { icon: Wallet, label: 'Caja', path: '/caja' },
+                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
+            ];
         } else {
-            // CAJERO / USER
+            // CAJERO / VENDEDOR / USER
             return [
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
                 { icon: RotateCcw, label: 'Ventas', path: '/ventas' },

@@ -3,6 +3,9 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from app.models.user import User, UserRole
+from app.models.product import Product
+from app.models.caja import CajaSession
+from app.models.sucursal import Sucursal, TipoSucursal
 from app.auth import get_current_active_user, get_password_hash
 
 router = APIRouter()
@@ -91,6 +94,22 @@ async def create_cajero(
     # Strict injection from JWT — client cannot override this
     sucursal_id = current_user.sucursal_id  # None if ADMIN_MATRIZ (matrix-level)
 
+    # BIZ RULE: If SUPERVISOR creates a VENDEDOR, that Vendedor needs their own inventory (Virtual Branch).
+    if current_user.role == UserRole.SUPERVISOR and data.role == 'VENDEDOR':
+        # Create a new VENDEDOR virtual branch
+        vendedor_branch = Sucursal(
+            tenant_id=current_user.tenant_id,
+            nombre=f"Vendedor: {data.full_name}",
+            ciudad="Móvil",
+            direccion="Móvil",
+            tipo=TipoSucursal.VENDEDOR
+        )
+        await vendedor_branch.create()
+        sucursal_id = str(vendedor_branch.id)
+    else:
+        # Otherwise they inherit the creator's branch
+        sucursal_id = current_user.sucursal_id
+
     hashed = get_password_hash(data.password)
     cajero = User(
         username=username_lower,
@@ -99,7 +118,7 @@ async def create_cajero(
         full_name=data.full_name,
         role=data.role,
         tenant_id=current_user.tenant_id,
-        sucursal_id=sucursal_id,  # injected from JWT, never from request
+        sucursal_id=sucursal_id,  # dynamically assigned
     )
     await cajero.create()
     return cajero

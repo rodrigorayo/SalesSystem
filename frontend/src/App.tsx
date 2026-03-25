@@ -42,7 +42,8 @@ const ProtectedRoute = ({
   if (allowedRoles && role && !allowedRoles.includes(role)) {
     if (role === 'SUPERADMIN') return <Navigate to="/admin" replace />;
     if (['ADMIN_MATRIZ', 'ADMIN'].includes(role)) return <Navigate to="/dashboard" replace />;
-    if (role === 'ADMIN_SUCURSAL') return <Navigate to="/pedidos" replace />;
+    if (role === 'ADMIN_SUCURSAL') return <Navigate to="/dashboard-sucursal" replace />;
+    if (['SUPERVISOR', 'VENDEDOR'].includes(role)) return <Navigate to="/inventario" replace />;
     return <Navigate to="/pos" replace />;
   }
 
@@ -55,12 +56,14 @@ const DashboardDispatch = () => {
   if (role === 'SUPERADMIN') return <Navigate to="/admin" replace />;
   if (['ADMIN_MATRIZ', 'ADMIN'].includes(role ?? '')) return <Navigate to="/dashboard" replace />;
   if (role === 'ADMIN_SUCURSAL') return <Navigate to="/dashboard-sucursal" replace />;
+  if (['SUPERVISOR', 'VENDEDOR'].includes(role ?? '')) return <Navigate to="/inventario" replace />;
   return <Navigate to="/pos" replace />;
 };
 
 const MATRIZ_ROLES = ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'];
 const BRANCH_ROLES = ['ADMIN_SUCURSAL', 'ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'];
-const ALL_STAFF = ['ADMIN_MATRIZ', 'ADMIN_SUCURSAL', 'CAJERO', 'ADMIN', 'USER', 'SUPERADMIN'];
+const MOBILE_MANAGEMENT_ROLES = [...BRANCH_ROLES, 'SUPERVISOR'];
+const ALL_STAFF = ['ADMIN_MATRIZ', 'ADMIN_SUCURSAL', 'CAJERO', 'ADMIN', 'USER', 'SUPERADMIN', 'SUPERVISOR', 'VENDEDOR'];
 
 function App() {
   return (
@@ -121,9 +124,9 @@ function App() {
                   </ProtectedRoute>
                 } />
 
-                {/* B2B Orders — both Matriz and Sucursal */}
+                {/* B2B Orders — both Matriz and Sucursal and Supervisors */}
                 <Route path="/pedidos" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES}>
                     <PedidosPage />
                   </ProtectedRoute>
                 } />
@@ -171,7 +174,7 @@ function App() {
 
                 {/* Users (Personal) */}
                 <Route path="/usuarios" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES}>
                     <UsersPage />
                   </ProtectedRoute>
                 } />
