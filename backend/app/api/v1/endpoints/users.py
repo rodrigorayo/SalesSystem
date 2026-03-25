@@ -3,8 +3,6 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from app.models.user import User, UserRole
-from app.models.product import Product
-from app.models.caja import CajaSession
 from app.models.sucursal import Sucursal, TipoSucursal
 from app.auth import get_current_active_user, get_password_hash
 
