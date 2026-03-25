@@ -3,8 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.db import init_db
-from app.models.user import User, UserRole
-from app.auth import get_password_hash
 from app.api.v1.router import api_router
 
 @asynccontextmanager

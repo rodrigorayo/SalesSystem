@@ -1,5 +1,4 @@
 from typing import Optional
-from beanie import PydanticObjectId
 from app.models.cliente import Cliente
 from app.models.price_list import ListaPrecio, ListaPrecioItem, TipoListaPrecio
 

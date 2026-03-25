@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional
 from datetime import datetime
 import io
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet
 from app.models.pedido_interno import PedidoInterno, PedidoItem, EstadoPedido
 from app.models.pedido_item import PedidoItemDocument
 from app.models.inventario import Inventario, TipoMovimiento, InventoryLog
@@ -358,7 +358,7 @@ async def recibir_pedido(
             costo_unitario_momento=item.precio_mayorista,
             usuario_id=str(current_user.id),
             usuario_nombre=current_user.full_name or current_user.username,
-            notas=f"Recepción de Pedido Central",
+            notas="Recepción de Pedido Central",
             referencia_id=str(pedido.id)
         ).create()
 
@@ -397,7 +397,7 @@ async def descargar_pdf_pedido(
     title_style = styles['Title']
     normal_style = styles['Normal']
     
-    Story.append(Paragraph(f"Comprobante de Recepción de Pedido", title_style))
+    Story.append(Paragraph("Comprobante de Recepción de Pedido", title_style))
     Story.append(Spacer(1, 12))
     
     Story.append(Paragraph(f"<b>Sucursal:</b> {pedido.sucursal_id}", normal_style))

@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Optional
 from datetime import datetime
 from beanie import Document
 from pydantic import Field

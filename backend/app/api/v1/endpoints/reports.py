@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from app.auth import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.sale_item import SaleItem

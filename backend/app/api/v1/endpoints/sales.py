@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from bson import ObjectId
-from app.models.sale import Sale, ClienteInfo, PagoItem, SaleItem, DescuentoInfo
+from app.models.sale import Sale, ClienteInfo, PagoItem, SaleItem
 from app.models.sale_item import SaleItem as SaleItemAnalytics
 from app.models.product import Product
 from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
@@ -15,7 +14,7 @@ from pymongo import ReturnDocument
 router = APIRouter()
 
 
-from app.schemas.sale import SaleItemIn, PagoIn, ClienteIn, SaleCreate, SalesPaginated
+from app.schemas.sale import SaleCreate, SalesPaginated
 # ─── POST /ventas ─────────────────────────────────────────────────────────────
 
 @router.post("/ventas", response_model=Sale)

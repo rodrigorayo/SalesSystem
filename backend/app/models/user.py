@@ -1,6 +1,6 @@
 from typing import Optional
 from enum import Enum
-from beanie import Document, Indexed
+from beanie import Document
 from pydantic import Field, EmailStr
 from datetime import datetime
 

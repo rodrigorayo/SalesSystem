@@ -1,4 +1,3 @@
-from typing import Optional
 from beanie import Document
 from pydantic import Field
 from datetime import datetime

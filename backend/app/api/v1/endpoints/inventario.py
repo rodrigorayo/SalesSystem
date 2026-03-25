@@ -1,11 +1,10 @@
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from pymongo import UpdateOne
 import pandas as pd
 import io
 import math
-from pydantic import BaseModel
 from app.models.inventario import Inventario
 from app.models.product import Product
 from app.models.user import User, UserRole
@@ -323,7 +322,6 @@ async def import_inventory(
     fallidos = 0
     
     from app.models.inventario import InventoryLog, TipoMovimiento
-    import datetime
     
     logs_a_insertar = []
     operaciones_inventario = []

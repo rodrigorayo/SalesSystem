@@ -1,7 +1,6 @@
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from pymongo import UpdateOne
 import pandas as pd
 import io

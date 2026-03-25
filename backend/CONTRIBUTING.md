@@ -82,9 +82,25 @@ main          ← producción (Render + Vercel)
         └── fix/TASK-XX-descripcion      ← tu bugfix
 ```
 
-1. **Nunca pushear directo a `main`**.
-2. PR a `develop`, mínimo 1 review antes de merge.
-3. Al final del sprint, `develop` → `main` (deploy).
+1. **Nunca pushear directo a `main` o `develop`**.
+2. Crear tu rama con el formato: `tipo/tarea`, por ejemplo: `feature/ventas-pos` o `fix/login-error`.
+3. PR a `develop`, mínimo 1 review antes de merge.
+4. Al final del sprint, `develop` → `main` (deploy a Producción).
+
+### Mensajes de Commit (Conventional Commits)
+
+Es fuertemente requerido seguir la semántica de Commits para mantener el historial limpio e identificable:
+
+- `feat:` (Nueva característica para el usuario, no del build script)
+- `fix:` (Solución de un bug para el usuario)
+- `docs:` (Cambios en la documentación)
+- `style:` (Formato, comas, puntos y comas; sin cambio de código en producción)
+- `refactor:` (Refactorización del código de producción, sin bugs o features nuevas)
+- `test:` (Agregando tests faltantes, refactorizando tests; sin código de prod)
+- `chore:` (Actualizando scripts de build; sin código de prod)
+
+**Ejemplo de commit ideal:**
+`git commit -m "feat(pos): agregar captura de celular en cobro por crédito"`
 
 ---
 

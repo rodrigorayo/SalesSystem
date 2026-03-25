@@ -5,7 +5,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from app.models.cliente import Cliente
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.auth import get_current_active_user
 
 router = APIRouter()
