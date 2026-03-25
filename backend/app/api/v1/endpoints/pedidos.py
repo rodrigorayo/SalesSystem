@@ -157,13 +157,27 @@ async def listar_pedidos(
     tenant_id = current_user.tenant_id or ""
     filters = [PedidoInterno.tenant_id == tenant_id]
 
+    from beanie.operators import Or
+
     # Rol based restrictions
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO]:
-        # Branch users can ONLY see their branch orders
-        filters.append(PedidoInterno.sucursal_id == current_user.sucursal_id)
+        # Branch users can see orders where they are either sending or receiving
+        filters.append(
+            Or(
+                PedidoInterno.sucursal_id == current_user.sucursal_id,
+                PedidoInterno.sucursal_origen_id == current_user.sucursal_id,
+                PedidoInterno.sucursal_destino_id == current_user.sucursal_id
+            )
+        )
     elif sucursal_id:
         # General admins can filter by sucursal or see all
-        filters.append(PedidoInterno.sucursal_id == sucursal_id)
+        filters.append(
+            Or(
+                PedidoInterno.sucursal_id == sucursal_id,
+                PedidoInterno.sucursal_origen_id == sucursal_id,
+                PedidoInterno.sucursal_destino_id == sucursal_id
+            )
+        )
 
     if estado:
         filters.append(PedidoInterno.estado == estado)
@@ -261,7 +275,7 @@ async def despachar_pedido(
     # If origin is a branch (not CENTRAL), we MUST deduct from the origin inventory directly
     if pedido.sucursal_origen_id != "CENTRAL":
         for item in pedido.items:
-            inv = await Inventario.get_pymongo_collection().find_one_and_update(
+            await Inventario.get_pymongo_collection().find_one_and_update(
                 {"tenant_id": tenant_id, "sucursal_id": pedido.sucursal_origen_id, "producto_id": item.producto_id},
                 {"$inc": {"cantidad": -item.cantidad}},
                 return_document=ReturnDocument.AFTER
@@ -298,7 +312,7 @@ async def recibir_pedido(
     if not pedido or pedido.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Order not found")
         
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and pedido.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and pedido.sucursal_destino_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Not authorized to receive this order")
 
     if pedido.estado != EstadoPedido.DESPACHADO:
