@@ -262,7 +262,7 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
     if sesion:
         total_pagado = 0.0
 
-        for pago in pagos:
+        for pago in actual_pagos:
             metodo  = str(pago.metodo).upper()
             monto_p = float(pago.monto)
             total_pagado += monto_p
