@@ -1,7 +1,9 @@
+export type UserRole = 'SUPERADMIN' | 'ADMIN_MATRIZ' | 'ADMIN' | 'USER' | 'ADMIN_SUCURSAL' | 'CAJERO' | 'SUPERVISOR' | 'VENDEDOR';
+
 export interface User {
     _id: string;
     username: string;
-    role: 'SUPERADMIN' | 'ADMIN_MATRIZ' | 'ADMIN_SUCURSAL' | 'CAJERO' | 'ADMIN' | 'USER';
+    role: UserRole;
     full_name?: string;
     tenant_id?: string;
     sucursal_id?: string;
@@ -36,6 +38,7 @@ export interface Sucursal {
     direccion: string;
     telefono?: string;
     is_active: boolean;
+    tipo?: 'FISICA' | 'SUPERVISOR' | 'VENDEDOR';
     created_at: string;
 }
 
@@ -44,6 +47,7 @@ export interface SucursalCreate {
     ciudad: string;
     direccion: string;
     telefono?: string;
+    tipo?: 'FISICA' | 'SUPERVISOR' | 'VENDEDOR';
     admin_username: string;
     admin_password: string;
 }
@@ -135,6 +139,9 @@ export interface PedidoInterno {
 
 export interface PedidoCreate {
     sucursal_id: string;
+    sucursal_origen_id?: string;
+    sucursal_destino_id?: string;
+    transferencia_directa?: boolean;
     items: { producto_id: string; cantidad: number }[];
     notas?: string;
 }
@@ -207,6 +214,7 @@ export interface EmployeeCreate {
     email: string;
     password: string;
     full_name: string;
+    role?: 'CAJERO' | 'SUPERVISOR' | 'VENDEDOR';
 }
 
 export interface CartItem {
@@ -217,7 +225,7 @@ export interface CartItem {
 export interface SaleCreate {
     items: { product_id: string; quantity: number; price_at_sale?: number }[];
     total: number;
-    payment_method: 'EFECTIVO' | 'TARJETA' | 'QR';
+    payment_method: 'EFECTIVO' | 'TARJETA' | 'QR' | 'CREDITO';
     cashier_name: string;
     sucursal_id?: string;
 }
@@ -292,6 +300,7 @@ export interface Sale {
     cashier_id: string;
     cashier_name: string;
     anulada: boolean;
+    estado_pago?: 'PAGADO' | 'PENDIENTE' | 'PARCIAL';
     factura_emitida?: boolean;
     created_at: string;
 }

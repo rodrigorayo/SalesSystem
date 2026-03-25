@@ -193,7 +193,7 @@ async def get_daily_report(
     
     # Permission check
     target_sucursal = sucursal_id
-    if current_user.role == UserRole.ADMIN_SUCURSAL:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
         target_sucursal = current_user.sucursal_id
     elif not target_sucursal:
          # For general admins, if no sucursal is provided, they might want a global daily report or it might be an error.

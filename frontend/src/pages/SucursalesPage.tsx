@@ -15,7 +15,7 @@ interface CreatedCredentials {
 }
 
 const BLANK_FORM: SucursalCreate = {
-    nombre: '', ciudad: '', direccion: '', telefono: '', admin_username: '', admin_password: '',
+    nombre: '', ciudad: '', direccion: '', telefono: '', admin_username: '', admin_password: '', tipo: 'FISICA',
 };
 
 export default function SucursalesPage() {
@@ -26,17 +26,26 @@ export default function SucursalesPage() {
     const [copied, setCopied] = useState(false);
     const [form, setForm] = useState<SucursalCreate>(BLANK_FORM);
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [editForm, setEditForm] = useState<{ nombre: string; ciudad: string; direccion: string; telefono: string }>({ nombre: '', ciudad: '', direccion: '', telefono: '' });
+    const [editForm, setEditForm] = useState<{ nombre: string; ciudad: string; direccion: string; telefono: string; tipo: 'FISICA' | 'SUPERVISOR' | 'VENDEDOR' }>({ nombre: '', ciudad: '', direccion: '', telefono: '', tipo: 'FISICA' });
+    const [tab, setTab] = useState<'FISICA' | 'FUERZA_VENTAS'>('FISICA');
     
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 6; // usually fewer branches than products
 
     const { data: sucursales = [], isLoading } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
 
+    const filteredSucursales = useMemo(() => {
+        if (tab === 'FISICA') return sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo);
+        return sucursales.filter(s => s.tipo === 'SUPERVISOR' || s.tipo === 'VENDEDOR');
+    }, [sucursales, tab]);
+
     const paginatedSucursales = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        return sucursales.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }, [sucursales, currentPage]);
+        return filteredSucursales.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredSucursales, currentPage]);
+
+    // reset page on tab switch
+    useMemo(() => setCurrentPage(1), [tab]);
 
     const createMut = useMutation({
         mutationFn: (data: SucursalCreate) => createSucursal(data as any),
@@ -76,7 +85,7 @@ export default function SucursalesPage() {
 
     const startEdit = (s: any) => {
         setEditId(s._id);
-        setEditForm({ nombre: s.nombre, ciudad: s.ciudad ?? '', direccion: s.direccion ?? '', telefono: s.telefono ?? '' });
+        setEditForm({ nombre: s.nombre, ciudad: s.ciudad ?? '', direccion: s.direccion ?? '', telefono: s.telefono ?? '', tipo: s.tipo || 'FISICA' });
     };
 
     const field = (key: keyof SucursalCreate, val: string) =>
@@ -90,14 +99,26 @@ export default function SucursalesPage() {
     return (
         <div className="max-w-7xl mx-auto px-3 py-4 md:p-4 space-y-4 pb-20 md:pb-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Sucursales</h1>
-                    <p className="text-gray-500 mt-1 text-sm">Gestiona las sucursales de tu empresa</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Entidades</h1>
+                    <p className="text-gray-500 mt-1 text-sm">Gestiona sucursales físicas y equipo de fuerza de ventas</p>
                 </div>
                 <button onClick={() => { setShowCreate(true); setEditId(null); setForm(BLANK_FORM); }}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm shadow-sm">
-                    <Plus size={16} /> Nueva Sucursal
+                    <Plus size={16} /> Nueva Entidad
+                </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 flex-wrap w-fit">
+                <button onClick={() => setTab('FISICA')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'FISICA' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                    Sucursales Físicas
+                </button>
+                <button onClick={() => setTab('FUERZA_VENTAS')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'FUERZA_VENTAS' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                    Fuerza de Ventas Móvil
                 </button>
             </div>
 
@@ -147,7 +168,7 @@ export default function SucursalesPage() {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-5">
-                            <h2 className="text-lg font-bold text-gray-900">Nueva Sucursal</h2>
+                            <h2 className="text-lg font-bold text-gray-900">Nueva Entidad</h2>
                             <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"><X size={20} /></button>
                         </div>
                         <form onSubmit={e => { e.preventDefault(); if (!canSubmit) return; createMut.mutate(form); }} className="space-y-4">
@@ -158,6 +179,16 @@ export default function SucursalesPage() {
                                 <input value={form.nombre} onChange={e => field('nombre', e.target.value)} required
                                     className="w-full border border-gray-300 rounded-xl px-3 py-2 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                                     placeholder="Sucursal Norte" />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Entidad</label>
+                                <select value={form.tipo} onChange={e => field('tipo', e.target.value)} required
+                                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
+                                    <option value="FISICA">Sucursal Física / Almacén</option>
+                                    <option value="SUPERVISOR">Supervisor (Móvil)</option>
+                                    <option value="VENDEDOR">Vendedor Preventista (Móvil)</option>
+                                </select>
                             </div>
 
                             <div>
@@ -217,7 +248,7 @@ export default function SucursalesPage() {
 
                             <button type="submit" disabled={createMut.isPending || !canSubmit}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
-                                {createMut.isPending ? <Loader2 size={18} className="animate-spin" /> : <><Check size={18} /> Crear Sucursal</>}
+                                {createMut.isPending ? <Loader2 size={18} className="animate-spin" /> : <><Check size={18} /> Crear Entidad</>}
                             </button>
                         </form>
                     </div>
@@ -245,6 +276,15 @@ export default function SucursalesPage() {
                                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
                                 </div>
                             ))}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Entidad</label>
+                                <select value={editForm.tipo} onChange={e => setEditForm(f => ({ ...f, tipo: e.target.value as any }))} required
+                                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
+                                    <option value="FISICA">Sucursal Física / Almacén</option>
+                                    <option value="SUPERVISOR">Supervisor (Móvil)</option>
+                                    <option value="VENDEDOR">Vendedor Preventista (Móvil)</option>
+                                </select>
+                            </div>
                             <button type="submit" disabled={updateMut.isPending}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2">
                                 {updateMut.isPending ? <Loader2 size={18} className="animate-spin" /> : <><Check size={18} /> Guardar</>}
@@ -257,10 +297,10 @@ export default function SucursalesPage() {
             {/* ── List ─────────────────────────────────────────────────────────── */}
             {isLoading ? (
                 <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-indigo-500" /></div>
-            ) : sucursales.length === 0 ? (
+            ) : filteredSucursales.length === 0 ? (
                 <div className="text-center py-20 text-gray-400">
                     <Store size={48} className="mx-auto mb-4 opacity-30" />
-                    <p className="text-gray-500">No hay sucursales. Crea la primera.</p>
+                    <p className="text-gray-500">No hay registros en esta vista.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -274,9 +314,14 @@ export default function SucursalesPage() {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-900">{s.nombre}</h3>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                                            {s.is_active ? 'Activa' : 'Inactiva'}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${s.tipo === 'VENDEDOR' ? 'bg-amber-100 text-amber-700' : s.tipo === 'SUPERVISOR' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {s.tipo || 'FISICA'}
+                                            </span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                                                {s.is_active ? 'Activa' : 'Inactiva'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -304,12 +349,12 @@ export default function SucursalesPage() {
                         </div>
                     ))}
                     </div>
-                    {sucursales.length > ITEMS_PER_PAGE && (
+                    {filteredSucursales.length > ITEMS_PER_PAGE && (
                         <Pagination 
                             currentPage={currentPage}
-                            totalPages={Math.ceil(sucursales.length / ITEMS_PER_PAGE)}
+                            totalPages={Math.ceil(filteredSucursales.length / ITEMS_PER_PAGE)}
                             onPageChange={setCurrentPage}
-                            totalItems={sucursales.length}
+                            totalItems={filteredSucursales.length}
                             itemsPerPage={ITEMS_PER_PAGE}
                         />
                     )}

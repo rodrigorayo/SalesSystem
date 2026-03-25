@@ -19,6 +19,11 @@ class SaleItemIn(BaseModel):
 
 class PagoIn(BaseModel):
     """One payment segment (supports split payments)."""
+    metodo: Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA", "CREDITO"]
+    monto: float
+
+class AbonoCreate(BaseModel):
+    """Request body to pay off portions of a credit sale."""
     metodo: Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA"]
     monto: float
 

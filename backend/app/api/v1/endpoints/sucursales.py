@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
-from app.models.sucursal import Sucursal
+from app.models.sucursal import Sucursal, TipoSucursal
 from app.models.user import User, UserRole
 from app.auth import get_current_active_user, get_password_hash
 
@@ -14,6 +14,7 @@ class SucursalCreate(BaseModel):
     ciudad: str            # required — e.g. "Cochabamba", "La Paz"
     direccion: str         # required — full street address
     telefono: Optional[str] = None
+    tipo: TipoSucursal = TipoSucursal.FISICA
     # Admin credentials — created automatically with the branch
     admin_username: EmailStr
     admin_password: str = Field(
@@ -85,16 +86,24 @@ async def create_sucursal(
         ciudad=data.ciudad,
         direccion=data.direccion,
         telefono=data.telefono,
+        tipo=data.tipo,
     )
     await sucursal.create()
 
-    # 2. Create the ADMIN_SUCURSAL user bound to this branch
+    # 2. Assign dynamic role based on Sucursal Type
+    assigned_role = UserRole.ADMIN_SUCURSAL
+    if data.tipo == TipoSucursal.SUPERVISOR:
+        assigned_role = UserRole.SUPERVISOR
+    elif data.tipo == TipoSucursal.VENDEDOR:
+        assigned_role = UserRole.VENDEDOR
+
+    # 3. Create the user bound to this branch
     hashed = get_password_hash(data.admin_password)
     admin = User(
         username=admin_username_lower,
         hashed_password=hashed,
-        full_name=f"Admin {data.nombre}",
-        role=UserRole.ADMIN_SUCURSAL,
+        full_name=f"{assigned_role.value} {data.nombre}",
+        role=assigned_role,
         tenant_id=current_user.tenant_id,
         sucursal_id=str(sucursal.id),
     )
@@ -114,8 +123,9 @@ async def create_sucursal(
         "admin_credentials": {
             "username": data.admin_username,
             "password": data.admin_password,   # show once so admin can hand it over
-            "role": "ADMIN_SUCURSAL",
+            "role": assigned_role.value,
             "sucursal_id": str(sucursal.id),
+            "tipo": sucursal.tipo.value,
         }
     }
 

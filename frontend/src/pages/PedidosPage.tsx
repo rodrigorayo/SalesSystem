@@ -41,6 +41,7 @@ export default function PedidosPage() {
     const [receptionModal, setReceptionModal] = useState<{ isOpen: boolean; pedido: any }>({ isOpen: false, pedido: null });
 
     const [selectedSucursal, setSelectedSucursal] = useState('');
+    const [supervisorAction, setSupervisorAction] = useState<'PEDIR' | 'TRANSFERIR'>('PEDIR');
     const [orderItems, setOrderItems] = useState<{ producto_id: string; cantidad: number }[]>([]);
     const [notas, setNotas] = useState('');
 
@@ -86,7 +87,7 @@ export default function PedidosPage() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-xl font-bold text-gray-900">Pedidos Internos</h1>
-                    <p className="text-gray-500 text-xs mt-1">Transferencias de stock Matriz → Sucursal</p>
+                    <p className="text-gray-500 text-xs mt-1">Gestión de transferencias de inventario</p>
                 </div>
                 {!isCajero() && (
                     <button onClick={() => setShowCreate(true)}
@@ -248,21 +249,72 @@ export default function PedidosPage() {
                         </div>
                         <form onSubmit={e => {
                             e.preventDefault();
-                            const targetId = isMatriz() || user?.role === 'SUPERADMIN' ? selectedSucursal : user?.sucursal_id;
                             const validItems = orderItems.filter(i => i.producto_id.trim() !== '');
-                            if (!targetId || validItems.length === 0) {
+                            if (!selectedSucursal && (isMatriz() || user?.role === 'SUPERADMIN' || user?.role === 'SUPERVISOR')) {
+                                alert("Por favor, selecciona una sucursal.");
+                                return;
+                            }
+                            if (validItems.length === 0) {
                                 alert("Por favor, selecciona al menos un producto válido para el pedido.");
                                 return;
                             }
-                            createMut.mutate({ sucursal_id: targetId, items: validItems, notas: notas || undefined });
+                            
+                            let payload: any = { items: validItems, notas: notas || undefined };
+                            
+                            if (isMatriz() || user?.role === 'SUPERADMIN') {
+                                payload.sucursal_destino_id = selectedSucursal;
+                                payload.sucursal_id = selectedSucursal;
+                                payload.sucursal_origen_id = "CENTRAL";
+                            } else if (user?.role === 'SUPERVISOR') {
+                                if (supervisorAction === 'PEDIR') {
+                                    payload.sucursal_destino_id = user.sucursal_id;
+                                    payload.sucursal_id = user.sucursal_id;
+                                    payload.sucursal_origen_id = selectedSucursal; // A physical branch
+                                } else {
+                                    payload.sucursal_destino_id = selectedSucursal; // A vendedor branch
+                                    payload.sucursal_id = selectedSucursal;
+                                    payload.sucursal_origen_id = user.sucursal_id;
+                                    payload.transferencia_directa = true;
+                                }
+                            } else {
+                                payload.sucursal_destino_id = user?.sucursal_id;
+                                payload.sucursal_id = user?.sucursal_id;
+                                payload.sucursal_origen_id = "CENTRAL";
+                            }
+                            
+                            createMut.mutate(payload);
                         }} className="space-y-4">
+                            {user?.role === 'SUPERVISOR' && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Acción</label>
+                                    <select value={supervisorAction} onChange={e => setSupervisorAction(e.target.value as any)}
+                                        className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
+                                        <option value="PEDIR">Pedir a Almacén (Recepción)</option>
+                                        <option value="TRANSFERIR">Entregar a Vendedor (Despacho)</option>
+                                    </select>
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Sucursal Destino *</label>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    {user?.role === 'SUPERVISOR' 
+                                        ? (supervisorAction === 'PEDIR' ? 'Sucursal Origen *' : 'Vendedor Destino *')
+                                        : 'Sucursal Destino *'}
+                                </label>
                                 {isMatriz() || user?.role === 'SUPERADMIN' ? (
                                     <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
                                         className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
                                         <option value="">Selecciona sucursal…</option>
-                                        {sucursales.map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                        {sucursales.filter(s => s.tipo !== 'VENDEDOR' && s.tipo !== 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                    </select>
+                                ) : user?.role === 'SUPERVISOR' ? (
+                                    <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
+                                        <option value="">Selecciona entidad…</option>
+                                        {supervisorAction === 'PEDIR' 
+                                            ? sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)
+                                            : sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)
+                                        }
                                     </select>
                                 ) : (
                                     <div className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-1.5 text-xs text-gray-700 font-medium cursor-not-allowed">

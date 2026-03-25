@@ -14,6 +14,8 @@ class UserRole(str, Enum):
     ADMIN_MATRIZ = "ADMIN_MATRIZ"   # Tenant Matrix Admin (owns the business)
     ADMIN_SUCURSAL = "ADMIN_SUCURSAL"  # Branch Admin
     CAJERO = "CAJERO"               # POS Cashier
+    SUPERVISOR = "SUPERVISOR"       # Fuerza de ventas - Supervisor
+    VENDEDOR = "VENDEDOR"           # Fuerza de ventas - Vendedor en calle
     # Legacy aliases for backward compatibility
     ADMIN = "ADMIN_MATRIZ"
     USER = "CAJERO"

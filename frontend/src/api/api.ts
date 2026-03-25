@@ -338,12 +338,13 @@ export const createEmployee = (data: EmployeeCreate) =>
 
 // ─── Sales ────────────────────────────────────────────────────────────────
 export const createSale = (data: SaleCreate) => client('/sales', { method: 'POST', body: data });
-export const getSales = (sucursal_id?: string, page: number = 1, limit: number = 50, metodo_pago?: string, solo_facturas?: boolean, qr_confirmed?: boolean) => {
+export const getSales = (sucursal_id?: string, page: number = 1, limit: number = 50, metodo_pago?: string, solo_facturas?: boolean, qr_confirmed?: boolean, estado_pago?: string) => {
     const params = new URLSearchParams();
     if (sucursal_id) params.set('sucursal_id', sucursal_id);
     if (metodo_pago) params.set('metodo_pago', metodo_pago);
     if (solo_facturas) params.set('solo_facturas', 'true');
     if (qr_confirmed !== undefined) params.set('qr_confirmed', String(qr_confirmed));
+    if (estado_pago) params.set('estado_pago', estado_pago);
     params.set('page', String(page));
     params.set('limit', String(limit));
     const qs = params.toString();
@@ -360,6 +361,8 @@ export const toggleFacturaEmitida = (id: string, emitida: boolean) =>
     client<Sale>(`/sales/${id}/factura?emitida=${emitida}`, { method: 'PATCH' });
 export const updateQRInfo = (id: string, qrData: { banco: string; referencia: string; monto_transferido: number }) => 
     client<Sale>(`/sales/${id}/qr`, { method: 'PATCH', body: qrData });
+export const registrarAbono = (sale_id: string, abono: { metodo: 'EFECTIVO' | 'TARJETA' | 'QR' | 'TRANSFERENCIA'; monto: number }) =>
+    client<Sale>(`/sales/${sale_id}/abono`, { method: 'POST', body: abono });
 
 
 // ─── Caja ─────────────────────────────────────────────────────────────────

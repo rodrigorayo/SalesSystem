@@ -19,6 +19,7 @@ import VentasPage from './pages/VentasPage';
 import ControlQRPage from './pages/ControlQRPage';
 import PriceRequestsPage from './pages/PriceRequestsPage';
 import ReportsPage from './pages/ReportsPage';
+import CreditosPage from './pages/CreditosPage';
 import { useAuthStore } from './store/authStore';
 import { Toaster } from 'sonner';
 
@@ -138,6 +139,13 @@ function App() {
                 <Route path="/qr-control" element={
                   <ProtectedRoute allowedRoles={ALL_STAFF}>
                     <ControlQRPage />
+                  </ProtectedRoute>
+                } />
+
+                {/* Créditos y Cuentas por Cobrar */}
+                <Route path="/creditos" element={
+                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                    <CreditosPage />
                   </ProtectedRoute>
                 } />
 

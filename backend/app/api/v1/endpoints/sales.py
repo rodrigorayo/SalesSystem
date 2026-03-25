@@ -176,7 +176,24 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
     else:
         computed_total = float(int_part) + 0.5
         
-    pagos = [PagoItem(metodo=p.metodo, monto=p.monto) for p in sale_in.pagos]
+    has_credit = any(p.metodo == "CREDITO" for p in sale_in.pagos)
+    if has_credit and not sale_in.cliente_id:
+        raise HTTPException(status_code=400, detail="Ventas a crédito requieren un cliente registrado")
+
+    actual_pagos = [PagoItem(metodo=p.metodo, monto=p.monto) for p in sale_in.pagos if p.metodo != "CREDITO"]
+    total_pagado = sum(p.monto for p in actual_pagos)
+    from app.models.sale import EstadoPago
+    
+    if has_credit:
+        if total_pagado <= 0:
+            estado_pago = EstadoPago.PENDIENTE
+        elif total_pagado < computed_total:
+            estado_pago = EstadoPago.PARCIAL
+        else:
+            estado_pago = EstadoPago.PAGADO
+    else:
+        estado_pago = EstadoPago.PAGADO
+        
     cliente_snap = ClienteInfo(**sale_in.cliente.model_dump()) if sale_in.cliente else None
 
     # Initialize empty QR Info if QR was used as payment method
@@ -189,7 +206,8 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
         sucursal_id=sucursal_id,
         items=sale_items,
         total=computed_total,
-        pagos=pagos,
+        pagos=actual_pagos,
+        estado_pago=estado_pago,
         descuento=sale_in.descuento,
         cliente_id=sale_in.cliente_id,
         cliente=cliente_snap,
@@ -314,6 +332,7 @@ async def get_today_stats(
 async def get_sales(
     sucursal_id: Optional[str] = None,
     metodo_pago: Optional[str] = None,
+    estado_pago: Optional[str] = None,
     solo_facturas: bool = False,
     qr_confirmed: Optional[bool] = None,
     page: int = 1,
@@ -334,6 +353,13 @@ async def get_sales(
     if metodo_pago:
         # Filter sales where at least one payment method matches
         filters.append({"pagos.metodo": metodo_pago.upper()})
+        
+    if estado_pago:
+        if estado_pago.upper() == "DEUDA":
+            from beanie.operators import In
+            filters.append(In(Sale.estado_pago, ["PENDIENTE", "PARCIAL"]))
+        else:
+            filters.append(Sale.estado_pago == estado_pago.upper())
 
     if qr_confirmed is not None:
         filters.append(Sale.qr_info.confirmado == qr_confirmed)
@@ -347,7 +373,7 @@ async def get_sales(
         ))
         
     # Superadmins / Matriz see all based on filter, Sucursal sees only theirs
-    if current_user.role == UserRole.ADMIN_SUCURSAL:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
         if sucursal_id and sucursal_id != current_user.sucursal_id:
             raise HTTPException(status_code=403, detail="Cannot view sales of another branch")
         filters.append(Sale.sucursal_id == current_user.sucursal_id)
@@ -384,7 +410,7 @@ async def anular_sale(
     - Restores inventory stock and logs to Kardex
     - Auto-registers an EGRESO in the active cash register session to cancel the income.
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="No tienes permiso para anular ventas")
 
     sale = await Sale.get(sale_id)
@@ -394,7 +420,7 @@ async def anular_sale(
     if sale.anulada:
         raise HTTPException(status_code=400, detail="La venta ya está anulada")
 
-    if current_user.role == UserRole.ADMIN_SUCURSAL and sale.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes anular ventas de tu propia sucursal")
 
     tenant_id = sale.tenant_id
@@ -471,7 +497,7 @@ async def toggle_factura_emitida(
     if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
         raise HTTPException(status_code=404, detail="Sale not found")
         
-    if current_user.role == UserRole.ADMIN_SUCURSAL and sale.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes editar ventas de tu propia sucursal")
         
     sale.factura_emitida = emitida
@@ -500,7 +526,7 @@ async def update_qr_info(
     if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
         raise HTTPException(status_code=404, detail="Sale not found")
         
-    if current_user.role == UserRole.ADMIN_SUCURSAL and sale.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes confirmar pagos de tu propia sucursal")
         
     if not sale.qr_info:
@@ -516,4 +542,39 @@ async def update_qr_info(
     
     await sale.save()
     
+    return sale
+
+from app.schemas.sale import AbonoCreate
+from app.models.sale import EstadoPago
+
+@router.post("/sales/{sale_id}/abono", response_model=Sale)
+async def registrar_abono(sale_id: str, abono: AbonoCreate, current_user: User = Depends(get_current_active_user)):
+    """
+    Registers a partial layout (amortization) to an active debt in a sale.
+    """
+    sale = await Sale.get(sale_id)
+    if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
+        raise HTTPException(status_code=404, detail="Sale not found")
+        
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="No puedes abonar a ventas de otras sucursales")
+        
+    if sale.estado_pago == EstadoPago.PAGADO:
+        raise HTTPException(status_code=400, detail="Esta venta ya está completamente pagada.")
+        
+    # Append the payment
+    nuevo_pago = PagoItem(metodo=abono.metodo, monto=abono.monto)
+    if not sale.pagos:
+        sale.pagos = []
+    sale.pagos.append(nuevo_pago)
+    
+    # Recalculate state
+    # Due to floating point math, check against a small epsilon
+    total_pagado = sum(p.monto for p in sale.pagos)
+    if total_pagado >= sale.total - 0.01:
+        sale.estado_pago = EstadoPago.PAGADO
+    else:
+        sale.estado_pago = EstadoPago.PARCIAL
+        
+    await sale.save()
     return sale

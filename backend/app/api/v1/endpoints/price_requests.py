@@ -29,13 +29,13 @@ async def crear_solicitud_precio(
     current_user: User = Depends(get_current_active_user)
 ):
     """Sucursal admin requests a price change for a product in their branch."""
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     tenant_id = current_user.tenant_id or ""
     
     # Validation: Sucursal Admin can only request for their own branch
-    if current_user.role == UserRole.ADMIN_SUCURSAL and data.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and data.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Cannot request price changes for other branches")
 
     product = await Product.get(data.producto_id)
@@ -76,7 +76,7 @@ async def listar_solicitudes_precio(
     tenant_id = current_user.tenant_id or ""
     filters = [PriceChangeRequest.tenant_id == tenant_id]
     
-    if current_user.role == UserRole.ADMIN_SUCURSAL:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
         filters.append(PriceChangeRequest.sucursal_id == current_user.sucursal_id)
     elif sucursal_id:
         filters.append(PriceChangeRequest.sucursal_id == sucursal_id)

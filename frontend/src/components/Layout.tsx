@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     LayoutDashboard, Wallet, ShoppingBag, LogOut,
     Tag, Store, Package, ClipboardList, Warehouse, Users,
-    Menu, Percent, RotateCcw, X, QrCode, BarChart3
+    Menu, Percent, RotateCcw, X, QrCode, BarChart3, Banknote
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -50,6 +50,7 @@ export default function Layout({ children }: LayoutProps) {
                 { icon: Percent, label: 'Descuentos', path: '/descuentos' },
                 { icon: Tag, label: 'Precios', path: '/solicitudes-precio' },
                 { icon: Tag, label: 'Categorías', path: '/categories' },
+                { icon: Banknote, label: 'Créditos', path: '/creditos' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
                 { icon: QrCode, label: 'Control QR', path: '/qr-control' },
@@ -64,6 +65,7 @@ export default function Layout({ children }: LayoutProps) {
                 { icon: Warehouse, label: 'Inventario', path: '/inventario' },
                 { icon: Users, label: 'Personal', path: '/usuarios' },
                 { icon: Percent, label: 'Descuentos', path: '/descuentos' },
+                { icon: Banknote, label: 'Créditos', path: '/creditos' },
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
                 { icon: QrCode, label: 'Control QR', path: '/qr-control' },
@@ -73,6 +75,7 @@ export default function Layout({ children }: LayoutProps) {
             return [
                 { icon: ShoppingBag, label: 'POS', path: '/pos' },
                 { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
+                { icon: Banknote, label: 'Créditos', path: '/creditos' },
                 { icon: Warehouse, label: 'Inventario', path: '/inventario' },
                 { icon: Wallet, label: 'Caja', path: '/caja' },
                 { icon: QrCode, label: 'Control QR', path: '/qr-control' },

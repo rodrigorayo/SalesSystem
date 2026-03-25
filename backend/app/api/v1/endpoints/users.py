@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr, field_validator
@@ -17,6 +17,7 @@ class CajeroCreate(BaseModel):
         description="Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character."
     )
     full_name: str
+    role: Optional[str] = "CAJERO"
     # NOTE: sucursal_id is intentionally NOT here — it is extracted from the JWT token
 
     @field_validator("password")
@@ -40,13 +41,13 @@ async def get_users(current_user: User = Depends(get_current_active_user)):
     - ADMIN_MATRIZ: all employees of the tenant
     - ADMIN_SUCURSAL: only cajeros in their own sucursal
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     if current_user.role == UserRole.SUPERADMIN:
         return await User.find(User.role == UserRole.CAJERO).to_list()
 
-    if current_user.role == UserRole.ADMIN_SUCURSAL:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
         # Strict isolation: only sees cajeros of their own sucursal
         return await User.find(
             User.tenant_id == current_user.tenant_id,
@@ -75,7 +76,7 @@ async def create_cajero(
     - ADMIN_SUCURSAL → cajero is bound to their sucursal automatically.
     - ADMIN_MATRIZ   → cajero is bound to the matrix (no sucursal).
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     import re
@@ -96,7 +97,7 @@ async def create_cajero(
         email=data.email,
         hashed_password=hashed,
         full_name=data.full_name,
-        role=UserRole.CAJERO,
+        role=data.role,
         tenant_id=current_user.tenant_id,
         sucursal_id=sucursal_id,  # injected from JWT, never from request
     )

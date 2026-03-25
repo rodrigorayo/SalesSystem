@@ -130,7 +130,7 @@ async def ajustar_inventario(
     Manually adjust inventory (add/remove/set stock).
     ADMIN_MATRIZ for CENTRAL, ADMIN_SUCURSAL for their branch.
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     if ajuste.cantidad < 0:
@@ -235,13 +235,13 @@ async def export_inventory_template(
     sucursal_id: str = "CENTRAL",
     current_user: User = Depends(get_current_active_user)
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="No autorizado")
         
     tenant_id = current_user.tenant_id or "default"
     
     # Validation branch access
-    if current_user.role == UserRole.ADMIN_SUCURSAL and sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes exportar tu propia sucursal")
         
     from app.models.sucursal import Sucursal
@@ -281,10 +281,10 @@ async def import_inventory(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="No autorizado")
         
-    if current_user.role == UserRole.ADMIN_SUCURSAL and sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes importar a tu propia sucursal")
         
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -441,7 +441,7 @@ async def sincronizar_inventario_sucursal(
     Recibe el Excel maestro (ej: test1.xlsx) y extrae SOLO la columna de inventario correspondiente a su sucursal actual.
     Ignora las columnas de otras sucursales, así como los productos que NO existen en el catálogo original.
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.CAJERO, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="No autorizado")
 
     sucursal_id_user = current_user.sucursal_id

@@ -22,10 +22,11 @@ import type { Sale } from '../api/types';
 
 const fmt = (n?: number) => (n || 0).toFixed(2);
 
-const METODO_META: Record<MetodoPago, { icon: React.ReactNode; color: string; bg: string }> = {
+const METODO_META: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
     EFECTIVO: { icon: <DollarSign size={14} />, color: 'text-green-700', bg: 'bg-green-100 border-green-300' },
     QR: { icon: <QrCode size={14} />, color: 'text-blue-700', bg: 'bg-blue-100 border-blue-300' },
     TARJETA: { icon: <CreditCard size={14} />, color: 'text-purple-700', bg: 'bg-purple-100 border-purple-300' },
+    CREDITO: { icon: <Lock size={14} />, color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300' },
 };
 
 function useStockMap(sucursalId: string) {
@@ -561,8 +562,8 @@ export default function POSPage() {
                         >
                             <div className="px-3 py-2">
                                 {/* Method toggles */}
-                                <div className="flex gap-1 mb-1.5">
-                                    {(['EFECTIVO', 'QR', 'TARJETA'] as MetodoPago[]).map(m => {
+                                <div className="flex gap-1 mb-1.5 flex-wrap">
+                                    {(['EFECTIVO', 'QR', 'TARJETA', 'CREDITO'] as MetodoPago[]).map(m => {
                                         const meta = METODO_META[m];
                                         const active = pendingPago.metodo === m;
                                         return (
@@ -589,11 +590,14 @@ export default function POSPage() {
                                             placeholder="0.00" />
                                     </div>
                                     <button onClick={addPago}
-                                        disabled={!pendingPago.monto || parseFloat(pendingPago.monto) <= 0 || ticketCovered || !items.length}
+                                        disabled={!pendingPago.monto || parseFloat(pendingPago.monto) <= 0 || ticketCovered || !items.length || (pendingPago.metodo === 'CREDITO' && !cliente.nit && !cliente.razon_social)}
                                         className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shrink-0">
                                         <Plus size={12} /> Agregar
                                     </button>
                                 </div>
+                                {pendingPago.metodo === 'CREDITO' && !cliente.nit && !cliente.razon_social && (
+                                    <p className="text-[10px] text-amber-600 font-bold mb-1.5 bg-amber-50 rounded px-2 py-1">⚠️ El pago a Crédito requiere que asocies un Cliente en la sección de Factura / Cliente.</p>
+                                )}
 
                                 {/* Registered payments */}
                                 {pagos.length > 0 && (

@@ -34,9 +34,11 @@ class PedidoRecepcion(BaseModel):
 
 
 class PedidoCreate(BaseModel):
-    sucursal_id: str
+    sucursal_origen_id: str = "CENTRAL"
+    sucursal_destino_id: str
     items: List[PedidoItemCreate]
     notas: Optional[str] = None
+    transferencia_directa: bool = False # If true, auto-resolves to RECIBIDO
 
 
 class DespachoData(BaseModel):
@@ -51,14 +53,20 @@ async def crear_pedido(
     current_user: User = Depends(get_current_active_user)
 ):
     """Branch admin creates an internal order to request stock from the central warehouse."""
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     tenant_id = current_user.tenant_id or ""
     
-    # Validation constraint: Admin Sucursal can only create orders for their own sucursal
-    if current_user.role == UserRole.ADMIN_SUCURSAL and data.sucursal_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="Cannot create orders for other branches")
+    # Validation constraints
+    if data.sucursal_origen_id == "CENTRAL" and current_user.role == UserRole.SUPERVISOR:
+        raise HTTPException(status_code=403, detail="Los Supervisores no pueden pedir directo a Matriz, solo a Sucursales Físicas")
+        
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.VENDEDOR] and data.sucursal_destino_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="No puedes crear solicitudes de entrada para otras sucursales")
+        
+    if current_user.role == UserRole.SUPERVISOR and data.transferencia_directa and data.sucursal_origen_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="Solo puedes transferir inventario desde tu propia bodega de Supervisor")
     
     items = []
     for item in data.items:
@@ -76,16 +84,44 @@ async def crear_pedido(
             subtotal=subtotal
         ))
 
+    tipo_pedido = "SUCURSAL_A_SUCURSAL" if data.sucursal_origen_id != "CENTRAL" else "MATRIZ_A_SUCURSAL"
+    
     pedido = PedidoInterno(
         tenant_id=tenant_id,
-        sucursal_id=data.sucursal_id, # Legacy
-        sucursal_origen_id="CENTRAL", # Matrix to Branch
-        sucursal_destino_id=data.sucursal_id,
-        tipo_pedido="MATRIZ_A_SUCURSAL",
+        sucursal_id=data.sucursal_destino_id, # Legacy compatibility
+        sucursal_origen_id=data.sucursal_origen_id,
+        sucursal_destino_id=data.sucursal_destino_id,
+        tipo_pedido=tipo_pedido,
+        estado=EstadoPedido.CREADO,
         items=items,
         notas=data.notas,
         total_mayorista=sum(i.subtotal for i in items)
     )
+    
+    # Auto-dispatch/receive for Direct Transfers (Supervisor -> Vendedor)
+    if data.transferencia_directa:
+        pedido.estado = EstadoPedido.RECIBIDO
+        pedido.aceptado_at = datetime.utcnow()
+        pedido.despachado_at = datetime.utcnow()
+        pedido.recibido_at = datetime.utcnow()
+        pedido.aceptado_por = str(current_user.id)
+        pedido.despachado_por = str(current_user.id)
+        pedido.recibido_por = str(current_user.id)
+        
+        # Deduct from origin (Supervisor inventory)
+        for item in items:
+            item.cantidad_recibida = item.cantidad
+            await Inventario.get_pymongo_collection().find_one_and_update(
+                {"tenant_id": tenant_id, "sucursal_id": data.sucursal_origen_id, "producto_id": item.producto_id},
+                {"$inc": {"cantidad": -item.cantidad}}
+            )
+            # Add to destination (Vendedor inventory)
+            await Inventario.get_pymongo_collection().find_one_and_update(
+                {"tenant_id": tenant_id, "sucursal_id": data.sucursal_destino_id, "producto_id": item.producto_id},
+                {"$inc": {"cantidad": item.cantidad}},
+                upsert=True
+            )
+
     await pedido.create()
 
     # D-02: Write to separate collection for analytics
@@ -122,7 +158,7 @@ async def listar_pedidos(
     filters = [PedidoInterno.tenant_id == tenant_id]
 
     # Rol based restrictions
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.CAJERO]:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO]:
         # Branch users can ONLY see their branch orders
         filters.append(PedidoInterno.sucursal_id == current_user.sucursal_id)
     elif sucursal_id:
@@ -153,7 +189,7 @@ async def cancelar_pedido(
     if pedido.estado != EstadoPedido.CREADO:
         raise HTTPException(status_code=400, detail=f"No se puede cancelar un pedido en estado {pedido.estado}")
         
-    if current_user.role == UserRole.ADMIN_SUCURSAL and pedido.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and pedido.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Not authorized to cancel this order")
 
     pedido.estado = EstadoPedido.CANCELADO
@@ -172,12 +208,18 @@ async def aceptar_pedido(
     Matrix admin accepts an order.
     Allowed only if state is CREADO.
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="Only matrix admins can accept orders")
+    # Matrix Admins can accept any. Branch Admins can accept if they are the ORIGIN.
+    is_matrix_admin = current_user.role in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]
+    # We will validate branch admin in the next step
+
 
     pedido = await PedidoInterno.get(pedido_id)
     if not pedido or pedido.tenant_id != (current_user.tenant_id or ""):
         raise HTTPException(status_code=404, detail="Order not found")
+        
+    if not is_matrix_admin:
+        if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR] or pedido.sucursal_origen_id != current_user.sucursal_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para aprobar despachos de esta sucursal origen")
         
     if pedido.estado != EstadoPedido.CREADO:
         raise HTTPException(status_code=400, detail=f"No se puede aceptar un pedido en estado {pedido.estado}")
@@ -202,19 +244,30 @@ async def despachar_pedido(
     - Deducts from CENTRAL inventory.
     - Sets estado = DESPACHADO.
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="Only matrix admins can dispatch orders")
+    is_matrix_admin = current_user.role in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]
 
     pedido = await PedidoInterno.get(pedido_id)
     if not pedido or pedido.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Order not found")
+        
+    if not is_matrix_admin:
+        if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR] or pedido.sucursal_origen_id != current_user.sucursal_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para despachar de esta sucursal origen")
     if pedido.estado not in [EstadoPedido.CREADO, EstadoPedido.ACEPTADO]:
         raise HTTPException(status_code=400, detail=f"El pedido debe estar CREADO o ACEPTADO para ser despachado. Actual: {pedido.estado}")
 
     tenant_id = current_user.tenant_id or ""
 
-    # Since products come directly from the factory, we do NOT deduct from any CENTRAL inventory.
-    # We just register the total and update the state to DESPACHADO.
+    # If origin is a branch (not CENTRAL), we MUST deduct from the origin inventory directly
+    if pedido.sucursal_origen_id != "CENTRAL":
+        for item in pedido.items:
+            inv = await Inventario.get_pymongo_collection().find_one_and_update(
+                {"tenant_id": tenant_id, "sucursal_id": pedido.sucursal_origen_id, "producto_id": item.producto_id},
+                {"$inc": {"cantidad": -item.cantidad}},
+                return_document=ReturnDocument.AFTER
+            )
+            # You could add negative stock validations here, but we'll allow negative for simplicity if they oversell
+            
     total = sum(item.cantidad * item.precio_mayorista for item in pedido.items)
 
     pedido.estado = EstadoPedido.DESPACHADO
@@ -238,14 +291,14 @@ async def recibir_pedido(
     - Adds stock to the branch's Inventario.
     - Sets estado = RECIBIDO.
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     pedido = await PedidoInterno.get(pedido_id)
     if not pedido or pedido.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Order not found")
         
-    if current_user.role == UserRole.ADMIN_SUCURSAL and pedido.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and pedido.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Not authorized to receive this order")
 
     if pedido.estado != EstadoPedido.DESPACHADO:
@@ -326,14 +379,14 @@ async def descargar_pdf_pedido(
     """
     Generate a PDF summarizing the order, specifically showing quantities dispatched vs received.
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     pedido = await PedidoInterno.get(pedido_id)
     if not pedido or pedido.tenant_id != (current_user.tenant_id or ""):
         raise HTTPException(status_code=404, detail="Order not found")
         
-    if current_user.role == UserRole.ADMIN_SUCURSAL and pedido.sucursal_id != current_user.sucursal_id:
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and pedido.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Not authorized to view this order")
 
     buffer = io.BytesIO()

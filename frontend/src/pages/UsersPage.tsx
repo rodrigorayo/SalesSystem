@@ -13,7 +13,7 @@ interface NewCredentials {
     full_name: string;
 }
 
-const BLANK: EmployeeCreate = { username: '', email: '', password: '', full_name: '' };
+const BLANK: EmployeeCreate = { username: '', email: '', password: '', full_name: '', role: 'CAJERO' };
 
 export default function UsersPage() {
     const queryClient = useQueryClient();
@@ -63,12 +63,12 @@ export default function UsersPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Personal (Cajeros)</h1>
-                    <p className="text-gray-500 mt-1 text-sm">Gestiona los cajeros asignados a tu vista.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Personal</h1>
+                    <p className="text-gray-500 mt-1 text-sm">Gestiona los miembros asignados a tu vista.</p>
                 </div>
                 <button onClick={() => setShowModal(true)}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm shadow-sm">
-                    <Plus size={16} /> Nuevo Cajero
+                    <Plus size={16} /> Nuevo Miembro
                 </button>
             </div>
 
@@ -78,7 +78,7 @@ export default function UsersPage() {
             ) : !employees || employees.length === 0 ? (
                 <div className="text-center py-20 text-gray-400">
                     <Users size={48} className="mx-auto mb-4 opacity-30" />
-                    <p className="text-gray-500">No hay cajeros registrados aún.</p>
+                    <p className="text-gray-500">No hay personal registrado aún.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -86,15 +86,20 @@ export default function UsersPage() {
                         {paginatedEmployees.map(emp => (
                             <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start">
                             <div className="flex items-center gap-3 mr-auto">
-                                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                                    <Users size={20} className="text-blue-600" />
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emp.role === 'SUPERVISOR' ? 'bg-purple-50 text-purple-600' : emp.role === 'VENDEDOR' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    <Users size={20} />
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{emp.full_name ?? emp.username}</h3>
-                                    <p className="text-sm text-gray-500">@{emp.username}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm text-gray-500">@{emp.username}</p>
+                                        <span className={`text-[10px] font-bold px-1.5 rounded uppercase ${emp.role === 'VENDEDOR' ? 'bg-amber-100 text-amber-700' : emp.role === 'SUPERVISOR' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {emp.role}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-lg uppercase self-center">Activo</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-lg uppercase self-center shrink-0">Activo</span>
                         </div>
                     ))}
                     </div>
@@ -120,7 +125,7 @@ export default function UsersPage() {
                                 <KeyRound size={20} className="text-amber-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900">Cajero creado</h2>
+                                <h2 className="text-lg font-bold text-gray-900">Personal creado</h2>
                                 <p className="text-sm text-gray-500">{credentials.full_name}</p>
                             </div>
                         </div>
@@ -157,7 +162,7 @@ export default function UsersPage() {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-5">
-                            <h2 className="text-lg font-bold text-gray-900">Nuevo Cajero</h2>
+                            <h2 className="text-lg font-bold text-gray-900">Nuevo Cuenta de Personal</h2>
                             <button onClick={() => { setShowModal(false); setConfirmPassword(''); setForm(BLANK); }} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"><X size={18} /></button>
                         </div>
                         <form onSubmit={e => {
@@ -170,6 +175,16 @@ export default function UsersPage() {
                                 <input type="text" placeholder="Ej: Juan Pérez" required
                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm text-gray-900 placeholder-gray-400"
                                     value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">Rol / Puesto</label>
+                                <select 
+                                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm text-gray-900"
+                                    value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })}>
+                                    <option value="CAJERO">Cajero (Punto de Venta Fijo)</option>
+                                    <option value="SUPERVISOR">Supervisor de Ventas (Móvil)</option>
+                                    <option value="VENDEDOR">Vendedor Preventista (Móvil)</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1">Usuario de Login</label>
@@ -193,13 +208,13 @@ export default function UsersPage() {
 
                             {createMutation.isError && (
                                 <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                                    {((createMutation.error as any)?.detail as string) ?? 'Error al crear el cajero'}
+                                    {((createMutation.error as any)?.detail as string) ?? 'Error al crear la cuenta'}
                                 </p>
                             )}
 
                             <button type="submit" disabled={createMutation.isPending || !canSubmit}
                                 className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 text-sm mt-2">
-                                {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar Cajero'}
+                                {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar Cuenta'}
                             </button>
                         </form>
                     </div>

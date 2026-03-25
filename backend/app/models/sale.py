@@ -1,7 +1,13 @@
 from typing import List, Optional, Literal
+from enum import Enum
 from beanie import Document
 from pydantic import BaseModel, Field
 from datetime import datetime
+
+class EstadoPago(str, Enum):
+    PAGADO = "PAGADO"
+    PENDIENTE = "PENDIENTE"
+    PARCIAL = "PARCIAL"
 
 
 class SaleItem(BaseModel):
@@ -15,9 +21,10 @@ class SaleItem(BaseModel):
 
 
 class PagoItem(BaseModel):
-    """One segment of a split payment."""
-    metodo: Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA"]
+    """One segment of a split payment or later amortization."""
+    metodo: Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA", "CREDITO"]
     monto: float = Field(gt=0)
+    fecha: datetime = Field(default_factory=datetime.utcnow)
 
 
 class DescuentoInfo(BaseModel):
@@ -57,6 +64,7 @@ class Sale(Document):
     cashier_id: str
     cashier_name: str
     anulada: bool = False
+    estado_pago: EstadoPago = EstadoPago.PAGADO
     factura_emitida: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

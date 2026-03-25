@@ -10,7 +10,7 @@ export interface CartItem {
     precio: number;
 }
 
-export type MetodoPago = 'EFECTIVO' | 'QR' | 'TARJETA';
+export type MetodoPago = 'EFECTIVO' | 'QR' | 'TARJETA' | 'CREDITO';
 
 export interface PagoEntry {
     metodo: MetodoPago;
