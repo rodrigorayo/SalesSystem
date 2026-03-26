@@ -65,8 +65,9 @@ async def crear_pedido(
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.VENDEDOR] and data.sucursal_destino_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="No puedes crear solicitudes de entrada para otras sucursales")
         
-    if current_user.role == UserRole.SUPERVISOR and data.transferencia_directa and data.sucursal_origen_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="Solo puedes transferir inventario desde tu propia bodega de Supervisor")
+    if current_user.role == UserRole.SUPERVISOR and data.transferencia_directa:
+        if data.sucursal_origen_id != current_user.sucursal_id and data.sucursal_destino_id != current_user.sucursal_id:
+            raise HTTPException(status_code=403, detail="Solo puedes transferir inventario desde o hacia tu propia bodega de Supervisor")
     
     items = []
     for item in data.items:

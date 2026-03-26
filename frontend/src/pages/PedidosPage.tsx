@@ -41,7 +41,7 @@ export default function PedidosPage() {
     const [receptionModal, setReceptionModal] = useState<{ isOpen: boolean; pedido: any }>({ isOpen: false, pedido: null });
 
     const [selectedSucursal, setSelectedSucursal] = useState('');
-    const [supervisorAction, setSupervisorAction] = useState<'PEDIR' | 'TRANSFERIR'>('PEDIR');
+    const [supervisorAction, setSupervisorAction] = useState<'PEDIR' | 'TRANSFERIR' | 'DEVOLVER'>('PEDIR');
     const [orderItems, setOrderItems] = useState<{ producto_id: string; cantidad: number }[]>([]);
     const [notas, setNotas] = useState('');
 
@@ -223,7 +223,7 @@ export default function PedidosPage() {
                                                     Despachar
                                                 </button>
                                             )}
-                                            {pedido.estado === 'DESPACHADO' && isSucursal() && (
+                                            {pedido.estado === 'DESPACHADO' && (isSucursal() || user?.role === 'SUPERVISOR') && (
                                                 <button onClick={() => setReceptionModal({ isOpen: true, pedido })}
                                                     className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     <CheckCircle2 size={14} />
@@ -281,10 +281,15 @@ export default function PedidosPage() {
                                     payload.sucursal_destino_id = user.sucursal_id;
                                     payload.sucursal_id = user.sucursal_id;
                                     payload.sucursal_origen_id = selectedSucursal; // A physical branch
-                                } else {
+                                } else if (supervisorAction === 'TRANSFERIR') {
                                     payload.sucursal_destino_id = selectedSucursal; // A vendedor branch
                                     payload.sucursal_id = selectedSucursal;
                                     payload.sucursal_origen_id = user.sucursal_id;
+                                    payload.transferencia_directa = true;
+                                } else if (supervisorAction === 'DEVOLVER') {
+                                    payload.sucursal_destino_id = user.sucursal_id; 
+                                    payload.sucursal_id = user.sucursal_id;
+                                    payload.sucursal_origen_id = selectedSucursal; // A vendedor branch
                                     payload.transferencia_directa = true;
                                 }
                             } else {
@@ -302,6 +307,7 @@ export default function PedidosPage() {
                                         className="w-full border border-indigo-200 bg-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none">
                                         <option value="PEDIR">Solicitar Mercadería (A una Sucursal)</option>
                                         <option value="TRANSFERIR">Transferir Mercadería (A un Vendedor)</option>
+                                        <option value="DEVOLVER">Retornar Inventario (Desde Vendedor)</option>
                                     </select>
                                 </div>
                             )}
@@ -322,6 +328,12 @@ export default function PedidosPage() {
                                                 className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
                                                 <option value="">Seleccionar Sucursal...</option>
                                                 {sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
+                                        ) : supervisorAction === 'DEVOLVER' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                <option value="">Seleccionar Vendedor...</option>
+                                                {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : (
                                             <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
@@ -356,12 +368,16 @@ export default function PedidosPage() {
                                             <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
                                                 {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
                                             </div>
-                                        ) : (
+                                        ) : supervisorAction === 'TRANSFERIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
                                                 className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Vendedor/Ruta...</option>
+                                                <option value="">Seleccionar Vendedor...</option>
                                                 {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
+                                        ) : (
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                            </div>
                                         )
                                     ) : (
                                         <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
