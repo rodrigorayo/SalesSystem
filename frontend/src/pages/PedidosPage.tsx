@@ -223,7 +223,7 @@ export default function PedidosPage() {
                                                     Despachar
                                                 </button>
                                             )}
-                                            {pedido.estado === 'DESPACHADO' && (isSucursal() || user?.role === 'SUPERVISOR') && (
+                                            {pedido.estado === 'DESPACHADO' && (user?.sucursal_id === pedido.sucursal_destino_id || user?.role === 'SUPERADMIN') && (
                                                 <button onClick={() => setReceptionModal({ isOpen: true, pedido })}
                                                     className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     <CheckCircle2 size={14} />
@@ -281,7 +281,6 @@ export default function PedidosPage() {
                                     payload.sucursal_destino_id = user.sucursal_id;
                                     payload.sucursal_id = user.sucursal_id;
                                     payload.sucursal_origen_id = selectedSucursal; // A physical branch
-                                    payload.transferencia_directa = true;
                                 } else if (supervisorAction === 'TRANSFERIR') {
                                     payload.sucursal_destino_id = selectedSucursal; // A vendedor branch
                                     payload.sucursal_id = selectedSucursal;
