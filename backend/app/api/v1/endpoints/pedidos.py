@@ -65,8 +65,9 @@ async def crear_pedido(
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.VENDEDOR] and data.sucursal_destino_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="No puedes crear solicitudes de entrada para otras sucursales")
         
-    if current_user.role == UserRole.SUPERVISOR and data.transferencia_directa and data.sucursal_origen_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="Solo puedes transferir inventario desde tu propia bodega de Supervisor")
+    if current_user.role == UserRole.SUPERVISOR and data.transferencia_directa:
+        if data.sucursal_origen_id != current_user.sucursal_id and data.sucursal_destino_id != current_user.sucursal_id:
+            raise HTTPException(status_code=403, detail="Solo puedes transferir inventario desde o hacia tu propia bodega de Supervisor")
     
     items = []
     for item in data.items:
@@ -108,19 +109,46 @@ async def crear_pedido(
         pedido.despachado_por = str(current_user.id)
         pedido.recibido_por = str(current_user.id)
         
-        # Deduct from origin (Supervisor inventory)
         for item in items:
             item.cantidad_recibida = item.cantidad
-            await Inventario.get_pymongo_collection().find_one_and_update(
+            inv_origen = await Inventario.get_pymongo_collection().find_one_and_update(
                 {"tenant_id": tenant_id, "sucursal_id": data.sucursal_origen_id, "producto_id": item.producto_id},
-                {"$inc": {"cantidad": -item.cantidad}}
+                {"$inc": {"cantidad": -item.cantidad}},
+                return_document=ReturnDocument.AFTER
             )
             # Add to destination (Vendedor inventory)
-            await Inventario.get_pymongo_collection().find_one_and_update(
+            inv_destino = await Inventario.get_pymongo_collection().find_one_and_update(
                 {"tenant_id": tenant_id, "sucursal_id": data.sucursal_destino_id, "producto_id": item.producto_id},
                 {"$inc": {"cantidad": item.cantidad}},
-                upsert=True
+                upsert=True,
+                return_document=ReturnDocument.AFTER
             )
+            
+            # Record Audit Trail
+            if inv_origen:
+                await InventoryLog(
+                    tenant_id=tenant_id,
+                    sucursal_id=data.sucursal_origen_id,
+                    producto_id=item.producto_id,
+                    producto_nombre=item.descripcion,
+                    tipo_movimiento=TipoMovimiento.TRASLADO,
+                    cantidad_movida=-item.cantidad,
+                    stock_resultante=inv_origen.get("cantidad", 0),
+                    usuario_nombre=current_user.username,
+                    notas=f"Transferencia directa hacia {data.sucursal_destino_id}"
+                ).create()
+            if inv_destino:
+                await InventoryLog(
+                    tenant_id=tenant_id,
+                    sucursal_id=data.sucursal_destino_id,
+                    producto_id=item.producto_id,
+                    producto_nombre=item.descripcion,
+                    tipo_movimiento=TipoMovimiento.TRASLADO,
+                    cantidad_movida=item.cantidad,
+                    stock_resultante=inv_destino.get("cantidad", 0),
+                    usuario_nombre=current_user.username,
+                    notas=f"Recepción directa desde {data.sucursal_origen_id}"
+                ).create()
 
     await pedido.create()
 
