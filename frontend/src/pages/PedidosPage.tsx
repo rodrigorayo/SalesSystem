@@ -201,7 +201,7 @@ export default function PedidosPage() {
                                                     Cancelar
                                                 </button>
                                             )}
-                                            {pedido.estado === 'CREADO' && isMatriz() && (
+                                            {pedido.estado === 'CREADO' && (isMatriz() || user?.role === 'SUPERADMIN' || user?.sucursal_id === pedido.sucursal_origen_id) && (
                                                 <button onClick={() => setConfirmModal({
                                                     isOpen: true, title: 'Aceptar Pedido',
                                                     message: '¿Estás seguro de ACEPTAR este pedido y comenzar a prepararlo?',
@@ -212,10 +212,10 @@ export default function PedidosPage() {
                                                     Aceptar Pedido
                                                 </button>
                                             )}
-                                            {pedido.estado === 'ACEPTADO' && isMatriz() && (
+                                            {pedido.estado === 'ACEPTADO' && (isMatriz() || user?.role === 'SUPERADMIN' || user?.sucursal_id === pedido.sucursal_origen_id) && (
                                                 <button onClick={() => setConfirmModal({
-                                                    isOpen: true, title: 'Despachar a Sucursal',
-                                                    message: '¿Confirmas que la fábrica ya envió los productos y están EN CAMINO a la sucursal?',
+                                                    isOpen: true, title: 'Despachar Pedido',
+                                                    message: '¿Confirmas que ya enviaste los productos y están EN CAMINO a su destino?',
                                                     type: 'info', action: () => despacharMut.mutate(pedido._id)
                                                 })} disabled={despacharMut.isPending}
                                                     className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
