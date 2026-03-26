@@ -281,6 +281,7 @@ export default function PedidosPage() {
                                     payload.sucursal_destino_id = user.sucursal_id;
                                     payload.sucursal_id = user.sucursal_id;
                                     payload.sucursal_origen_id = selectedSucursal; // A physical branch
+                                    payload.transferencia_directa = true;
                                 } else if (supervisorAction === 'TRANSFERIR') {
                                     payload.sucursal_destino_id = selectedSucursal; // A vendedor branch
                                     payload.sucursal_id = selectedSucursal;
@@ -292,6 +293,22 @@ export default function PedidosPage() {
                                     payload.sucursal_origen_id = selectedSucursal; // A vendedor branch
                                     payload.transferencia_directa = true;
                                 }
+                            } else if (isSucursal()) {
+                                if (supervisorAction === 'PEDIR') {
+                                    payload.sucursal_destino_id = user?.sucursal_id;
+                                    payload.sucursal_id = user?.sucursal_id;
+                                    payload.sucursal_origen_id = "CENTRAL";
+                                } else if (supervisorAction === 'TRANSFERIR') {
+                                    payload.sucursal_destino_id = selectedSucursal; // A supervisor
+                                    payload.sucursal_id = selectedSucursal;
+                                    payload.sucursal_origen_id = user?.sucursal_id;
+                                    payload.transferencia_directa = true;
+                                } else if (supervisorAction === 'DEVOLVER') {
+                                    payload.sucursal_destino_id = user?.sucursal_id;
+                                    payload.sucursal_id = user?.sucursal_id;
+                                    payload.sucursal_origen_id = selectedSucursal; // A supervisor
+                                    payload.transferencia_directa = true;
+                                }
                             } else {
                                 payload.sucursal_destino_id = user?.sucursal_id;
                                 payload.sucursal_id = user?.sucursal_id;
@@ -300,14 +317,20 @@ export default function PedidosPage() {
                             
                             createMut.mutate(payload);
                         }} className="space-y-4">
-                            {user?.role === 'SUPERVISOR' && (
+                            {(user?.role === 'SUPERVISOR' || isSucursal()) && (
                                 <div className="mb-4">
                                     <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Movimiento</label>
                                     <select value={supervisorAction} onChange={e => setSupervisorAction(e.target.value as any)}
                                         className="w-full border border-indigo-200 bg-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                        <option value="PEDIR">Solicitar Mercadería (A una Sucursal)</option>
-                                        <option value="TRANSFERIR">Transferir Mercadería (A un Vendedor)</option>
-                                        <option value="DEVOLVER">Retornar Inventario (Desde Vendedor)</option>
+                                        <option value="PEDIR">
+                                            {isSucursal() ? 'Solicitar Mercadería (A Matriz)' : 'Extraer Mercadería (Desde Sucursal Física)'}
+                                        </option>
+                                        <option value="TRANSFERIR">
+                                            {isSucursal() ? 'Entregar Mercadería (A un Supervisor)' : 'Entregar Mercadería (A un Vendedor)'}
+                                        </option>
+                                        <option value="DEVOLVER">
+                                            {isSucursal() ? 'Recuperar Inventario (De un Supervisor)' : 'Recuperar Inventario (De un Vendedor)'}
+                                        </option>
                                     </select>
                                 </div>
                             )}
@@ -326,7 +349,7 @@ export default function PedidosPage() {
                                         supervisorAction === 'PEDIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
                                                 className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Seleccionar Sucursal...</option>
+                                                <option value="">Seleccionar Sucursal Física...</option>
                                                 {sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : supervisorAction === 'DEVOLVER' ? (
@@ -337,13 +360,25 @@ export default function PedidosPage() {
                                             </select>
                                         ) : (
                                             <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         )
                                     ) : (
-                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
-                                            Matriz Principal
-                                        </div>
+                                        supervisorAction === 'PEDIR' ? (
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
+                                                Matriz Principal
+                                            </div>
+                                        ) : supervisorAction === 'DEVOLVER' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                <option value="">Seleccionar Supervisor Móvil...</option>
+                                                {sucursales.filter(s => s.tipo === 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
+                                        ) : (
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Sucursal'}
+                                            </div>
+                                        )
                                     )}
                                 </div>
 
@@ -366,7 +401,7 @@ export default function PedidosPage() {
                                     ) : user?.role === 'SUPERVISOR' ? (
                                         supervisorAction === 'PEDIR' ? (
                                             <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         ) : supervisorAction === 'TRANSFERIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
@@ -376,13 +411,21 @@ export default function PedidosPage() {
                                             </select>
                                         ) : (
                                             <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         )
                                     ) : (
-                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                            {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
-                                        </div>
+                                        supervisorAction === 'TRANSFERIR' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                <option value="">Seleccionar Supervisor Móvil...</option>
+                                                {sucursales.filter(s => s.tipo === 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
+                                        ) : (
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             </div>
