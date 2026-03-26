@@ -126,6 +126,9 @@ export interface PedidoInterno {
     _id: string;
     tenant_id: string;
     sucursal_id: string;
+    sucursal_origen_id?: string;
+    sucursal_destino_id?: string;
+    tipo_pedido?: string;
     estado: 'CREADO' | 'ACEPTADO' | 'DESPACHADO' | 'RECIBIDO' | 'CANCELADO';
     items: PedidoItem[];
     notas?: string;

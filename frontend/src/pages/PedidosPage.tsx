@@ -121,18 +121,29 @@ export default function PedidosPage() {
                         const cfg = ESTADO[pedido.estado];
                         const Icon = cfg.icon;
                         const isOpen = expanded === pedido._id;
-                        const sNombre = sucursales.find(s => s._id === pedido.sucursal_id)?.nombre ?? pedido.sucursal_id;
+                        const getNombre = (id: string) => id === 'CENTRAL' ? 'Matriz Principal' : sucursales.find(s => s._id === id)?.nombre || id;
+                        const origenNombre = getNombre(pedido.sucursal_origen_id || 'CENTRAL');
+                        const destinoNombre = getNombre(pedido.sucursal_destino_id || pedido.sucursal_id);
 
                         return (
                             <div key={pedido._id} className={`${cfg.bg} border-2 ${cfg.border} rounded-2xl overflow-hidden hover:shadow-md transition-shadow ${isOpen ? 'shadow-md' : 'shadow-sm'}`}>
                                 <button onClick={() => setExpanded(isOpen ? null : pedido._id)}
                                     className="w-full flex items-center justify-between p-4 text-left">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center`}>
+                                        <div className={`w-8 h-8 rounded-lg ${cfg.bg} border ${cfg.border} flex items-center justify-center shrink-0`}>
                                             <Icon size={16} className={cfg.color} />
                                         </div>
                                         <div>
-                                            <div className="font-semibold text-sm text-gray-900">{sNombre}</div>
+                                            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                                <span className="font-semibold text-sm text-gray-900 line-clamp-1 flex items-center gap-1.5">
+                                                    {origenNombre} <ChevronRight size={14} className="text-gray-400" /> {destinoNombre}
+                                                </span>
+                                                {pedido.tipo_pedido === 'MATRIZ_A_SUCURSAL' ? (
+                                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold tracking-wider uppercase border border-purple-200">Reabastecimiento</span>
+                                                ) : (
+                                                    <span className="text-[9px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-bold tracking-wider uppercase border border-sky-200">Traslado Operativo</span>
+                                                )}
+                                            </div>
                                             <div className="text-xs text-gray-500">
                                                 {formatDate(pedido.created_at)} · {pedido.items.length} producto(s)
                                             </div>
@@ -285,42 +296,79 @@ export default function PedidosPage() {
                             createMut.mutate(payload);
                         }} className="space-y-4">
                             {user?.role === 'SUPERVISOR' && (
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Acción</label>
+                                <div className="mb-4">
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Movimiento</label>
                                     <select value={supervisorAction} onChange={e => setSupervisorAction(e.target.value as any)}
-                                        className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
-                                        <option value="PEDIR">Pedir a Almacén (Recepción)</option>
-                                        <option value="TRANSFERIR">Entregar a Vendedor (Despacho)</option>
+                                        className="w-full border border-indigo-200 bg-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                        <option value="PEDIR">Solicitar Mercadería (A una Sucursal)</option>
+                                        <option value="TRANSFERIR">Transferir Mercadería (A un Vendedor)</option>
                                     </select>
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    {user?.role === 'SUPERVISOR' 
-                                        ? (supervisorAction === 'PEDIR' ? 'Sucursal Origen *' : 'Vendedor Destino *')
-                                        : 'Sucursal Destino *'}
-                                </label>
-                                {isMatriz() || user?.role === 'SUPERADMIN' ? (
-                                    <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                        className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
-                                        <option value="">Selecciona sucursal…</option>
-                                        {sucursales.filter(s => s.tipo !== 'VENDEDOR' && s.tipo !== 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
-                                    </select>
-                                ) : user?.role === 'SUPERVISOR' ? (
-                                    <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                        className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
-                                        <option value="">Selecciona entidad…</option>
-                                        {supervisorAction === 'PEDIR' 
-                                            ? sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)
-                                            : sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)
-                                        }
-                                    </select>
-                                ) : (
-                                    <div className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-1.5 text-xs text-gray-700 font-medium cursor-not-allowed">
-                                        {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Sucursal'}
-                                    </div>
-                                )}
+                            <div className="flex bg-gray-50 p-3 rounded-xl border border-gray-100 gap-3">
+                                {/* ORIGEN */}
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                        <Truck size={12} /> Origen
+                                    </label>
+                                    {isMatriz() || user?.role === 'SUPERADMIN' ? (
+                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
+                                            Matriz Principal
+                                        </div>
+                                    ) : user?.role === 'SUPERVISOR' ? (
+                                        supervisorAction === 'PEDIR' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                <option value="">Seleccionar Sucursal...</option>
+                                                {sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
+                                        ) : (
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                            </div>
+                                        )
+                                    ) : (
+                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
+                                            Matriz Principal
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ICON */}
+                                <div className="flex items-center justify-center pt-5">
+                                    <ChevronRight size={18} className="text-gray-400" />
+                                </div>
+
+                                {/* DESTINO */}
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                        <Package size={12} /> Destino
+                                    </label>
+                                    {isMatriz() || user?.role === 'SUPERADMIN' ? (
+                                        <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                            className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                            <option value="">Sucursal Física...</option>
+                                            {sucursales.filter(s => s.tipo !== 'VENDEDOR' && s.tipo !== 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                        </select>
+                                    ) : user?.role === 'SUPERVISOR' ? (
+                                        supervisorAction === 'PEDIR' ? (
+                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                            </div>
+                                        ) : (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                <option value="">Vendedor/Ruta...</option>
+                                                {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
+                                        )
+                                    ) : (
+                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                            {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div>
