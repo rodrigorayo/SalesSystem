@@ -147,6 +147,7 @@ async def crear_pedido(
                     tipo_movimiento=TipoMovimiento.TRASLADO,
                     cantidad_movida=-item.cantidad,
                     stock_resultante=inv_origen.get("cantidad", 0),
+                    usuario_id=str(current_user.id),
                     usuario_nombre=current_user.username,
                     notas=f"Transferencia directa hacia {data.sucursal_destino_id}"
                 ).create()
@@ -159,6 +160,7 @@ async def crear_pedido(
                     tipo_movimiento=TipoMovimiento.TRASLADO,
                     cantidad_movida=item.cantidad,
                     stock_resultante=inv_destino.get("cantidad", 0),
+                    usuario_id=str(current_user.id),
                     usuario_nombre=current_user.username,
                     notas=f"Recepción directa desde {data.sucursal_origen_id}"
                 ).create()
@@ -345,6 +347,7 @@ async def despachar_pedido(
                     tipo_movimiento=TipoMovimiento.TRASLADO,
                     cantidad_movida=-item.cantidad,
                     stock_resultante=inv_origen.get("cantidad", 0),
+                    usuario_id=str(current_user.id),
                     usuario_nombre=current_user.username,
                     notas=f"Despacho Interno hacia {pedido.sucursal_destino_id}"
                 ).create()
