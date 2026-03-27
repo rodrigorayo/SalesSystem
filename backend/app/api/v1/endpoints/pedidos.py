@@ -74,6 +74,19 @@ async def crear_pedido(
         product = await Product.get(item.producto_id)
         if not product or product.tenant_id != tenant_id:
             raise HTTPException(status_code=404, detail=f"Product {item.producto_id} not found")
+            
+        if data.sucursal_origen_id != "CENTRAL":
+            inv = await Inventario.find_one({
+                "tenant_id": tenant_id,
+                "sucursal_id": data.sucursal_origen_id,
+                "producto_id": item.producto_id
+            })
+            stock_disp = inv.cantidad if inv else 0
+            if stock_disp < item.cantidad:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Inventario insuficiente para '{product.descripcion}'. Solicitado: {item.cantidad}, Disponible en origen: {stock_disp}"
+                )
         
         costo = product.costo_producto
         subtotal = item.cantidad * costo
@@ -300,15 +313,41 @@ async def despachar_pedido(
 
     tenant_id = current_user.tenant_id or ""
 
-    # If origin is a branch (not CENTRAL), we MUST deduct from the origin inventory directly
+    # If origin is a branch (not CENTRAL), we MUST check stock and deduct from the origin inventory directly
     if pedido.sucursal_origen_id != "CENTRAL":
+        # Validate stock again before deducting to prevent race conditions or double dispatch
         for item in pedido.items:
-            await Inventario.get_pymongo_collection().find_one_and_update(
+            inv = await Inventario.find_one({
+                "tenant_id": tenant_id,
+                "sucursal_id": pedido.sucursal_origen_id,
+                "producto_id": item.producto_id
+            })
+            stock_disp = inv.cantidad if inv else 0
+            if stock_disp < item.cantidad:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Inventario insuficiente al intentar despachar '{item.descripcion}'. Requerido: {item.cantidad}, Disponible: {stock_disp}"
+                )
+
+        for item in pedido.items:
+            inv_origen = await Inventario.get_pymongo_collection().find_one_and_update(
                 {"tenant_id": tenant_id, "sucursal_id": pedido.sucursal_origen_id, "producto_id": item.producto_id},
                 {"$inc": {"cantidad": -item.cantidad}},
                 return_document=ReturnDocument.AFTER
             )
-            # You could add negative stock validations here, but we'll allow negative for simplicity if they oversell
+            # Record Audit Trail for dispatch
+            if inv_origen:
+                await InventoryLog(
+                    tenant_id=tenant_id,
+                    sucursal_id=pedido.sucursal_origen_id,
+                    producto_id=item.producto_id,
+                    producto_nombre=item.descripcion,
+                    tipo_movimiento=TipoMovimiento.TRASLADO,
+                    cantidad_movida=-item.cantidad,
+                    stock_resultante=inv_origen.get("cantidad", 0),
+                    usuario_nombre=current_user.username,
+                    notas=f"Despacho Interno hacia {pedido.sucursal_destino_id}"
+                ).create()
             
     total = sum(item.cantidad * item.precio_mayorista for item in pedido.items)
 
