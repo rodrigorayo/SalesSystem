@@ -17,6 +17,7 @@ class ProductCreate(BaseModel):
     categoria_id: str
     precio_venta: float
     costo_producto: float = 0.0
+    proveedor: Optional[str] = None
     codigo_largo: Optional[str] = None
     codigo_corto: Optional[str] = None
     image_url: Optional[str] = None
@@ -28,6 +29,7 @@ class ProductUpdate(BaseModel):
     categoria_id: Optional[str] = None
     precio_venta: Optional[float] = None
     costo_producto: Optional[float] = None
+    proveedor: Optional[str] = None
     codigo_largo: Optional[str] = None
     codigo_corto: Optional[str] = None
     image_url: Optional[str] = None

@@ -70,4 +70,12 @@ class Sale(Document):
 
     class Settings:
         name = "sales"
-        indexes = ["tenant_id", "created_at", "cliente_id", "cashier_id"]
+        indexes = [
+            "tenant_id", 
+            "created_at", 
+            "cliente_id", 
+            "cashier_id",
+            # Índices compuestos para analítica rápida (BI)
+            [("tenant_id", 1), ("created_at", -1), ("anulada", 1)],
+            [("tenant_id", 1), ("sucursal_id", 1), ("created_at", -1)]
+        ]

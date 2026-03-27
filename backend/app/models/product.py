@@ -28,6 +28,7 @@ class Product(Document, SoftDeleteMixin):
     codigo_largo: Optional[str] = None          # barcode
     codigo_corto: Optional[str] = None          # short SKU, unique per tenant
     descripcion: str                             # product name
+    proveedor: Optional[str] = None              # product supplier
     categoria_id: str                            # required FK → categories
     costo_producto: float = 0.0                  # production/purchase cost
     precio_venta: float = 0.0                    # retail price (deprecated for MATRIZ, mapped from sucursal)

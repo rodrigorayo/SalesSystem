@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth, tenants, users, products, sales,
-    caja, categories, upload,
+    caja, categories, upload, analytics,
     sucursales, inventario, pedidos, descuentos,
     price_requests, clientes, price_lists, reports
 )
@@ -24,3 +24,5 @@ api_router.include_router(price_requests.router, tags=["price_requests"])
 api_router.include_router(clientes.router, tags=["clientes"])
 api_router.include_router(price_lists.router, prefix="/listas-precios", tags=["price_lists"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+
