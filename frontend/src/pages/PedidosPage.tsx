@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getProducts, downloadPedidoPDF } from '../api/api';
+import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getInventario, getProducts, downloadPedidoPDF } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 
 import {
@@ -50,8 +50,47 @@ export default function PedidosPage() {
         queryFn: () => getPedidos(undefined, tab === 'todos' ? undefined : tab),
     });
     const { data: sucursales = [] } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
-    const { data: productsData } = useQuery({ queryKey: ['products'], queryFn: () => getProducts(1, 1000) });
-    const products = productsData?.items || [];
+    
+    // Determine the true source of merchandise based on user role and action
+    const origenId = useMemo(() => {
+        if (isMatriz() || user?.role === 'SUPERADMIN') return "CENTRAL";
+        if (user?.role === 'SUPERVISOR') {
+            if (supervisorAction === 'PEDIR') return selectedSucursal;
+            if (supervisorAction === 'TRANSFERIR') return user.sucursal_id;
+            if (supervisorAction === 'DEVOLVER') return selectedSucursal;
+        }
+        if (isSucursal()) {
+            if (supervisorAction === 'PEDIR') return "CENTRAL";
+            if (supervisorAction === 'TRANSFERIR') return user?.sucursal_id;
+            if (supervisorAction === 'DEVOLVER') return selectedSucursal;
+        }
+        return "CENTRAL";
+    }, [user, supervisorAction, selectedSucursal, isMatriz, isSucursal]);
+
+    const { data: invData } = useQuery({
+        queryKey: ['inventario-for-order', origenId],
+        queryFn: () => getInventario(origenId, 1, 1000),
+        enabled: showCreate && !!origenId && origenId !== 'CENTRAL'
+    });
+    
+    // Matriz does not have strict stock limits; they can craft from factory.
+    // Fetch the global catalog unrestricted for CENTRAL orders.
+    const { data: productsData } = useQuery({ 
+        queryKey: ['products'], 
+        queryFn: () => getProducts(1, 1000),
+        enabled: showCreate && origenId === 'CENTRAL' 
+    });
+
+    const availableProducts = useMemo(() => {
+        if (origenId === 'CENTRAL') {
+            return (productsData?.items || []).map((p: any) => ({
+                producto_id: p._id || p.id,
+                producto_nombre: p.descripcion || p.name,
+                cantidad: '∞'
+            }));
+        }
+        return (invData?.items || []).filter((inv: any) => inv.cantidad > 0);
+    }, [origenId, invData, productsData]);
 
     const createMut = useMutation({
         mutationFn: createPedido,
@@ -442,7 +481,11 @@ export default function PedidosPage() {
                                             <select required value={item.producto_id} onChange={e => updateItem(i, 'producto_id', e.target.value)}
                                                 className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] bg-white">
                                                 <option value="">Producto…</option>
-                                                {products.map((p: any) => <option key={p._id || p.id} value={p._id || p.id}>{p.descripcion || p.name}</option>)}
+                                                {availableProducts.map((p: any) => (
+                                                    <option key={p.producto_id} value={p.producto_id}>
+                                                        {p.producto_nombre} (Disponibles: {p.cantidad})
+                                                    </option>
+                                                ))}
                                             </select>
                                             <input required type="number" min="1" value={item.cantidad} onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
                                                 className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] text-center"
