@@ -409,18 +409,31 @@ async def anular_sale(
     - Restores inventory stock and logs to Kardex
     - Auto-registers an EGRESO in the active cash register session to cancel the income.
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
+    # Allowed roles
+    allowed_roles = [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN, UserRole.CAJERO]
+    if current_user.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="No tienes permiso para anular ventas")
 
     sale = await Sale.get(sale_id)
     if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
-        raise HTTPException(status_code=404, detail="Sale not found")
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
         
     if sale.anulada:
         raise HTTPException(status_code=400, detail="La venta ya está anulada")
 
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="Solo puedes anular ventas de tu propia sucursal")
+    # If the user is a local operator, restrict them
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO]:
+        if sale.sucursal_id != current_user.sucursal_id:
+            raise HTTPException(status_code=403, detail="Solo puedes anular ventas de tu propia sucursal")
+            
+    # Cashiers can ONLY annul their OWN sales, and preferably within 24h
+    if current_user.role == UserRole.CAJERO:
+        if sale.cashier_id != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Los cajeros solo pueden anular sus propias ventas")
+        from datetime import datetime
+        hours_diff = (datetime.utcnow() - sale.created_at).total_seconds() / 3600
+        if hours_diff > 24:
+            raise HTTPException(status_code=403, detail="Un cajero no puede anular una venta pasada de 24 horas. Solicita apoyo de un Supervisor/Admin.")
 
     tenant_id = sale.tenant_id
     sucursal_id = sale.sucursal_id
@@ -444,39 +457,53 @@ async def anular_sale(
                 tenant_id=tenant_id,
                 sucursal_id=sucursal_id,
                 producto_id=item.producto_id,
+                descripcion=item.descripcion,
                 tipo_movimiento=TipoMovimiento.ENTRADA_MANUAL,
                 cantidad_movida=item.cantidad,
                 stock_resultante=updated_inv["cantidad"],
+                costo_unitario_momento=item.costo_unitario,
+                precio_venta_momento=item.precio_unitario,
                 usuario_id=str(current_user.id),
                 usuario_nombre=current_user.full_name or current_user.username,
                 notas=f"Anulación de Venta #{str(sale.id)[-6:]}",
                 referencia_id=str(sale.id)
             ).create()
 
-    # 2. Add an Egreso to the active session to cancel the monetary ingress 
-    # (assuming all was mapped correctly, we just do a generic refund movement)
+    # 2. Perfect Cash Register Reversion: Find all original movements and invert them.
+    from app.models.caja import CajaMovimiento, CajaSesion, EstadoSesion
     sesion = await CajaSesion.find_one(
         CajaSesion.tenant_id   == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
         CajaSesion.estado      == EstadoSesion.ABIERTA,
     )
     if sesion:
-        await CajaMovimiento(
-            tenant_id   = tenant_id,
-            sucursal_id = sucursal_id,
-            sesion_id   = str(sesion.id),
-            cajero_id   = str(current_user.id),
-            cajero_name = current_user.full_name or current_user.username,
-            subtipo     = SubtipoMovimiento.AJUSTE,
-            tipo        = "EGRESO",
-            monto       = sale.total,
-            descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reembolso)",
-            sale_id     = str(sale.id),
-        ).create()
+        movs = await CajaMovimiento.find(
+            CajaMovimiento.tenant_id == tenant_id,
+            CajaMovimiento.sale_id == str(sale.id)
+        ).to_list()
         
-    # 3. Mark as anulada
+        for mov in movs:
+            inverse_type = "EGRESO" if mov.tipo == "INGRESO" else "INGRESO"
+            await CajaMovimiento(
+                tenant_id   = tenant_id,
+                sucursal_id = sucursal_id,
+                sesion_id   = str(sesion.id),
+                cajero_id   = str(current_user.id),
+                cajero_name = current_user.full_name or current_user.username,
+                subtipo     = mov.subtipo,
+                tipo        = inverse_type,
+                monto       = mov.monto,
+                descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reversión de {mov.descripcion.split('— ')[-1] if '— ' in mov.descripcion else 'pago'})",
+                sale_id     = str(sale.id),
+            ).create()
+    # 3. Mark as anulada and delete analytics to keep charts clean
     sale.anulada = True
     await sale.save()
+    
+    await SaleItemAnalytics.find(
+        SaleItemAnalytics.tenant_id == tenant_id,
+        SaleItemAnalytics.sale_id == str(sale.id)
+    ).delete()
     
     return sale
 
