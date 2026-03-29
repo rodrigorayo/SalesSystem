@@ -247,10 +247,11 @@ async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
         "TARJETA":  SubtipoMovimiento.VENTA_TARJETA,
     }
 
-    # Find the active cash session for this branch (may not exist — that's OK)
+    # Find the active cash session for this cashier (may not exist — that's OK)
     sesion = await CajaSesion.find_one(
         CajaSesion.tenant_id   == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
+        CajaSesion.cajero_id   == str(current_user.id),
         CajaSesion.estado      == EstadoSesion.ABIERTA,
     )
 
@@ -474,6 +475,7 @@ async def anular_sale(
     sesion = await CajaSesion.find_one(
         CajaSesion.tenant_id   == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
+        CajaSesion.cajero_id   == str(current_user.id),
         CajaSesion.estado      == EstadoSesion.ABIERTA,
     )
     if sesion:

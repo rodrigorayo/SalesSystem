@@ -28,10 +28,11 @@ from app.schemas.caja import AbrirCajaIn, CerrarCajaIn, GastoIn, IngresoIn, Cate
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async def _get_active_session(tenant_id: str, sucursal_id: str) -> Optional[CajaSesion]:
+async def _get_active_session(tenant_id: str, sucursal_id: str, cajero_id: str) -> Optional[CajaSesion]:
     return await CajaSesion.find_one(
         CajaSesion.tenant_id   == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
+        CajaSesion.cajero_id   == cajero_id,
         CajaSesion.estado      == EstadoSesion.ABIERTA,
     )
 
@@ -44,10 +45,16 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesiones = await CajaSesion.find(
+    filters = [
         CajaSesion.tenant_id   == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
-    ).sort("-abierta_at").to_list()
+    ]
+    
+    # Restrict local operators to only see their own cash register history
+    if current_user.role in [UserRole.CAJERO, UserRole.VENDEDOR, UserRole.SUPERVISOR]:
+        filters.append(CajaSesion.cajero_id == str(current_user.id))
+
+    sesiones = await CajaSesion.find(*filters).sort("-abierta_at").to_list()
 
     result = []
     for s in sesiones:
@@ -104,10 +111,10 @@ async def abrir_caja(body: AbrirCajaIn, current_user: User = Depends(get_current
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or body.sucursal_id or "CENTRAL"
 
-    # Block if a session is already open
-    existing = await _get_active_session(tenant_id, sucursal_id)
+    # Block if THIS USER already has a session open
+    existing = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if existing:
-        raise HTTPException(status_code=400, detail="Ya existe una sesión de caja abierta para esta sucursal.")
+        raise HTTPException(status_code=400, detail="Ya tienes una sesión de caja abierta.")
 
     sesion = CajaSesion(
         tenant_id    = tenant_id,
@@ -139,7 +146,7 @@ async def abrir_caja(body: AbrirCajaIn, current_user: User = Depends(get_current
 async def get_sesion_activa(current_user: User = Depends(get_current_active_user)):
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         return None
     return sesion
@@ -246,7 +253,7 @@ async def registrar_gasto(body: GastoIn, current_user: User = Depends(get_curren
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         raise HTTPException(status_code=400, detail="No hay una sesión de caja abierta. Abrí la caja primero.")
 
@@ -273,7 +280,7 @@ async def registrar_ingreso(body: IngresoIn, current_user: User = Depends(get_cu
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         raise HTTPException(status_code=400, detail="No hay una sesión de caja abierta. Abrí la caja primero.")
 
@@ -306,7 +313,7 @@ async def get_movimientos(current_user: User = Depends(get_current_active_user))
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         return []
 
