@@ -3,6 +3,7 @@ from enum import Enum
 from beanie import Document
 from pydantic import BaseModel, Field
 from datetime import datetime
+from .base import DecimalMoney
 
 class EstadoPago(str, Enum):
     PAGADO = "PAGADO"
@@ -14,23 +15,23 @@ class SaleItem(BaseModel):
     producto_id: str
     descripcion: str
     cantidad: int = Field(gt=0)
-    precio_unitario: float = Field(ge=0)
-    costo_unitario: float = Field(ge=0)
-    descuento_unitario: float = Field(ge=0, default=0)
-    subtotal: float = Field(ge=0)
+    precio_unitario: DecimalMoney
+    costo_unitario: DecimalMoney
+    descuento_unitario: DecimalMoney = DecimalMoney("0")
+    subtotal: DecimalMoney
 
 
 class PagoItem(BaseModel):
     """One segment of a split payment or later amortization."""
     metodo: Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA", "CREDITO"]
-    monto: float = Field(gt=0)
+    monto: DecimalMoney
     fecha: datetime = Field(default_factory=datetime.utcnow)
 
 
 class DescuentoInfo(BaseModel):
     nombre: Optional[str] = None
     tipo: Literal["MONTO", "PORCENTAJE"]
-    valor: float
+    valor: DecimalMoney
 
 
 class ClienteInfo(BaseModel):
@@ -45,7 +46,7 @@ class ClienteInfo(BaseModel):
 class QRInfo(BaseModel):
     banco: Optional[str] = None
     referencia: Optional[str] = None
-    monto_transferido: Optional[float] = None
+    monto_transferido: Optional[DecimalMoney] = None
     confirmado: bool = False
     confirmado_at: Optional[datetime] = None
     confirmado_por: Optional[str] = None
@@ -55,7 +56,7 @@ class Sale(Document):
     tenant_id: str
     sucursal_id: str = "CENTRAL"
     items: List[SaleItem]
-    total: float
+    total: DecimalMoney
     pagos: List[PagoItem] = []
     descuento: Optional[DescuentoInfo] = None
     cliente_id: Optional[str] = None  # Ref to Clientes collection

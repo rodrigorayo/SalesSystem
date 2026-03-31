@@ -1,3 +1,4 @@
+from .base import DecimalMoney
 from typing import Optional
 from beanie import Document
 from pydantic import Field
@@ -19,8 +20,8 @@ class PriceChangeRequest(Document):
     # Snapshots — context without joins
     producto_nombre: str
     sucursal_nombre: str
-    precio_actual: float
-    precio_propuesto: float
+    precio_actual: DecimalMoney
+    precio_propuesto: DecimalMoney
     
     motivo_solicitud: str
     estado: PriceRequestStatus = PriceRequestStatus.PENDIENTE

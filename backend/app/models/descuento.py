@@ -4,7 +4,7 @@ from datetime import datetime
 from bson import ObjectId
 from beanie import Document
 
-from .base import SoftDeleteMixin
+from .base import SoftDeleteMixin, DecimalMoney
 
 class Descuento(Document, SoftDeleteMixin):
     tenant_id: str
@@ -12,7 +12,7 @@ class Descuento(Document, SoftDeleteMixin):
     aplica_todas_sucursales: bool = False
     nombre: str
     tipo: Literal["MONTO", "PORCENTAJE"]
-    valor: float
+    valor: DecimalMoney
     fecha_inicio: Optional[datetime] = None
     fecha_fin: Optional[datetime] = None
     dias_semana: Optional[list[int]] = None # [0..6]
@@ -40,7 +40,7 @@ class Descuento(Document, SoftDeleteMixin):
 class DescuentoBase(BaseModel):
     nombre: str = Field(..., description="Nombre del descuento (ej. Tercera Edad, Mayorista)")
     tipo: str = Field(..., description="Tipo de descuento: MONTO o PORCENTAJE")
-    valor: float = Field(..., gt=0, description="Valor numérico del descuento")
+    valor: DecimalMoney = Field(..., gt=0, description="Valor numérico del descuento")
     is_active: bool = Field(True, description="Si el descuento está disponible para usarse")
     fecha_inicio: Optional[datetime] = None
     fecha_fin: Optional[datetime] = None
@@ -52,7 +52,7 @@ class DescuentoCreate(DescuentoBase):
 class DescuentoUpdate(BaseModel):
     nombre: Optional[str] = None
     tipo: Optional[str] = None
-    valor: Optional[float] = None
+    valor: Optional[DecimalMoney] = None
     is_active: Optional[bool] = None
     fecha_inicio: Optional[datetime] = None
     fecha_fin: Optional[datetime] = None

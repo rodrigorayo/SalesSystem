@@ -1,3 +1,4 @@
+from .base import DecimalMoney
 from datetime import datetime
 from beanie import Document
 from pydantic import Field, BaseModel
@@ -6,8 +7,8 @@ class PedidoItem(BaseModel):
     producto_id: str
     descripcion: str
     cantidad: int = Field(gt=0)
-    precio_mayorista: float = Field(ge=0)
-    subtotal: float = Field(ge=0)
+    precio_mayorista: DecimalMoney = Field(ge=0)
+    subtotal: DecimalMoney = Field(ge=0)
 
 class PedidoItemDocument(Document):
     tenant_id: str
@@ -18,8 +19,8 @@ class PedidoItemDocument(Document):
     producto_id: str
     descripcion: str
     cantidad: int
-    precio_mayorista: float
-    subtotal: float
+    precio_mayorista: DecimalMoney
+    subtotal: DecimalMoney
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

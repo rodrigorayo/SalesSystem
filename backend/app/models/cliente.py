@@ -1,3 +1,4 @@
+from .base import DecimalMoney
 from typing import Optional
 from beanie import Document
 from pydantic import Field
@@ -12,7 +13,7 @@ class Cliente(Document):
     direccion: Optional[str] = None
     notas: Optional[str] = None
     lista_precio_id: Optional[str] = None
-    total_compras: float = 0.0
+    total_compras: DecimalMoney = DecimalMoney("0.0")
     cantidad_compras: int = 0
     ultima_compra_at: Optional[datetime] = None
     is_active: bool = True

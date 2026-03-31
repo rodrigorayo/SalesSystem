@@ -1,6 +1,7 @@
 from beanie import Document
 from pydantic import Field
 from datetime import datetime
+from .base import DecimalMoney
 
 class SaleItem(Document):
     """
@@ -16,10 +17,10 @@ class SaleItem(Document):
     descripcion: str        # Snapshot
     
     cantidad: int
-    precio_unitario: float
-    costo_unitario: float    # Snapshot del costo al momento
-    descuento_unitario: float = 0.0
-    subtotal: float
+    precio_unitario: DecimalMoney
+    costo_unitario: DecimalMoney    # Snapshot del costo al momento
+    descuento_unitario: DecimalMoney = DecimalMoney("0.0")
+    subtotal: DecimalMoney
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

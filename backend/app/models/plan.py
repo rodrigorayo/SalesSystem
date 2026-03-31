@@ -1,3 +1,4 @@
+from .base import DecimalMoney
 from typing import List
 from beanie import Document
 from pydantic import Field
@@ -10,7 +11,7 @@ class Plan(Document):
     max_sucursales: int  # -1 = ilimitado
     max_usuarios: int
     features: List[PlanFeature] = []
-    precio_mensual: float = 0.0
+    precio_mensual: DecimalMoney = DecimalMoney("0.0")
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, Any
 from beanie import Document
 from pydantic import Field, model_validator
-from .base import SoftDeleteMixin
+from .base import SoftDeleteMixin, DecimalMoney
 
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
@@ -25,13 +25,6 @@ class SubtipoMovimiento(str, Enum):
     AJUSTE          = "AJUSTE"          # corrección manual
 
 
-def _coerce_decimal128(v: Any) -> float:
-    """Convert MongoDB Decimal128 (or Decimal / str) to plain float."""
-    type_name = type(v).__name__
-    if type_name == "Decimal128":          # bson.Decimal128
-        return float(v.to_decimal())
-    return float(v)
-
 
 # ─── CajaSesion ───────────────────────────────────────────────────────────────
 
@@ -41,24 +34,15 @@ class CajaSesion(Document):
     sucursal_id:         str
     cajero_id:           str
     cajero_name:         str
-    monto_inicial:       float = 0.0
+    monto_inicial:       DecimalMoney = DecimalMoney("0.0")
     estado:              EstadoSesion = EstadoSesion.ABIERTA
     abierta_at:          datetime = Field(default_factory=datetime.utcnow)
     cerrada_at:          Optional[datetime] = None
-    monto_cierre_fisico: Optional[float] = None   # conteo físico al cerrar
+    monto_cierre_fisico: Optional[DecimalMoney] = None   # conteo físico al cerrar
     notas_cierre:        Optional[str] = None
     created_at:          datetime = Field(default_factory=datetime.utcnow)
 
-    @model_validator(mode='before')
-    @classmethod
-    def _fix_decimal128(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        for field in ("monto_inicial", "monto_cierre_fisico"):
-            v = data.get(field)
-            if v is not None and type(v).__name__ == "Decimal128":
-                data[field] = float(v.to_decimal())
-        return data
+    # Handled by DecimalMoney annotation now.
 
     class Settings:
         name = "caja_sesiones"
@@ -92,22 +76,14 @@ class CajaMovimiento(Document):
     subtipo:      SubtipoMovimiento
     # INGRESO = cash coming IN;  EGRESO = cash going OUT
     tipo:         str                           # "INGRESO" | "EGRESO"
-    monto:        float
+    monto:        DecimalMoney
     descripcion:  str
     categoria_id: Optional[str] = None         # for GASTO
     sale_id:      Optional[str] = None         # for VENTA_EFECTIVO / CAMBIO
     fecha:        datetime = Field(default_factory=datetime.utcnow)
     created_at:   datetime = Field(default_factory=datetime.utcnow)
 
-    @model_validator(mode='before')
-    @classmethod
-    def _fix_decimal128(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        v = data.get("monto")
-        if v is not None and type(v).__name__ == "Decimal128":
-            data["monto"] = float(v.to_decimal())
-        return data
+    # Handled by DecimalMoney annotation now.
 
     class Settings:
         name = "caja_movimientos"

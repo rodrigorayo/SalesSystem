@@ -101,38 +101,9 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
 
 @router.post("/sesion/abrir")
 async def abrir_caja(body: AbrirCajaIn, current_user: User = Depends(get_current_active_user)):
-    tenant_id   = current_user.tenant_id or "default"
-    sucursal_id = current_user.sucursal_id or body.sucursal_id or "CENTRAL"
-
-    # Block if a session is already open
-    existing = await _get_active_session(tenant_id, sucursal_id)
-    if existing:
-        raise HTTPException(status_code=400, detail="Ya existe una sesión de caja abierta para esta sucursal.")
-
-    sesion = CajaSesion(
-        tenant_id    = tenant_id,
-        sucursal_id  = sucursal_id,
-        cajero_id    = str(current_user.id),
-        cajero_name  = current_user.full_name or current_user.username,
-        monto_inicial= float(body.monto_inicial),
-        estado       = EstadoSesion.ABIERTA,
-    )
-    await sesion.create()
-
-    # Register the opening movement
-    await CajaMovimiento(
-        tenant_id   = tenant_id,
-        sucursal_id = sucursal_id,
-        sesion_id   = str(sesion.id),
-        cajero_id   = str(current_user.id),
-        cajero_name = current_user.full_name or current_user.username,
-        subtipo     = SubtipoMovimiento.APERTURA,
-        tipo        = "INGRESO",
-        monto       = float(body.monto_inicial),
-        descripcion = "Apertura de caja",
-    ).create()
-
-    return sesion
+    """Opens a cash session with ACID transactional integrity."""
+    from app.services.caja_service import CajaService
+    return await CajaService.abrir_caja(body, current_user)
 
 
 @router.get("/sesion/activa")
@@ -147,20 +118,9 @@ async def get_sesion_activa(current_user: User = Depends(get_current_active_user
 
 @router.post("/sesion/{sesion_id}/cerrar")
 async def cerrar_caja(sesion_id: str, body: CerrarCajaIn, current_user: User = Depends(get_current_active_user)):
-    tenant_id = current_user.tenant_id or "default"
-
-    sesion = await CajaSesion.get(sesion_id)
-    if not sesion or sesion.tenant_id != tenant_id:
-        raise HTTPException(status_code=404, detail="Sesión no encontrada.")
-    if sesion.estado == EstadoSesion.CERRADA:
-        raise HTTPException(status_code=400, detail="La sesión ya está cerrada.")
-
-    sesion.estado                = EstadoSesion.CERRADA
-    sesion.cerrada_at            = datetime.utcnow()
-    sesion.monto_cierre_fisico   = float(body.monto_fisico_contado)
-    sesion.notas_cierre          = body.notas
-    await sesion.save()
-    return sesion
+    """Closes an active cash session."""
+    from app.services.caja_service import CajaService
+    return await CajaService.cerrar_caja(sesion_id, body, current_user)
 
 
 @router.get("/sesion/{sesion_id}/resumen", response_model=ResumenCaja)

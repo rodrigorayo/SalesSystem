@@ -3,6 +3,7 @@ from enum import Enum
 from beanie import Document
 from pydantic import BaseModel, Field
 from datetime import datetime
+from .base import DecimalMoney
 
 
 class EstadoPedido(str, Enum):
@@ -18,8 +19,8 @@ class PedidoItem(BaseModel):
     descripcion: str
     cantidad: int = Field(gt=0)
     cantidad_recibida: Optional[int] = None
-    precio_mayorista: float = Field(ge=0)
-    subtotal: float = Field(ge=0)
+    precio_mayorista: DecimalMoney
+    subtotal: DecimalMoney
 
 
 class PedidoInterno(Document):
@@ -39,7 +40,7 @@ class PedidoInterno(Document):
     estado: EstadoPedido = EstadoPedido.CREADO
     items: List[PedidoItem]
     notas: Optional[str] = None
-    total_mayorista: float = 0.0        # calculated on despacho
+    total_mayorista: DecimalMoney = DecimalMoney("0.0")        # calculated on despacho
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     aceptado_at: Optional[datetime] = None

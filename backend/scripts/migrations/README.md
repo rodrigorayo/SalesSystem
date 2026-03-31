@@ -1,27 +1,28 @@
-# 📁 scripts/migrations/
+# Migrador de Flotantes a Decimal128 (Idempotente)
 
-Scripts de migración de datos. Representan cambios **ya aplicados** a la base de datos de producción.
-Están aquí como historial. **No re-ejecutar** a menos que sea explícitamente necesario.
+Este script fue diseñado arquitectónicamente para transformar TODA tu base de datos y parchar operaciones financieras peligrosas basadas en "Float/Double" hacia el entorno empresarial "Decimal128".
+
+## Características de Producción
+- **Batch Processing:** Utiliza `bulk_write` asíncrono en lotes de 500 para jamás ahogar la RAM de tu Cluster de MongoDB Atlas si tienes millones de tickets de caja.
+- **Idempotencia:** Si el servidor se apaga a la mitad de la migración... vuelve a correrla. El script está programado para ignorar y descartar inteligentemente los documentos que ya tengan el flag nativo de `$Decimal128`.
+- **Recursión Dinámica:** Encuentra y sanea `floats` incluso escondidos dentro de Arrays de `Sale.items[]` y objetos incrustados `dict`.
 
 ---
 
-## Historial de migraciones aplicadas
+# INSTRUCCIONES DE USO
 
-| Script | Descripción | Estado |
-|--------|-------------|--------|
-| `migrate_f1.py` | Migración inicial de formato de documentos | ✅ Aplicado |
-| `migrate_f2.py` | Segunda migración de formato | ✅ Aplicado |
-| `migrate_tenant_fix.py` | Corrección de tenant_id en documentos legacy | ✅ Aplicado |
-| `apply_corrections_v2.py` | Correcciones de datos v2 | ✅ Aplicado |
-| `check_dupes.py` | Detección y limpieza de duplicados | ✅ Aplicado |
-| `fix_indexes.py` | Corrección de índices en MongoDB | ✅ Aplicado |
-| `limpiar_huerfanos.py` | Limpieza de documentos huérfanos (v1) | ✅ Aplicado |
-| `limpiar_huerfanos_2.py` | Limpieza de documentos huérfanos (v2) | ✅ Aplicado |
-| `limpiar_huerfanos_3.py` | Limpieza de documentos huérfanos (v3) | ✅ Aplicado |
-| `limpiar_inventario_nulls.py` | Limpieza de nulls en inventario | ✅ Aplicado |
+> [!CAUTION]
+> **OBLIGATORIO: HAZ UN BACKUP.**
+> Jamás juegues a los dados con la base de datos de producción financiera de un cliente real. Antes de correr el script, asegúrate de tomar una snapshot nativa tu base de Mongo. Si usas MongoDB Atlas, solo ve a tu Cluster y presiona "Create Snapshot".
 
-## ¿Cómo agregar una nueva migración?
+```bash
+# 1. Posiciónate en la raíz del backend (donde está el Pipfile o main.py)
+cd backend
 
-1. Crear un nuevo script `migrate_NNN_descripcion.py` en esta carpeta.
-2. Documentar qué hace, cuándo se aplicó y en qué entorno.
-3. Marcarla como ✅ en esta tabla una vez aplicada.
+# 2. Ejecuta el archivo desde tu consola o CI/CD (con las ENV vars de Mongo ya configuradas)
+python scripts/migrations/float_to_decimal128.py
+
+# 3. Te pedirá confirmación de que tomaste backup. Escribe "SI" en mayúsculas y presiona Enter.
+```
+
+El loguero mostrará de forma asíncrona exactamente cuántos registros inspeccionó (con una latencia mínima) y cuántos documentos modificó e interceptó.

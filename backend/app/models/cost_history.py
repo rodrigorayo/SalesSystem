@@ -1,3 +1,4 @@
+from .base import DecimalMoney
 from typing import Optional
 from beanie import Document
 from pydantic import Field
@@ -10,9 +11,9 @@ class ProductCostHistory(Document):
     tenant_id: str
     producto_id: str
     descripcion: str               # Snapshot of name
-    costo_anterior: float
-    costo_nuevo: float
-    diferencia: float              # Calculated: nuevo - anterior
+    costo_anterior: DecimalMoney
+    costo_nuevo: DecimalMoney
+    diferencia: DecimalMoney              # Calculated: nuevo - anterior
     motivo: Optional[str] = None
     cambiado_por: str              # user_id
     cambiado_por_nombre: str       # Snapshot of user name
