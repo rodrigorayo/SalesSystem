@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 
 
-from .base import SoftDeleteMixin
+from .base import SoftDeleteMixin, DecimalMoney
 
 
 class Product(Document, SoftDeleteMixin):
@@ -29,13 +29,14 @@ class Product(Document, SoftDeleteMixin):
     codigo_corto: Optional[str] = None          # short SKU, unique per tenant
     descripcion: str                             # product name
     categoria_id: str                            # required FK → categories
-    costo_producto: float = 0.0                  # production/purchase cost
-    precio_venta: float = 0.0                    # retail price (deprecated for MATRIZ, mapped from sucursal)
+    proveedor: Optional[str] = None              # supplier/provider
+    costo_producto: DecimalMoney = DecimalMoney("0.0")                  # production/purchase cost
+    precio_venta: DecimalMoney = DecimalMoney("0.0")                    # retail price (deprecated for MATRIZ, mapped from sucursal)
 
     # optional enrichment (resolved at query time, not stored)
     categoria_nombre: Optional[str] = None
     image_url: Optional[str] = None
-    precios_sucursales: Optional[dict[str, float]] = None
+    precios_sucursales: Optional[dict[str, DecimalMoney]] = None
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

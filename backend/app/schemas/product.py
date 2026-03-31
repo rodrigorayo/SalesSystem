@@ -19,6 +19,7 @@ class ProductCreate(BaseModel):
     costo_producto: float = 0.0
     codigo_largo: Optional[str] = None
     codigo_corto: Optional[str] = None
+    proveedor: Optional[str] = None
     image_url: Optional[str] = None
     precios_sucursales: Optional[dict[str, float]] = None
 
@@ -30,6 +31,7 @@ class ProductUpdate(BaseModel):
     costo_producto: Optional[float] = None
     codigo_largo: Optional[str] = None
     codigo_corto: Optional[str] = None
+    proveedor: Optional[str] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
     precios_sucursales: Optional[dict[str, float]] = None

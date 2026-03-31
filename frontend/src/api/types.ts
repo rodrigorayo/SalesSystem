@@ -59,6 +59,7 @@ export interface Product {
     codigo_sistema?: string;
     codigo_largo?: string;
     codigo_corto?: string;
+    proveedor?: string;
     descripcion: string;          // product name
     categoria_id: string;
     categoria_nombre?: string;    // resolved at query time
@@ -76,6 +77,7 @@ export interface ProductCreate {
     costo_producto?: number;
     codigo_largo?: string;
     codigo_corto?: string;
+    proveedor?: string;
     image_url?: string;
     precios_sucursales?: Record<string, number>;
 }
