@@ -3,8 +3,7 @@ Pydantic schemas for the Inventario domain.
 Extracted from inventario.py endpoint.
 """
 
-from typing import Optional
-from pydantic import BaseModel
+from app.models.base import DecimalMoney
 
 
 class InventarioItem(BaseModel):
@@ -12,8 +11,8 @@ class InventarioItem(BaseModel):
     inventario_id: str
     producto_id: str
     producto_nombre: str
-    precio: float
-    precio_sucursal: Optional[float] = None
+    precio: DecimalMoney
+    precio_sucursal: Optional[DecimalMoney] = None
     image_url: Optional[str] = None
     sucursal_id: str
     cantidad: int
