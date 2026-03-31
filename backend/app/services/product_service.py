@@ -160,7 +160,7 @@ class ProductService:
         if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
             raise HTTPException(status_code=403, detail="No autorizado para importar productos")
             
-        if not file.filename.endswith((".xlsx", ".xls")):
+        if not filename.endswith((".xlsx", ".xls")):
             raise HTTPException(status_code=400, detail="Formato de archivo inválido. Solo se permite .xlsx o .xls")
             
         tenant_id = current_user.tenant_id or "default"
@@ -292,7 +292,7 @@ class ProductService:
         if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
             raise HTTPException(status_code=403, detail="No autorizado para la importación global")
             
-        if not file.filename.endswith((".xlsx", ".xls")):
+        if not filename.endswith((".xlsx", ".xls")):
             raise HTTPException(status_code=400, detail="Formato inválido. Solo .xlsx o .xls")
             
         tenant_id = current_user.tenant_id or "default"
@@ -579,7 +579,7 @@ class ProductService:
         if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
             raise HTTPException(status_code=403, detail="No autorizado para importar precios")
             
-        if not file.filename.endswith((".xlsx", ".xls")):
+        if not filename.endswith((".xlsx", ".xls")):
             raise HTTPException(status_code=400, detail="Formato de archivo inválido. Solo se permite .xlsx o .xls")
             
         tenant_id = current_user.tenant_id or "default"
