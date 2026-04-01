@@ -1,3 +1,4 @@
+from app.infrastructure.db import get_client
 import math
 import logging
 from datetime import datetime
@@ -25,7 +26,7 @@ class SalesService:
         tenant_id = current_user.tenant_id or "default"
         sucursal_id = current_user.sucursal_id or sale_in.sucursal_id or "CENTRAL"
         
-        client = Sale.get_motor_collection().database.client
+        client = get_client()
 
         try:
             async with await client.start_session() as session:
@@ -266,7 +267,7 @@ class SalesService:
     @staticmethod
     async def anular_sale(sale_id: str, current_user: User) -> Sale:
         tenant_id = current_user.tenant_id or "default"
-        client = Sale.get_motor_collection().database.client
+        client = get_client()
 
         try:
             async with await client.start_session() as session:

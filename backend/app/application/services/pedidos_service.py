@@ -1,3 +1,4 @@
+from app.infrastructure.db import get_client
 import logging
 from typing import List, Optional
 from datetime import datetime
@@ -28,7 +29,7 @@ class PedidosService:
             if data.sucursal_origen_id != current_user.sucursal_id and data.sucursal_destino_id != current_user.sucursal_id:
                 raise HTTPException(status_code=403, detail="Solo puedes transferir inventario desde o hacia tu propia bodega de Supervisor")
 
-        client = PedidoInterno.get_motor_collection().database.client
+        client = get_client()
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
@@ -200,7 +201,7 @@ class PedidosService:
         is_matrix_admin = current_user.role in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]
         tenant_id = current_user.tenant_id or ""
 
-        client = PedidoInterno.get_motor_collection().database.client
+        client = get_client()
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
@@ -268,7 +269,7 @@ class PedidosService:
     @staticmethod
     async def recibir_pedido(pedido_id: str, data: Optional[PedidoRecepcion], current_user: User) -> PedidoInterno:
         tenant_id = current_user.tenant_id or ""
-        client = PedidoInterno.get_motor_collection().database.client
+        client = get_client()
 
         try:
             async with await client.start_session() as session:

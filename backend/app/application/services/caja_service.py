@@ -1,3 +1,4 @@
+from app.infrastructure.db import get_client
 import logging
 from datetime import datetime
 from fastapi import HTTPException
@@ -23,7 +24,7 @@ class CajaService:
         if sesion_existente:
             raise HTTPException(status_code=400, detail="Ya existe una sesión de caja abierta para esta sucursal.")
 
-        client = CajaSesion.get_motor_collection().database.client
+        client = get_client()
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():

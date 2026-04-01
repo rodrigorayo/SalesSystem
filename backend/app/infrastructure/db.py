@@ -22,10 +22,13 @@ from app.domain.models.price_list import ListaPrecio, ListaPrecioItem
 
 from app.infrastructure.core.config import settings
 
+_client = None
+
 async def init_db():
-    client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
+    global _client
+    _client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
     await init_beanie(
-        database=client.salessystem,
+        database=_client.salessystem,
         document_models=[
             User,
             Tenant,
@@ -52,3 +55,14 @@ async def init_db():
             ListaPrecioItem,
         ]
     )
+
+def get_client() -> motor.motor_asyncio.AsyncIOMotorClient:
+    """
+    Retorna el cliente asíncrono de MongoDB conectado.
+    Sigue el principio DRY para no tener que extraer el cliente
+    desde los Modelos individualmente en cada servicio.
+    """
+    global _client
+    if _client is None:
+        raise RuntimeError("Database not initialized")
+    return _client

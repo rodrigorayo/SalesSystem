@@ -1,3 +1,4 @@
+from app.infrastructure.db import get_client
 import io
 import pandas as pd
 from typing import Optional, Dict, Any
@@ -25,7 +26,7 @@ class InventarioService:
         if not product or (current_user.role != UserRole.SUPERADMIN and product.tenant_id != tenant_id):
             raise HTTPException(status_code=404, detail="Product not found")
 
-        client = Inventario.get_motor_collection().database.client
+        client = get_client()
         
         async with await client.start_session() as session:
             async with session.start_transaction():
