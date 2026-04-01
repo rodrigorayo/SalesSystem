@@ -1,12 +1,12 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from bson import ObjectId
 
-from app.models.price_list import ListaPrecio, ListaPrecioItem, TipoListaPrecio
-from app.models.user import User
-from app.auth import get_current_active_user
+from app.domain.models.price_list import ListaPrecio, ListaPrecioItem, TipoListaPrecio
+from app.domain.models.user import User
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -44,9 +44,7 @@ class ListaPrecioResponse(BaseModel):
     is_active: bool
     created_at: datetime
     
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(populate_by_name=True)
 
 class ListaPrecioItemResponse(BaseModel):
     id: str = Field(..., alias="_id")
@@ -58,9 +56,7 @@ class ListaPrecioItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # --- API Endpoints: Listas ---

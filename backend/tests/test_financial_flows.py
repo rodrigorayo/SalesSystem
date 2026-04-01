@@ -3,10 +3,10 @@ import pytest_asyncio
 from decimal import Decimal
 from typing import AsyncGenerator
 
-from app.services.sales_service import SalesService
-from app.models.base import DecimalMoney
-from app.schemas.sale import SaleCreate, SaleItemCreate, PagoItemCreate
-from app.models.user import User
+from app.application.services.sales_service import SalesService
+from app.domain.models.base import DecimalMoney
+from app.domain.schemas.sale import SaleCreate, SaleItemIn, PagoIn
+from app.domain.models.user import User
 
 @pytest_asyncio.fixture
 async def authenticated_test_user() -> User:
@@ -31,7 +31,7 @@ async def test_decimal_rounding_and_acid_creation(authenticated_test_user):
     sale_payload = SaleCreate(
         sucursal_id="sucursal_001",
         items=[
-            SaleItemCreate(
+            SaleItemIn(
                 producto_id="prod_mock_001",
                 cantidad=2,
                 precio_unitario=10.51,  # Subtotal 21.02
@@ -39,7 +39,7 @@ async def test_decimal_rounding_and_acid_creation(authenticated_test_user):
             )
         ],
         pagos=[
-            PagoItemCreate(metodo="EFECTIVO", monto=50.0) # Esperamos 28.98 Bs de cambio redondeado comercialmente
+            PagoIn(metodo="EFECTIVO", monto=50.0) # Esperamos 28.98 Bs de cambio redondeado comercialmente
         ],
         cliente_id=None
     )

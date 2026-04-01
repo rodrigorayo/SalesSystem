@@ -2,9 +2,9 @@ from typing import List, Optional
 import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr, field_validator
-from app.models.user import User, UserRole
-from app.models.sucursal import Sucursal, TipoSucursal
-from app.auth import get_current_active_user, get_password_hash
+from app.domain.models.user import User, UserRole
+from app.domain.models.sucursal import Sucursal, TipoSucursal
+from app.infrastructure.auth import get_current_active_user, get_password_hash
 
 router = APIRouter()
 

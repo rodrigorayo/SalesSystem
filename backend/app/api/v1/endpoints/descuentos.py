@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
-from app.auth import get_current_active_user
-from app.models.user import User
-from app.models.descuento import DescuentoCreate, DescuentoUpdate, DescuentoResponse, Descuento
+from app.infrastructure.auth import get_current_active_user
+from app.domain.models.user import User
+from app.domain.models.descuento import DescuentoCreate, DescuentoUpdate, DescuentoResponse, Descuento
 from bson import ObjectId
 from datetime import datetime
 

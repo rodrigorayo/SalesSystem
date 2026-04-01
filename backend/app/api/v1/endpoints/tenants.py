@@ -2,11 +2,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
-from app.models.tenant import Tenant, PlanType
-from app.models.user import User, UserRole
-from app.models.product import Product
-from app.models.sale import Sale
-from app.auth import get_current_active_user, get_password_hash
+from app.domain.models.tenant import Tenant, PlanType
+from app.domain.models.user import User, UserRole
+from app.domain.models.product import Product
+from app.domain.models.sale import Sale
+from app.infrastructure.auth import get_current_active_user, get_password_hash
 
 router = APIRouter()
 
@@ -140,12 +140,12 @@ async def delete_tenant(tenant_id: str, current_user: User = Depends(get_current
     await tenant.delete()
     
     # Cascade delete all related entities so credentials and codes are freed
-    from app.models.user import User
-    from app.models.product import Product
-    from app.models.category import Category
-    from app.models.sucursal import Sucursal
-    from app.models.inventario import Inventario, InventoryLog
-    from app.models.sale import Sale
+    from app.domain.models.user import User
+    from app.domain.models.product import Product
+    from app.domain.models.category import Category
+    from app.domain.models.sucursal import Sucursal
+    from app.domain.models.inventario import Inventario, InventoryLog
+    from app.domain.models.sale import Sale
     
     await User.find(User.tenant_id == tenant_id).delete()
     await Sucursal.find(Sucursal.tenant_id == tenant_id).delete()

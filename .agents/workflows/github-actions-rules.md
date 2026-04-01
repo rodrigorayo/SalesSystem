@@ -1,0 +1,30 @@
+---
+description: Pipeline y Reglas Estrictas de GitHub Actions
+---
+
+# 🛡️ Reglas Strictas de GitHub Actions (Pre-Push Checks)
+
+Antes de hacer un `git push` a `main` o a cualquier rama sincronizada, el agente y los desarrolladores deben respetar las siguientes directrices y verificar localmente para evitar roturas del Pipeline de Integración Continua (CI/CD) de GitHub.
+
+## 1. Zero Warning Policy (Pydantic & Pytest)
+GitHub Actions en este repositorio está configurado para fallar si los tests no pasan, y deberíamos evitar cualquier advertencia de Deprecación (DeprecationWarnings).
+- **Pydantic V2:** No utilizar `class Config:`. En su lugar usar `model_config = ConfigDict(...)` en los modelos de Beanie/Pydantic, o `model_config = SettingsConfigDict(...)` para variables de entorno.
+- **Imports Limpios:** El proyecto utiliza Arquitectura Limpia estricta. Ningún esquema (`domain/schemas`) puede importar de `application` o `api`. Ningún test (`tests/`) puede importar dependencias legacy como `app.schemas...`, deben apuntar a `app.domain.schemas...`.
+
+## 2. Test Suites (Pytest)
+Siempre ejecutar la suite de pruebas localmente. Si la lógica del modelo cambia, el test respectivo debe cambiar acorde a ello (Mapear parámetros actualizados o campos mandatorios como `PROVEEDOR`).
+Comando de verificación local recomendada:
+```bash
+# Ejecutar desde root/backend
+pytest tests/ -v
+```
+
+## 3. Ignorar Cache Locales (Gitignore)
+Bajo ninguna circunstancia subir configuraciones locales. 
+Revisar que `.env*`, `.pytest_cache/`, `.vercel/`, `__pycache__/` estén listados en el `.gitignore`.
+
+// turbo
+## Paso de Revisión Previa (Workflow Manual)
+Puedes ejecutar estas comprobaciones pidiendo o auto-verificando:
+1. `pytest tests/` (Verificar tests exitosos)
+2. `python -c "from app.main import app; print('App syntax OK')"` (Verificar compilación e integridad de ruteadores)

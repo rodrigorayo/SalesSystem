@@ -14,17 +14,17 @@ Routes:
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.models.caja import CajaSesion, CajaMovimiento, CajaGastoCategoria, EstadoSesion, SubtipoMovimiento
-from app.models.sale import Sale
-from app.models.user import User
-from app.auth import get_current_active_user
+from app.domain.models.caja import CajaSesion, CajaMovimiento, CajaGastoCategoria, EstadoSesion, SubtipoMovimiento
+from app.domain.models.sale import Sale
+from app.domain.models.user import User
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 
 
-from app.schemas.caja import AbrirCajaIn, CerrarCajaIn, GastoIn, IngresoIn, CategoriaGastoIn, ResumenCaja
+from app.domain.schemas.caja import AbrirCajaIn, CerrarCajaIn, GastoIn, IngresoIn, CategoriaGastoIn, ResumenCaja
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,10 +100,12 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
 # ─── Sesión ───────────────────────────────────────────────────────────────────
 
 @router.post("/sesion/abrir")
-async def abrir_caja(body: AbrirCajaIn, current_user: User = Depends(get_current_active_user)):
+async def abrir_caja(request: Request, body: AbrirCajaIn, current_user: User = Depends(get_current_active_user)):
     """Opens a cash session with ACID transactional integrity."""
-    from app.services.caja_service import CajaService
-    return await CajaService.abrir_caja(body, current_user)
+    from app.application.services.caja_service import CajaService
+    ip = request.client.host if request.client else "Unknown IP"
+    ua = request.headers.get("user-agent", "Unknown Device")
+    return await CajaService.abrir_caja(body, current_user, ip, ua)
 
 
 @router.get("/sesion/activa")
@@ -119,7 +121,7 @@ async def get_sesion_activa(current_user: User = Depends(get_current_active_user
 @router.post("/sesion/{sesion_id}/cerrar")
 async def cerrar_caja(sesion_id: str, body: CerrarCajaIn, current_user: User = Depends(get_current_active_user)):
     """Closes an active cash session."""
-    from app.services.caja_service import CajaService
+    from app.application.services.caja_service import CajaService
     return await CajaService.cerrar_caja(sesion_id, body, current_user)
 
 

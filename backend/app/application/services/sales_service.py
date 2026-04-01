@@ -6,16 +6,16 @@ from fastapi import HTTPException
 from pymongo import ReturnDocument
 from decimal import Decimal
 
-from app.models.sale import Sale, SaleItem, PagoItem, ClienteInfo, QRInfo, EstadoPago
-from app.models.sale_item import SaleItem as SaleItemAnalytics
-from app.models.product import Product
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
-from app.models.cliente import Cliente
-from app.models.user import User, UserRole
-from app.schemas.sale import SaleCreate
+from app.domain.models.sale import Sale, SaleItem, PagoItem, ClienteInfo, QRInfo, EstadoPago
+from app.domain.models.sale_item import SaleItem as SaleItemAnalytics
+from app.domain.models.product import Product
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
+from app.domain.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
+from app.domain.models.cliente import Cliente
+from app.domain.models.user import User, UserRole
+from app.domain.schemas.sale import SaleCreate
 from app.utils.pricing import resolver_precio
-from app.models.base import DecimalMoney
+from app.domain.models.base import DecimalMoney
 
 logger = logging.getLogger("SalesService")
 

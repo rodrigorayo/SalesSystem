@@ -1,12 +1,12 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from bson import ObjectId
 
-from app.models.cliente import Cliente
-from app.models.user import User
-from app.auth import get_current_active_user
+from app.domain.models.cliente import Cliente
+from app.domain.models.user import User
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -45,9 +45,7 @@ class ClienteResponse(BaseModel):
     is_active: bool
     created_at: datetime
     
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(populate_by_name=True)
 
 
 @router.get("/clientes", response_model=List[ClienteResponse])

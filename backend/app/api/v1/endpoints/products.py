@@ -6,13 +6,13 @@ import pandas as pd
 import io
 import math
 import uuid
-from app.schemas.product import ProductCreate, ProductUpdate
-from app.models.product import Product
-from app.models.category import Category
-from app.models.user import User, UserRole
-from app.models.sucursal import Sucursal
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.auth import get_current_active_user
+from app.domain.schemas.product import ProductCreate, ProductUpdate
+from app.domain.models.product import Product
+from app.domain.models.category import Category
+from app.domain.models.user import User, UserRole
+from app.domain.models.sucursal import Sucursal
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 async def _enrich(product: Product) -> Product:
@@ -93,7 +93,7 @@ async def create_product(
     data: ProductCreate,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.product_service import ProductService
+    from app.application.services.product_service import ProductService
     return await ProductService.create_product(data, current_user)
 
 
@@ -103,7 +103,7 @@ async def update_product(
     data: ProductUpdate,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.product_service import ProductService
+    from app.application.services.product_service import ProductService
     return await ProductService.update_product(product_id, data, current_user)
 
 
@@ -112,7 +112,7 @@ async def deactivate_product(
     product_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.product_service import ProductService
+    from app.application.services.product_service import ProductService
     return await ProductService.deactivate_product(product_id, current_user)
 
 
@@ -163,9 +163,9 @@ async def import_products(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.product_service import ProductService
+    from app.application.services.excel_import_service import ExcelImportService
     contents = await file.read()
-    return await ProductService.import_products(contents, file.filename, current_user)
+    return await ExcelImportService.import_products(contents, file.filename, current_user)
 
 
 @router.post("/productos/importacion-global")
@@ -173,9 +173,9 @@ async def importacion_global_excel(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.product_service import ProductService
+    from app.application.services.excel_import_service import ExcelImportService
     contents = await file.read()
-    return await ProductService.importacion_global_excel(contents, file.filename, current_user)
+    return await ExcelImportService.importacion_global_excel(contents, file.filename, current_user)
 
 
 @router.get("/productos/exportar-plantilla-precios")
@@ -233,6 +233,6 @@ async def import_product_prices(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.product_service import ProductService
+    from app.application.services.excel_import_service import ExcelImportService
     contents = await file.read()
-    return await ProductService.import_product_prices(sucursal_id, contents, file.filename, current_user)
+    return await ExcelImportService.import_product_prices(sucursal_id, contents, file.filename, current_user)

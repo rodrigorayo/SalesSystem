@@ -42,3 +42,10 @@ class Product(Document, SoftDeleteMixin):
 
     class Settings:
         name = "products"
+        from pymongo import IndexModel, TEXT
+        indexes = [
+            "tenant_id",
+            "categoria_id",
+            "codigo_corto",
+            IndexModel([("descripcion", TEXT), ("codigo_corto", TEXT)], name="product_text_search"),
+        ]

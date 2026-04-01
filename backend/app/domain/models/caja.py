@@ -38,7 +38,13 @@ class CajaSesion(Document):
     estado:              EstadoSesion = EstadoSesion.ABIERTA
     abierta_at:          datetime = Field(default_factory=datetime.utcnow)
     cerrada_at:          Optional[datetime] = None
-    monto_cierre_fisico: Optional[DecimalMoney] = None   # conteo físico al cerrar
+    monto_cierre_fisico: Optional[DecimalMoney] = None
+    monto_diferencia:    Optional[DecimalMoney] = None
+
+    # Campos de Auditoria Estricta (Rate/Device Tracking)
+    ip_apertura:         Optional[str] = None
+    user_agent_apertura: Optional[str] = None
+
     notas_cierre:        Optional[str] = None
     created_at:          datetime = Field(default_factory=datetime.utcnow)
 

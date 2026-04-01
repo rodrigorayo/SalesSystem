@@ -8,13 +8,13 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-from app.models.pedido_interno import PedidoInterno, PedidoItem, EstadoPedido
-from app.models.pedido_item import PedidoItemDocument
-from app.models.inventario import Inventario, TipoMovimiento, InventoryLog
+from app.domain.models.pedido_interno import PedidoInterno, PedidoItem, EstadoPedido
+from app.domain.models.pedido_item import PedidoItemDocument
+from app.domain.models.inventario import Inventario, TipoMovimiento, InventoryLog
 from pymongo import ReturnDocument
-from app.models.product import Product
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
+from app.domain.models.product import Product
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -52,7 +52,7 @@ async def crear_pedido(
     data: PedidoCreate,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.pedidos_service import PedidosService
+    from app.application.services.pedidos_service import PedidosService
     return await PedidosService.crear_pedido(data, current_user)
 
 
@@ -103,7 +103,7 @@ async def cancelar_pedido(
     pedido_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.pedidos_service import PedidosService
+    from app.application.services.pedidos_service import PedidosService
     return await PedidosService.cancelar_pedido(pedido_id, current_user)
 
 
@@ -112,7 +112,7 @@ async def aceptar_pedido(
     pedido_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.pedidos_service import PedidosService
+    from app.application.services.pedidos_service import PedidosService
     return await PedidosService.aceptar_pedido(pedido_id, current_user)
 
 
@@ -123,7 +123,7 @@ async def despachar_pedido(
     pedido_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.pedidos_service import PedidosService
+    from app.application.services.pedidos_service import PedidosService
     return await PedidosService.despachar_pedido(pedido_id, current_user)
 
 
@@ -135,7 +135,7 @@ async def recibir_pedido(
     data: Optional[PedidoRecepcion] = None,
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.pedidos_service import PedidosService
+    from app.application.services.pedidos_service import PedidosService
     return await PedidosService.recibir_pedido(pedido_id, data, current_user)
 
 

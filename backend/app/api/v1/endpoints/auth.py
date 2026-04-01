@@ -1,18 +1,21 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.models.user import User
-from app.auth import (
+from app.domain.models.user import User
+from app.infrastructure.auth import (
     create_access_token,
     verify_password,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     get_current_active_user
 )
+from fastapi import Request
+from app.infrastructure.core.rate_limit import limiter
 
 router = APIRouter()
 
 @router.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("5/minute")
+async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     import re
     # Use native re case-insensitive regex match — re.escape() prevents dots/@ in emails from breaking the pattern
     user = await User.find_one({"username": re.compile(f"^{re.escape(form_data.username)}$", re.IGNORECASE)})

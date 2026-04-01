@@ -4,12 +4,12 @@ from datetime import datetime
 from fastapi import HTTPException
 from pymongo import ReturnDocument
 
-from app.models.pedido_interno import PedidoInterno, PedidoItem, EstadoPedido
-from app.models.pedido_item import PedidoItemDocument
-from app.models.inventario import Inventario, TipoMovimiento, InventoryLog
-from app.models.product import Product
-from app.models.user import User, UserRole
-from app.schemas.pedidos import PedidoCreate, PedidoRecepcion, PedidoRecepcionItem  # Pydantic schemas needed
+from app.domain.models.pedido_interno import PedidoInterno, PedidoItem, EstadoPedido
+from app.domain.models.pedido_item import PedidoItemDocument
+from app.domain.models.inventario import Inventario, TipoMovimiento, InventoryLog
+from app.domain.models.product import Product
+from app.domain.models.user import User, UserRole
+from app.domain.schemas.pedidos import PedidoCreate, PedidoRecepcion, PedidoRecepcionItem  # Pydantic schemas needed
 
 logger = logging.getLogger("PedidosService")
 

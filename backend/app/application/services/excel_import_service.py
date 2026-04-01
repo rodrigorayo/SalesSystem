@@ -2,159 +2,17 @@ import io
 import math
 import uuid
 import pandas as pd
-from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from pymongo import UpdateOne
 from bson import ObjectId
 
-from app.models.product import Product
-from app.models.category import Category
-from app.models.user import User, UserRole
-from app.models.sucursal import Sucursal
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.schemas.product import ProductCreate, ProductUpdate
+from app.domain.models.product import Product
+from app.domain.models.category import Category
+from app.domain.models.user import User, UserRole
+from app.domain.models.sucursal import Sucursal
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
 
-async def _enrich(product: Product) -> Product:
-    if product.categoria_id:
-        cat = await Category.get(product.categoria_id)
-        if cat:
-            product.categoria_nombre = cat.name
-    return product
-
-class ProductService:
-    @staticmethod
-    async def create_product(data: ProductCreate, current_user: User) -> Product:
-        if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Not authorized")
-    
-        tenant_id = current_user.tenant_id or "default"
-    
-        # Validate category belongs to tenant
-        cat = await Category.get(data.categoria_id)
-        if not cat or (current_user.role != UserRole.SUPERADMIN and cat.tenant_id != tenant_id):
-            raise HTTPException(status_code=400, detail="Categoría no encontrada o no pertenece a tu empresa")
-    
-        # Validate codigo_corto uniqueness within tenant
-        if data.codigo_corto:
-            existing = await Product.find_one(
-                Product.tenant_id == tenant_id,
-                Product.codigo_corto == data.codigo_corto,
-            )
-            if existing:
-                raise HTTPException(status_code=400, detail=f"El código corto '{data.codigo_corto}' ya existe en tu catálogo")
-    
-        product = Product(
-            tenant_id=tenant_id,
-            **data.model_dump(exclude={"precios_sucursales"}),
-        )
-        await product.create()
-        
-        if data.precios_sucursales:
-            from pymongo import UpdateOne
-            ops = []
-            for suc_id, precio in data.precios_sucursales.items():
-                if precio is not None and precio >= 0:
-                    ops.append(
-                        UpdateOne(
-                            {"tenant_id": tenant_id, "sucursal_id": suc_id, "producto_id": str(product.id)},
-                            {
-                                "$setOnInsert": {"cantidad": 0},
-                                "$set": {"precio_sucursal": precio},
-                                "$currentDate": {"updated_at": True}
-                            },
-                            upsert=True
-                        )
-                    )
-            if ops:
-                await Inventario.get_pymongo_collection().bulk_write(ops)
-                
-        product.precios_sucursales = data.precios_sucursales or {}
-        return await _enrich(product)
-    
-    @staticmethod
-    async def update_product(product_id: str, data: ProductUpdate, current_user: User) -> Product:
-        if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Not authorized")
-    
-        product = await Product.get(product_id)
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
-        if current_user.role != UserRole.SUPERADMIN and product.tenant_id != current_user.tenant_id:
-            raise HTTPException(status_code=403, detail="Product not found")
-    
-        # Audit log
-        from app.models.audit import AuditLog
-        from app.models.cost_history import ProductCostHistory
-        old = product.model_dump()
-        updates = data.model_dump(exclude_none=True)
-        changes = {k: {"old": old.get(k), "new": v} for k, v in updates.items() if old.get(k) != v}
-        
-        if changes:
-            # P-02: Cost History Trigger
-            if "costo_producto" in changes:
-                await ProductCostHistory(
-                    tenant_id=product.tenant_id,
-                    producto_id=str(product.id),
-                    descripcion=product.descripcion,
-                    costo_anterior=old.get("costo_producto"),
-                    costo_nuevo=updates.get("costo_producto"),
-                    diferencia=round(updates.get("costo_producto") - old.get("costo_producto"), 4),
-                    motivo=None, # Motivo from Request could be added in schema later
-                    cambiado_por=str(current_user.id),
-                    cambiado_por_nombre=current_user.full_name or current_user.username
-                ).create()
-    
-            await AuditLog(
-                tenant_id=current_user.tenant_id,
-                user_id=str(current_user.id),
-                username=current_user.username,
-                action="UPDATE", entity="PRODUCT",
-                entity_id=product_id, details=changes,
-            ).create()
-    
-        for field, value in updates.items():
-            if field == "precios_sucursales": continue
-            setattr(product, field, value)
-        await product.save()
-        
-        if "precios_sucursales" in updates and updates["precios_sucursales"] is not None:
-            from pymongo import UpdateOne
-            precios = updates["precios_sucursales"]
-            ops = []
-            for suc_id, precio in precios.items():
-                if precio is not None and precio >= 0:
-                    ops.append(
-                        UpdateOne(
-                            {"tenant_id": product.tenant_id, "sucursal_id": suc_id, "producto_id": str(product.id)},
-                            {
-                                "$setOnInsert": {"cantidad": 0},
-                                "$set": {"precio_sucursal": precio},
-                                "$currentDate": {"updated_at": True}
-                            },
-                            upsert=True
-                        )
-                    )
-            if ops:
-                await Inventario.get_pymongo_collection().bulk_write(ops)
-            product.precios_sucursales = precios
-        else:
-            # Load them to return properly to admin
-            invs = await Inventario.find(Inventario.producto_id == str(product.id)).to_list()
-            product.precios_sucursales = {i.sucursal_id: i.precio_sucursal for i in invs if i.precio_sucursal is not None}
-            
-        return await _enrich(product)
-    
-    @staticmethod
-    async def deactivate_product(product_id: str, current_user: User):
-        if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Not authorized")
-        product = await Product.get(product_id)
-        if not product or (current_user.role != UserRole.SUPERADMIN and product.tenant_id != current_user.tenant_id):
-            raise HTTPException(status_code=404, detail="Product not found")
-        product.is_active = False
-        await product.save()
-        return {"message": "Product deactivated"}
-    
+class ExcelImportService:
     @staticmethod
     async def import_products(file_bytes: bytes, filename: str, current_user: User):
         if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
@@ -166,25 +24,20 @@ class ProductService:
         tenant_id = current_user.tenant_id or "default"
         
         try:
-            contents = file_bytes
-            df = pd.read_excel(io.BytesIO(contents))
+            df = pd.read_excel(io.BytesIO(file_bytes))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error al leer el archivo Excel: {str(e)}")
             
-        # Standardize columns
         df.columns = df.columns.astype(str).str.strip().str.lower()
         
-        # Required columns
         required_cols = {"codigo_corto", "nombre", "id_categoria"}
         if not required_cols.issubset(set(df.columns)):
             missing = required_cols - set(df.columns)
             raise HTTPException(status_code=400, detail=f"Faltan columnas obligatorias en el archivo: {missing}")
             
-        # Valid categories cache
         categories = await Category.find(Category.tenant_id == tenant_id, Category.is_active == True).to_list()
         valid_category_ids = {str(c.id) for c in categories}
         
-        # Existing products cache
         products = await Product.find(Product.tenant_id == tenant_id).to_list()
         existing_products_map = {p.codigo_corto: p for p in products if p.codigo_corto}
         
@@ -199,12 +52,13 @@ class ProductService:
         
         for index, row in df.iterrows():
             procesados += 1
-            fila_num = index + 2 # Header is row 1
+            fila_num = index + 2
             
             codigo_corto = str(row.get("codigo_corto", "")).strip()
             nombre = str(row.get("nombre", "")).strip()
+            proveedor = str(row.get("proveedor", "")).strip()
+            if proveedor == "nan": proveedor = ""
             
-            # Validar numérico
             try:
                 val = row.get("precio_base", 0)
                 if isinstance(val, str):
@@ -219,7 +73,6 @@ class ProductService:
                 
             id_categoria = str(row.get("id_categoria", "")).strip()
             
-            # Validaciones de existencia
             if not codigo_corto or str(codigo_corto) == "nan":
                 errores.append({"fila": fila_num, "motivo": "codigo_corto está vacío"})
                 fallidos += 1
@@ -233,33 +86,34 @@ class ProductService:
                 fallidos += 1
                 continue
                 
-            # Logica de Upsert
             if codigo_corto in existing_products_map:
-                # Update (Bulk update con PyMongo)
                 existing_product = existing_products_map[codigo_corto]
+                updates = {
+                    "descripcion": nombre,
+                    "precio_venta": precio_base,
+                    "categoria_id": id_categoria
+                }
+                if proveedor:
+                    updates["proveedor"] = proveedor
+                    
                 operaciones_actualizacion.append(
                     UpdateOne(
                         {"_id": existing_product.id},
-                        {"$set": {
-                            "descripcion": nombre,
-                            "precio_venta": precio_base,
-                            "categoria_id": id_categoria
-                        }}
+                        {"$set": updates}
                     )
                 )
                 actualizados += 1
             else:
-                # Insertar (Bulk insert con Beanie)
                 nuevo_prod = Product(
                     tenant_id=tenant_id,
                     codigo_corto=codigo_corto,
                     descripcion=nombre,
                     precio_venta=precio_base,
                     categoria_id=id_categoria,
-                    codigo_sistema=str(uuid.uuid4())[:8].upper()
+                    codigo_sistema=str(uuid.uuid4())[:8].upper(),
+                    proveedor=proveedor if proveedor else None
                 )
                 nuevos_productos.append(nuevo_prod)
-                # Prevenir duplicados en el mismo archivo
                 existing_products_map[codigo_corto] = nuevo_prod 
                 insertados += 1
     
@@ -267,7 +121,6 @@ class ProductService:
             await Product.insert_many(nuevos_productos)
             
         if operaciones_actualizacion:
-            # Intenta usar motor_collection
             collection = Product.get_pymongo_collection()
             await collection.bulk_write(operaciones_actualizacion)
             
@@ -283,12 +136,6 @@ class ProductService:
     
     @staticmethod
     async def importacion_global_excel(file_bytes: bytes, filename: str, current_user: User):
-        """
-        Súper Endpoint a Medida: Sube el Catálogo Maestro y el Inventario Físico de TODAS las sucursales a la vez.
-        Opcional: Crea categorías al vuelo que no existan.
-        Las columnas esperadas: CODIGO CORTO (o CODIGO_CORTO), DESCRIPCION, PRECIO PUBLICO, CATEGORIA.
-        Para el inventario físico, usar la cabecera "INV_..." (ej: INV_CENTRAL).
-        """
         if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
             raise HTTPException(status_code=403, detail="No autorizado para la importación global")
             
@@ -297,11 +144,8 @@ class ProductService:
             
         tenant_id = current_user.tenant_id or "default"
         
-        from bson import ObjectId
-        
         try:
-            contents = file_bytes
-            df = pd.read_excel(io.BytesIO(contents))
+            df = pd.read_excel(io.BytesIO(file_bytes))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error leyendo origen Excel: {str(e)}")
             
@@ -313,7 +157,6 @@ class ProductService:
             
         nombres_categorias_excel = df['CATEGORIA'].dropna().unique()
         
-        # 1. CATEGORÍAS
         categorias_db = await Category.find(Category.tenant_id == tenant_id).to_list()
         cat_map = {c.name.strip().upper(): c for c in categorias_db}
         
@@ -321,9 +164,8 @@ class ProductService:
         for cat_name in nombres_categorias_excel:
             cat_key = str(cat_name).strip().upper()
             if cat_key and cat_key not in cat_map:
-                new_cat_id = ObjectId()
                 nueva_cat = Category(
-                    id=new_cat_id,
+                    id=ObjectId(),
                     tenant_id=tenant_id, 
                     name=str(cat_name).strip().capitalize(), 
                     is_active=True
@@ -334,13 +176,12 @@ class ProductService:
         if categorias_a_insertar:
             await Category.insert_many(categorias_a_insertar)
             
-        # 2. SUCURSALES (Multi-stock)
         sucursales_db = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
         suc_map = {}
         for s in sucursales_db:
             clean_name = s.nombre.replace(" ", "").upper()
             suc_map[clean_name] = str(s.id)
-        suc_map["CENTRAL"] = "CENTRAL" # Fallback mapping
+        suc_map["CENTRAL"] = "CENTRAL"
         
         inv_columns = [col for col in df.columns if col.startswith("INV_") or col.startswith("INVENTARIO_")]
         col_to_sucursal_id = {}
@@ -361,7 +202,6 @@ class ProductService:
             if suc_name in suc_map:
                 col_to_precio_sucursal_id[col] = suc_map[suc_name]
                 
-        # 3. PROCESAR CATÁLOGO E INVENTARIO
         productos_db = await Product.find(Product.tenant_id == tenant_id).to_list()
         prod_map = {p.codigo_corto: p for p in productos_db if p.codigo_corto}
         
@@ -382,8 +222,6 @@ class ProductService:
         cat_procesados = 0
         inv_procesados = 0
         
-        from bson import ObjectId
-        
         def clean_codigo(val):
             s = str(val).strip()
             if s.endswith('.0'): s = s[:-2]
@@ -394,7 +232,6 @@ class ProductService:
             procesados += 1
             fila_num = index + 2
             
-            # CODIGO CORTO validation
             codigo_corto = clean_codigo(row.get("CODIGO_CORTO", row.get("CODIGOCORTO", "")))
             if not codigo_corto:
                  codigo_corto = clean_codigo(row.get("CODIGO", ""))
@@ -404,8 +241,9 @@ class ProductService:
                 continue
                 
             descripcion = str(row.get("DESCRIPCION", "")).strip()
+            proveedor = str(row.get("PROVEEDOR", "")).strip()
+            if proveedor == "nan": proveedor = ""
             
-            # Parse precios safely
             def safe_float(val):
                 try:
                     return float(val) if pd.notnull(val) else 0.0
@@ -424,18 +262,16 @@ class ProductService:
             
             product_id = ""
             
-            # -- CATÁLOGO UPSERT --
             if codigo_corto in prod_map:
-                # Producto existe: Se actualiza
                 p = prod_map[codigo_corto]
                 product_id = str(p.id)
-                # Evitar sobreescribir con valores nulos si no vienen en este excel
                 update_fields = {}
                 if descripcion: update_fields["descripcion"] = descripcion
                 if precio_publico > 0: update_fields["precio_venta"] = precio_publico
                 if costo_unitario > 0: update_fields["costo_producto"] = costo_unitario
                 if categoria_id: update_fields["categoria_id"] = categoria_id
                 if codigo_largo: update_fields["codigo_largo"] = codigo_largo
+                if proveedor: update_fields["proveedor"] = proveedor
                 
                 if update_fields:
                     operaciones_catalogo.append(
@@ -444,7 +280,6 @@ class ProductService:
                 cat_procesados += 1
                 
             else:
-                # Producto nuevo: Se inserta
                 nuevo_prod = Product(
                     tenant_id=tenant_id,
                     descripcion=descripcion or "S/N",
@@ -454,6 +289,7 @@ class ProductService:
                     codigo_corto=codigo_corto,
                     codigo_sistema=str(uuid.uuid4())[:8].upper(),
                     codigo_largo=codigo_largo if codigo_largo else None,
+                    proveedor=proveedor if proveedor else None,
                     is_active=True
                 )
                 product_id = str(nuevo_prod.id)
@@ -461,7 +297,6 @@ class ProductService:
                 prod_map[codigo_corto] = nuevo_prod
                 cat_procesados += 1
                 
-            # -- PRECIOS POR SUCURSAL (Sin alterar inventario físico, solo precio_sucursal) --
             for col in precio_cols:
                 if col in col_to_precio_sucursal_id:
                     suc_val = col_to_precio_sucursal_id[col]
@@ -494,7 +329,6 @@ class ProductService:
                                 )
                             )
                         
-            # -- INVENTARIO UPSERT --
             for col in inv_columns:
                 if col in col_to_sucursal_id:
                     suc_val = col_to_sucursal_id[col]
@@ -509,7 +343,6 @@ class ProductService:
                     if suc_val in inv_map and product_id in inv_map[suc_val]:
                         stock_anterior = inv_map[suc_val][product_id].cantidad
                         
-                    # Sólo ajustar si el excel marca una cantidad diferente al stock en bd
                     if cantidad_fisica != stock_anterior:
                         diff = cantidad_fisica - stock_anterior
                         
@@ -547,7 +380,6 @@ class ProductService:
                         ))
                         inv_procesados += 1
     
-        # EJECUTAR TODOS LOS BULK
         if productos_a_insertar:
             await Product.insert_many(productos_a_insertar)
             
@@ -584,18 +416,15 @@ class ProductService:
             
         tenant_id = current_user.tenant_id or "default"
         
-        # Validar sucursal
         sucursal = await Sucursal.get(sucursal_id)
         if not sucursal or (current_user.role != UserRole.SUPERADMIN and sucursal.tenant_id != tenant_id):
             raise HTTPException(status_code=400, detail="Sucursal no encontrada")
         
         try:
-            contents = file_bytes
-            df = pd.read_excel(io.BytesIO(contents))
+            df = pd.read_excel(io.BytesIO(file_bytes))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error al leer el archivo Excel: {str(e)}")
             
-        # Standardize columns
         df.columns = df.columns.astype(str).str.strip().str.upper()
         df.columns = df.columns.str.replace(' ', '_')
         
@@ -624,7 +453,7 @@ class ProductService:
                 
             nuevo_precio_val = row.get("NUEVO_PRECIO")
             if pd.isna(nuevo_precio_val) or str(nuevo_precio_val).strip() == "":
-                ignorados += 1 # Empty price ignored
+                ignorados += 1 
                 continue
                 
             try:
@@ -679,4 +508,3 @@ class ProductService:
             },
             "errores": errores
         }
-    

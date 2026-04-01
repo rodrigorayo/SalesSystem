@@ -5,11 +5,11 @@ from pymongo import UpdateOne
 import pandas as pd
 import io
 import math
-from app.models.inventario import Inventario
-from app.models.product import Product
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
-from app.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
+from app.domain.models.inventario import Inventario
+from app.domain.models.product import Product
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
+from app.domain.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
 
 router = APIRouter()
 
@@ -26,88 +26,84 @@ async def get_inventario(
 ):
     """
     Get inventory for a specific sucursal.
-    Resolves the fatal N+1 issue by using a MongoDB aggregation pipeline.
+    Starts from Product to leverage Text Indexes, then lookups Inventario.
     """
     tenant_id = current_user.tenant_id or ""
     skip = (page - 1) * limit
     
-    prod_coll = Product.get_collection_name()
-    
-    # 1. Match inventory entries and filter out visually invalid objectIds like "None"
-    match_stage = {
-        "tenant_id": tenant_id,
-        "sucursal_id": sucursal_id,
-        "producto_id": {"$regex": "^[a-fA-F0-9]{24}$"}
-    }
-    
-    pipeline = [
-        {"$match": match_stage},
-        # 2. Lookup the actual product
-        {
-            "$lookup": {
-                "from": prod_coll,
-                "let": {"pid": {"$toObjectId": "$producto_id"}},
-                "pipeline": [
-                    {"$match": {"$expr": {"$eq": ["$_id", "$$pid"]}}}
-                ],
-                "as": "product"
-            }
-        },
-        # Unwind so we only keep inventory entries that have a valid mapped product
-        {"$unwind": {"path": "$product", "preserveNullAndEmptyArrays": False}}
-    ]
-    
-    # 3. Apply optional text search and category filter on the newly joined product
-    product_match = {}
+    prod_match = {"tenant_id": tenant_id}
     if search and search.strip():
-        # Match using regex on product.descripcion or product.codigo_corto
-        regex = {"$regex": search.strip(), "$options": "i"}
-        product_match["$or"] = [
-            {"product.descripcion": regex},
-            {"product.codigo_corto": regex}
-        ]
-        
+        # Using $text native index search! Extremely fast.
+        prod_match["$text"] = {"$search": search.strip()}
     if categoria_id:
-        product_match["product.categoria_id"] = categoria_id
-        
-    if product_match:
-        pipeline.append({"$match": product_match})
-        
+        prod_match["categoria_id"] = categoria_id
+
+    pipeline = [{"$match": prod_match}]
+    
+    # Lookup the inventory for this specific branch
+    inv_coll = Inventario.get_collection_name()
+    pipeline.append({
+        "$lookup": {
+            "from": inv_coll,
+            "let": {"pid": {"$toString": "$_id"}},
+            "pipeline": [
+                {"$match": {
+                    "$expr": {"$eq": ["$producto_id", "$$pid"]},
+                    "sucursal_id": sucursal_id,
+                    "tenant_id": tenant_id
+                }}
+            ],
+            "as": "inventory"
+        }
+    })
+    
+    # Unwind inventory, keeping products even if they have 0 stock (no doc yet)
+    pipeline.append({"$unwind": {"path": "$inventory", "preserveNullAndEmptyArrays": True}})
+    
     if stock_bajo:
-        pipeline.append({"$match": {"cantidad": {"$lte": 5}}})
+        # If no inventory doc exists, assumed 0, so it matches lte 5.
+        pipeline.append({
+            "$match": {
+                "$or": [
+                    {"inventory.cantidad": {"$lte": 5}},
+                    {"inventory": {"$exists": False}}
+                ]
+            }
+        })
         
-    # 4. Facet to get both paginated data and the total count in a single roundtrip to DB
     pipeline.append({
         "$facet": {
             "metadata": [{"$count": "total"}],
             "data": [
+                {"$sort": {"score": {"$meta": "textScore"}} if search else {"_id": -1}},
                 {"$skip": skip},
                 {"$limit": limit}
             ]
         }
     })
-    motor_coll = Inventario.get_pymongo_collection()
+    
+    motor_coll = Product.get_pymongo_collection()
     cursor = motor_coll.aggregate(pipeline)
     raw_results = await cursor.to_list(length=1)
+    
     if not raw_results or not raw_results[0].get("metadata"):
         return InventarioPaginated(items=[], total=0, page=page, pages=1)
         
     total = raw_results[0]["metadata"][0]["total"]
     data = raw_results[0]["data"]
     
-    # 5. Map the raw aggregation dicts to InventarioItem Pydantic schema
     result = []
-    for entry in data:
-        product_doc = entry["product"]
+    for doc in data:
+        inv_doc = doc.get("inventory") or {}
         result.append(InventarioItem(
-            inventario_id=str(entry["_id"]),
-            producto_id=str(product_doc["_id"]),
-            producto_nombre=product_doc.get("descripcion", "Desconocido"),
-            precio=product_doc.get("precio_venta", 0.0),
-            precio_sucursal=entry.get("precio_sucursal"),
-            image_url=product_doc.get("image_url"),
-            sucursal_id=entry.get("sucursal_id", "CENTRAL"),
-            cantidad=entry.get("cantidad", 0),
+            inventario_id=str(inv_doc.get("_id", doc["_id"])), # Fallback id
+            producto_id=str(doc["_id"]),
+            producto_nombre=doc.get("descripcion", "Desconocido"),
+            precio=doc.get("precio_venta", 0.0),
+            precio_sucursal=inv_doc.get("precio_sucursal"),
+            image_url=doc.get("image_url"),
+            sucursal_id=sucursal_id,
+            cantidad=inv_doc.get("cantidad", 0),
         ))
         
     return InventarioPaginated(
@@ -116,6 +112,7 @@ async def get_inventario(
         page=page,
         pages=math.ceil(total / limit) if limit > 0 else 1
     )
+
 
 
 
@@ -151,7 +148,7 @@ async def ajustar_inventario(
     stock_anterior = entry.cantidad if entry else 0
     cantidad_cambio = 0
     
-    from app.models.inventario import TipoMovimiento, InventoryLog
+    from app.domain.models.inventario import TipoMovimiento, InventoryLog
 
     if ajuste.tipo == "ENTRADA":
         nuevo_stock = stock_anterior + ajuste.cantidad
@@ -214,7 +211,7 @@ async def get_movimientos(
     if producto_id:
         query["producto_id"] = producto_id
         
-    from app.models.inventario import InventoryLog
+    from app.domain.models.inventario import InventoryLog
     
     movimientos = await InventoryLog.find(query).sort("-created_at").limit(limit).to_list()
     
@@ -243,7 +240,7 @@ async def export_inventory_template(
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes exportar tu propia sucursal")
         
-    from app.models.sucursal import Sucursal
+    from app.domain.models.sucursal import Sucursal
     sucursal_db = await Sucursal.get(sucursal_id)
     suc_name = sucursal_db.nombre.replace(" ", "").upper() if sucursal_db else "CENTRAL"
         
@@ -281,7 +278,7 @@ async def import_inventory(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.inventario_service import InventarioService
+    from app.application.services.inventario_service import InventarioService
     contents = await file.read()
     return await InventarioService.importar_inventario(sucursal_id, contents, file.filename, current_user)
         
@@ -292,7 +289,7 @@ async def sincronizar_inventario_sucursal(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    from app.services.inventario_service import InventarioService
+    from app.application.services.inventario_service import InventarioService
     contents = await file.read()
     return await InventarioService.sincronizar_sucursal(sucursal_id, contents, file.filename, current_user)
 

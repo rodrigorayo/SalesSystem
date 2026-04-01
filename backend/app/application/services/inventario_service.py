@@ -4,10 +4,10 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from pymongo import UpdateOne
 
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.models.product import Product
-from app.models.user import User, UserRole
-from app.schemas.inventario import AjusteInventario
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
+from app.domain.models.product import Product
+from app.domain.models.user import User, UserRole
+from app.domain.schemas.inventario import AjusteInventario
 
 class InventarioService:
 
@@ -261,7 +261,7 @@ class InventarioService:
         df.columns = df.columns.astype(str).str.strip().str.upper()
         df.columns = df.columns.str.replace(' ', '_')
 
-        from app.models.sucursal import Sucursal
+        from app.domain.models.sucursal import Sucursal
         sucursal_db = None
         suc_name = "CENTRAL"
 

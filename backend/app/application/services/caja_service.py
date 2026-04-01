@@ -2,16 +2,16 @@ import logging
 from datetime import datetime
 from fastapi import HTTPException
 
-from app.models.caja import CajaSesion, CajaMovimiento, EstadoSesion, SubtipoMovimiento
-from app.models.user import User
-from app.schemas.caja import AbrirCajaIn, CerrarCajaIn
-from app.models.base import DecimalMoney
+from app.domain.models.caja import CajaSesion, CajaMovimiento, EstadoSesion, SubtipoMovimiento
+from app.domain.models.user import User
+from app.domain.schemas.caja import AbrirCajaIn, CerrarCajaIn
+from app.domain.models.base import DecimalMoney
 
 logger = logging.getLogger("CajaService")
 
 class CajaService:
     @staticmethod
-    async def abrir_caja(body: AbrirCajaIn, current_user: User) -> CajaSesion:
+    async def abrir_caja(body: AbrirCajaIn, current_user: User, ip: str = None, user_agent: str = None) -> CajaSesion:
         tenant_id   = current_user.tenant_id or "default"
         sucursal_id = current_user.sucursal_id or body.sucursal_id or "CENTRAL"
 
@@ -35,6 +35,8 @@ class CajaService:
                         cajero_name  = current_user.full_name or current_user.username,
                         monto_inicial= monto,
                         estado       = EstadoSesion.ABIERTA,
+                        ip_apertura  = ip,
+                        user_agent_apertura = user_agent,
                     )
                     await sesion.create(session=session)
 

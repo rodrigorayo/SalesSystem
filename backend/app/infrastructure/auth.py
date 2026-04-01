@@ -4,8 +4,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from app.models.user import User
-from app.core.config import settings
+from app.domain.models.user import User
+from app.infrastructure.core.config import settings
 
 # Configuration — override via environment variable in production
 SECRET_KEY = settings.JWT_SECRET_KEY

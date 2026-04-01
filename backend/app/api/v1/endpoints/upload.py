@@ -3,7 +3,7 @@ import shutil
 import os
 import uuid
 
-from app.core.config import settings
+from app.infrastructure.core.config import settings
 
 router = APIRouter()
 

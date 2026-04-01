@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Optional, Literal
 from datetime import datetime
 from bson import ObjectId
@@ -67,6 +67,4 @@ class DescuentoResponse(DescuentoBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(populate_by_name=True)

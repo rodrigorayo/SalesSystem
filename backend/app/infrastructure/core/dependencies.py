@@ -2,7 +2,7 @@
 Centralized FastAPI dependencies for authentication and role-based authorization.
 
 Usage:
-    from app.core.dependencies import require_roles, get_tenant_id
+    from app.infrastructure.core.dependencies import require_roles, get_tenant_id
 
     # In an endpoint:
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.SUPERADMIN))
@@ -10,8 +10,8 @@ Usage:
 
 from typing import Callable
 from fastapi import Depends, HTTPException, status
-from app.auth import get_current_active_user
-from app.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
+from app.domain.models.user import User, UserRole
 
 
 def require_roles(*roles: UserRole) -> Callable:

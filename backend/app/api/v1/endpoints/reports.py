@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional
-from app.auth import get_current_active_user
-from app.models.user import User, UserRole
-from app.models.sale_item import SaleItem
-from app.models.sucursal import Sucursal
-from app.models.sale import Sale
-from app.models.caja import CajaMovimiento, SubtipoMovimiento
+from app.infrastructure.auth import get_current_active_user
+from app.domain.models.user import User, UserRole
+from app.domain.models.sale_item import SaleItem
+from app.domain.models.sucursal import Sucursal
+from app.domain.models.sale import Sale
+from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento
 from datetime import datetime, timedelta, time
 
 router = APIRouter()

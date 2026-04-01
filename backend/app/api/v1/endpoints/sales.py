@@ -2,22 +2,22 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.models.sale import Sale, ClienteInfo, PagoItem, SaleItem
-from app.models.sale_item import SaleItem as SaleItemAnalytics
-from app.models.product import Product
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
+from app.domain.models.sale import Sale, ClienteInfo, PagoItem, SaleItem
+from app.domain.models.sale_item import SaleItem as SaleItemAnalytics
+from app.domain.models.product import Product
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
+from app.domain.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
 from pymongo import ReturnDocument
 
 router = APIRouter()
 
 
-from app.schemas.sale import SaleCreate, SalesPaginated
-from app.services.sales_service import SalesService
+from app.domain.schemas.sale import SaleCreate, SalesPaginated
+from app.application.services.sales_service import SalesService
 
-from app.services.sales_service import SalesService
+from app.application.services.sales_service import SalesService
 
 @router.post("/ventas", response_model=Sale)
 @router.post("/sales", response_model=Sale)
@@ -180,7 +180,7 @@ async def update_qr_info(
         raise HTTPException(status_code=403, detail="Solo puedes confirmar pagos de tu propia sucursal")
         
     if not sale.qr_info:
-        from app.models.sale import QRInfo
+        from app.domain.models.sale import QRInfo
         sale.qr_info = QRInfo()
         
     sale.qr_info.banco = qr_data.banco
@@ -194,8 +194,8 @@ async def update_qr_info(
     
     return sale
 
-from app.schemas.sale import AbonoCreate
-from app.models.sale import EstadoPago
+from app.domain.schemas.sale import AbonoCreate
+from app.domain.models.sale import EstadoPago
 
 @router.post("/sales/{sale_id}/abono", response_model=Sale)
 async def registrar_abono(sale_id: str, abono: AbonoCreate, current_user: User = Depends(get_current_active_user)):

@@ -1,9 +1,9 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.models.category import Category
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
+from app.domain.models.category import Category
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 
