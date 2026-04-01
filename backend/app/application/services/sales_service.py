@@ -272,7 +272,9 @@ class SalesService:
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
-                    sale = await Sale.find_one(Sale.id == sale_id, session=session)
+                    # Beanie requires ObjectId type for equality comparison.
+                    # Using Sale.get() handles the str→ObjectId conversion automatically.
+                    sale = await Sale.get(sale_id, session=session)
                     if not sale or sale.tenant_id != tenant_id:
                         raise HTTPException(status_code=404, detail="Venta no encontrada")
                         
