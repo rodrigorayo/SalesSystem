@@ -241,34 +241,47 @@ async def export_inventory_template(
         raise HTTPException(status_code=403, detail="Solo puedes exportar tu propia sucursal")
         
     from app.domain.models.sucursal import Sucursal
-    sucursal_db = await Sucursal.get(sucursal_id)
-    suc_name = sucursal_db.nombre.replace(" ", "").upper() if sucursal_db else "CENTRAL"
-        
+    from app.domain.models.category import Category
+
+    # "CENTRAL" is a logical name, not a real ObjectId — handle gracefully
+    suc_name = "CENTRAL"
+    if sucursal_id and sucursal_id != "CENTRAL":
+        try:
+            sucursal_db = await Sucursal.get(sucursal_id)
+            if sucursal_db:
+                suc_name = sucursal_db.nombre.replace(" ", "").upper()
+        except Exception:
+            pass  # Invalid ObjectId or not found — fall back to "CENTRAL"
+
     products = await Product.find(Product.tenant_id == tenant_id, Product.is_active == True).to_list()
-    
+
+    # Build category map once (DRY) to resolve IDs → names without N+1 queries
+    categories = await Category.find(Category.tenant_id == tenant_id).to_list()
+    cat_name_map: dict = {str(c.id): c.name for c in categories}
+
     data = []
     for p in products:
         data.append({
-            "CODIGO": p.codigo_largo or "",
-            "CODIGO CORTO": p.codigo_corto,
-            "DESCRIPCION": p.descripcion,
-            "CATEGORIA": p.categoria_id, # Can be enriched if needed
-            "PROVEEDOR": getattr(p, "proveedor", "") or "",
-            f"INVENTARIO FISICO {suc_name}": "" # Leaves it empty for them to fill
+            "CODIGO":        p.codigo_largo or "",
+            "CODIGO CORTO":  p.codigo_corto or "",
+            "DESCRIPCION":   p.descripcion,
+            "CATEGORIA":     cat_name_map.get(p.categoria_id, p.categoria_id),  # name, not raw ID
+            "PROVEEDOR":     getattr(p, "proveedor", "") or "",
+            f"INVENTARIO FISICO {suc_name}": ""  # User fills this in
         })
-        
+
     df = pd.DataFrame(data)
-    
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='Conteo Fisico', index=False)
-            
+
     output.seek(0)
-    
+
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=plantilla_inventario_{sucursal_id}.xlsx"}
+        headers={"Content-Disposition": f"attachment; filename=plantilla_inventario_{suc_name}.xlsx"}
     )
 
 
