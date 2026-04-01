@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional
+from decimal import Decimal
 from app.infrastructure.auth import get_current_active_user
 from app.domain.models.user import User, UserRole
 from app.domain.models.sale_item import SaleItem
@@ -7,6 +8,8 @@ from app.domain.models.sucursal import Sucursal
 from app.domain.models.sale import Sale
 from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento
 from datetime import datetime, timedelta, time
+
+_ZERO = Decimal("0")  # Constante DRY para el valor cero monetario
 
 router = APIRouter()
 
@@ -216,11 +219,13 @@ async def get_daily_report(
         Sale.created_at <= end_dt
     ).to_list()
 
-    ventas_por_metodo = {"EFECTIVO": 0.0, "QR": 0.0, "TARJETA": 0.0, "TRANSFERENCIA": 0.0}
-    total_ventas = 0.0
-    total_descuentos = 0.0
-    anuladas_count = 0
-    anuladas_monto = 0.0
+    ventas_por_metodo: Dict[str, Decimal] = {
+        "EFECTIVO": _ZERO, "QR": _ZERO, "TARJETA": _ZERO, "TRANSFERENCIA": _ZERO
+    }
+    total_ventas    = _ZERO
+    total_descuentos = _ZERO
+    anuladas_count  = 0
+    anuladas_monto  = _ZERO
     
     for s in sales:
         if s.anulada:
@@ -234,10 +239,7 @@ async def get_daily_report(
             
         for p in s.pagos:
             metodo = p.metodo.upper()
-            if metodo in ventas_por_metodo:
-                ventas_por_metodo[metodo] += p.monto
-            else:
-                ventas_por_metodo[metodo] = ventas_por_metodo.get(metodo, 0) + p.monto
+            ventas_por_metodo[metodo] = ventas_por_metodo.get(metodo, _ZERO) + p.monto
 
     # 2. Expenses (Gastos) from CajaMovimiento
     movimientos = await CajaMovimiento.find(
@@ -247,7 +249,7 @@ async def get_daily_report(
         CajaMovimiento.fecha <= end_dt
     ).to_list()
 
-    total_gastos = 0.0
+    total_gastos = _ZERO
     gastos_list = []
     
     for m in movimientos:
@@ -255,7 +257,7 @@ async def get_daily_report(
             total_gastos += m.monto
             gastos_list.append({
                 "descripcion": m.descripcion,
-                "monto": m.monto,
+                "monto": float(m.monto),
                 "cajero": m.cajero_name,
                 "hora": m.fecha.strftime("%H:%M")
             })
@@ -286,20 +288,20 @@ async def get_daily_report(
         "fecha": date,
         "sucursal_id": target_sucursal,
         "resumen_ventas": {
-            "total_bruto": total_ventas,
-            "total_descuentos": total_descuentos,
-            "por_metodo": ventas_por_metodo,
+            "total_bruto":      float(total_ventas),
+            "total_descuentos": float(total_descuentos),
+            "por_metodo":       {k: float(v) for k, v in ventas_por_metodo.items()},
             "anuladas": {
                 "cantidad": anuladas_count,
-                "monto": anuladas_monto
+                "monto":    float(anuladas_monto)
             }
         },
         "gastos": {
-            "total": total_gastos,
+            "total":   float(total_gastos),
             "detalle": gastos_list
         },
         "items_vendidos": items_list,
-        "balance_neto": (ventas_por_metodo["EFECTIVO"] - total_gastos) # Balance de caja física solo efectivo
+        "balance_neto": float(ventas_por_metodo.get("EFECTIVO", _ZERO) - total_gastos)
     }
 
 @router.get("/financial-report")
