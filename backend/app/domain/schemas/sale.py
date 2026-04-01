@@ -7,6 +7,7 @@ of schemas vs endpoint logic.
 
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
+from decimal import Decimal
 
 
 class SaleItemIn(BaseModel):
