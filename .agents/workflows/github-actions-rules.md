@@ -28,3 +28,9 @@ Revisar que `.env*`, `.pytest_cache/`, `.vercel/`, `__pycache__/` estén listado
 Puedes ejecutar estas comprobaciones pidiendo o auto-verificando:
 1. `pytest tests/` (Verificar tests exitosos)
 2. `python -c "from app.main import app; print('App syntax OK')"` (Verificar compilación e integridad de ruteadores)
+
+## 4. Control Estricto de Dependencias Acopladas (Pip)
+**LA REGLA ABSOLUTA:** Cualquier librería nueva que se instale en local (`pip install libreria_equis`) **DEBE SER ANOTADA INMEDIATAMENTE** en `backend/requirements.txt` (y `frontend/package.json` en JS).
+Si esta regla se rompe ocurrirán 2 Desastres Críticos:
+1. El CI/CD de GitHub fallará en las pruebas (Ej. `ModuleNotFoundError`) trancando subidas.
+2. (Lo más grave): El servidor de **Producción (Render/Vercel/DigitalOcean)** **explotará y se caerá (Downtime)** en el reinicio del Build porque no tendrá instruido descargar el paquete vital para encender la App.
