@@ -3,6 +3,9 @@ Pydantic schemas for the Inventario domain.
 Extracted from inventario.py endpoint.
 """
 
+from typing import Optional
+from pydantic import BaseModel
+
 from app.models.base import DecimalMoney
 
 
