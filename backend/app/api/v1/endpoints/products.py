@@ -138,16 +138,23 @@ async def export_product_template(
         
     df_products = pd.DataFrame(columns=headers)
     
-    cat_data = [{"ID Categoría": str(c.id), "Nombre": c.name} for c in categories]
+    # Guide sheet: show only the name — the import service resolves name→ID internally.
+    # Never expose raw MongoDB ObjectIds to the end user.
+    cat_data = [
+        {
+            "✅ Escribe este nombre exacto en la columna CATEGORIA": c.name
+        }
+        for c in categories
+    ]
     df_categories = pd.DataFrame(cat_data)
-    
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_products.to_excel(writer, sheet_name='Catálogo', index=False)
         if not df_categories.empty:
             df_categories.to_excel(writer, sheet_name='Categorias (Guia)', index=False)
         else:
-            pd.DataFrame([{"Mensaje": "No tienes categorías creadas"}]).to_excel(writer, sheet_name='Categorias (Guia)', index=False)
+            pd.DataFrame([{"Mensaje": "No tienes categorías creadas aún. Créalas primero desde el sistema."}]).to_excel(writer, sheet_name='Categorias (Guia)', index=False)
             
     output.seek(0)
     
