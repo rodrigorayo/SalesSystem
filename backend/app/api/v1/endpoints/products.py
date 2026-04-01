@@ -129,7 +129,7 @@ async def export_product_template(
     sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
     
     # Construir cabeceras maestras
-    headers = ["CODIGO", "CODIGO CORTO", "DESCRIPCION", "COSTO UNITARIO", "CATEGORIA"]
+    headers = ["CODIGO", "CODIGO CORTO", "DESCRIPCION", "COSTO UNITARIO", "CATEGORIA", "PROVEEDOR"]
     
     # Agregar cabecera de precio por cada sucursal
     for s in sucursales:
