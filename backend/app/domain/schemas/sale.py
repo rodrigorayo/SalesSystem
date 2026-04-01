@@ -9,6 +9,8 @@ from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 
+from app.domain.models.sale import DescuentoInfo
+
 
 class SaleItemIn(BaseModel):
     """A single item line in a sale request."""
@@ -43,7 +45,7 @@ class SaleCreate(BaseModel):
     sucursal_id: Optional[str] = None
     items: List[SaleItemIn]
     pagos: List[PagoIn] = []
-    descuento: Optional[dict] = None   # DescuentoInfo from models/sale.py
+    descuento: Optional[DescuentoInfo] = None
     cliente_id: Optional[str] = None
     cliente: Optional[ClienteIn] = None
 
