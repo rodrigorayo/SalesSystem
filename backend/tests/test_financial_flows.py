@@ -11,8 +11,9 @@ from app.domain.models.user import User
 
 @pytest_asyncio.fixture
 async def authenticated_test_user() -> User:
-    # Retorna un usuario mockeado o real de prueba
-    return User(
+    # Evitamos la restricción que nos exige tener un Motor Asyncio/MongoDB inicializado 
+    # utilizando el constructor en memoria .model_construct de Pydantic V2 para mocks limpios.
+    return User.model_construct(
         id=ObjectId("507f191e810c19729de860ea"),
         username="cajero_tester",
         email="test@ventas.com",
