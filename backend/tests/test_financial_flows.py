@@ -2,6 +2,7 @@ import pytest
 import pytest_asyncio
 from decimal import Decimal
 from typing import AsyncGenerator
+from bson import ObjectId
 
 from app.application.services.sales_service import SalesService
 from app.domain.models.base import DecimalMoney
@@ -12,12 +13,13 @@ from app.domain.models.user import User
 async def authenticated_test_user() -> User:
     # Retorna un usuario mockeado o real de prueba
     return User(
-        id="mock_id_123",
+        id=ObjectId("507f191e810c19729de860ea"),
         username="cajero_tester",
         email="test@ventas.com",
         tenant_id="tenant_001",
         sucursal_id="sucursal_001",
-        role="CAJERO"
+        role="CAJERO",
+        hashed_password="hashed_str_mocked"
     )
 
 @pytest.mark.asyncio
