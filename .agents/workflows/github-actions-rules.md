@@ -19,13 +19,19 @@ Comando de verificación local recomendada:
 pytest tests/ -v
 ```
 
-## 3. Ignorar Cache Locales (Gitignore)
-Bajo ninguna circunstancia subir configuraciones locales. 
-Revisar que `.env*`, `.pytest_cache/`, `.vercel/`, `__pycache__/` estén listados en el `.gitignore`.
+## 3. Ignorar Cache Locales (Gitignore) 
+Bajo ninguna circunstancia subir archivos de cache, entornos virtuales o configuraciones privadas. 
+**LA REGLA DE ORO:** Lo que se genera automáticamente por tu computadora NO va al repositorio. Solo el código fuente escrito por humanos (o el Agente) tiene permitido entrar.
+Revisar que `.env*`, `.pytest_cache/`, `.vercel/`, `__pycache__/`, `.venv/` estén listados en el `.gitignore`.
 
 // turbo
-## Paso de Revisión Previa (Workflow Manual)
-Puedes ejecutar estas comprobaciones pidiendo o auto-verificando:
+## Paso de Revisión Previa (Pre-Push)
+Antes de un commit, si ves archivos de cache marcados para subir, bórralos del índice con:
+```bash
+git rm -r --cached .pytest_cache/
+git rm -r --cached __pycache__/
+```
+
 1. `pytest tests/` (Verificar tests exitosos)
 2. `python -c "from app.main import app; print('App syntax OK')"` (Verificar compilación e integridad de ruteadores)
 
