@@ -1,5 +1,6 @@
 from app.infrastructure.db import get_client
 import logging
+from app.utils.errors import CajaErrors, handle_service_error
 from datetime import datetime
 from fastapi import HTTPException
 
@@ -22,7 +23,7 @@ class CajaService:
             CajaSesion.estado      == EstadoSesion.ABIERTA,
         )
         if sesion_existente:
-            raise HTTPException(status_code=400, detail="Ya existe una sesión de caja abierta para esta sucursal.")
+            raise HTTPException(status_code=400, detail=CajaErrors.SESION_YA_ABIERTA)
 
         client = get_client()
         try:
@@ -57,17 +58,16 @@ class CajaService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"[CajaService.abrir_caja] Error: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Error transaccional: {str(e)}")
+            raise handle_service_error(e, "al abrir la caja")
 
     @staticmethod
     async def cerrar_caja(sesion_id: str, body: CerrarCajaIn, current_user: User) -> CajaSesion:
         tenant_id = current_user.tenant_id or "default"
         sesion = await CajaSesion.get(sesion_id)
         if not sesion or sesion.tenant_id != tenant_id:
-            raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+            raise HTTPException(status_code=404, detail=CajaErrors.SESION_NO_ENCONTRADA)
         if sesion.estado == EstadoSesion.CERRADA:
-            raise HTTPException(status_code=400, detail="La sesión ya está cerrada.")
+            raise HTTPException(status_code=400, detail=CajaErrors.SESION_YA_CERRADA)
 
         sesion.estado                = EstadoSesion.CERRADA
         sesion.cerrada_at            = datetime.utcnow()

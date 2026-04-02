@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
@@ -22,10 +22,28 @@ import ReportsPage from './pages/ReportsPage';
 import CreditosPage from './pages/CreditosPage';
 import { useAuthStore } from './store/authStore';
 import { Toaster } from 'sonner';
+import { ErrorModalProvider, useErrorModal } from './components/ErrorModal';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
+
+/**
+ * Bridges the imperative window CustomEvent from client.ts
+ * into the React ErrorModal context — keeping concerns separated.
+ */
+function ErrorEventBridge() {
+  const { showError } = useErrorModal();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { message, statusCode, retryFn } = (e as CustomEvent).detail;
+      showError(message, { statusCode, retryFn });
+    };
+    window.addEventListener('api:critical-error', handler);
+    return () => window.removeEventListener('api:critical-error', handler);
+  }, [showError]);
+  return null;
+}
 
 // ─── Route Guard ─────────────────────────────────────────────────────────────
 const ProtectedRoute = ({
@@ -68,7 +86,9 @@ const ALL_STAFF = ['ADMIN_MATRIZ', 'ADMIN_SUCURSAL', 'CAJERO', 'ADMIN', 'USER', 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" richColors theme="light" />
+      <ErrorModalProvider>
+        <ErrorEventBridge />
+        <Toaster position="top-right" richColors theme="light" />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -197,6 +217,7 @@ function App() {
           } />
         </Routes>
       </BrowserRouter>
+      </ErrorModalProvider>
     </QueryClientProvider>
   );
 }

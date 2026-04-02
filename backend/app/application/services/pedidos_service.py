@@ -10,7 +10,8 @@ from app.domain.models.pedido_item import PedidoItemDocument
 from app.domain.models.inventario import Inventario, TipoMovimiento, InventoryLog
 from app.domain.models.product import Product
 from app.domain.models.user import User, UserRole
-from app.domain.schemas.pedidos import PedidoCreate, PedidoRecepcion, PedidoRecepcionItem  # Pydantic schemas needed
+from app.domain.schemas.pedidos import PedidoCreate, PedidoRecepcion, PedidoRecepcionItem
+from app.utils.errors import PedidosErrors, handle_service_error
 
 logger = logging.getLogger("PedidosService")
 
@@ -37,7 +38,7 @@ class PedidosService:
                     for item in data.items:
                         product = await Product.get(item.producto_id, session=session)
                         if not product or product.tenant_id != tenant_id:
-                            raise HTTPException(status_code=404, detail=f"Product {item.producto_id} not found")
+                            raise HTTPException(status_code=404, detail=PedidosErrors.producto_no_encontrado(item.producto_id))
                             
                         if data.sucursal_origen_id != "CENTRAL":
                             inv = await Inventario.find_one(
@@ -49,8 +50,8 @@ class PedidosService:
                             stock_disp = inv.cantidad if inv else 0
                             if stock_disp < item.cantidad:
                                 raise HTTPException(
-                                    status_code=400, 
-                                    detail=f"Inventario insuficiente para '{product.descripcion}'. Solicitado: {item.cantidad}, Disponible en origen: {stock_disp}"
+                                    status_code=400,
+                                    detail=PedidosErrors.stock_insuficiente_origen(product.descripcion, item.cantidad, stock_disp)
                                 )
                         
                         costo = product.costo_producto

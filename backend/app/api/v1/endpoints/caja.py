@@ -25,6 +25,7 @@ router = APIRouter()
 
 
 from app.domain.schemas.caja import AbrirCajaIn, CerrarCajaIn, GastoIn, IngresoIn, CategoriaGastoIn, ResumenCaja
+from app.utils.errors import CajaErrors
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ async def registrar_gasto(body: GastoIn, current_user: User = Depends(get_curren
 
     sesion = await _get_active_session(tenant_id, sucursal_id)
     if not sesion:
-        raise HTTPException(status_code=400, detail="No hay una sesión de caja abierta. Abrí la caja primero.")
+        raise HTTPException(status_code=400, detail=CajaErrors.SIN_SESION_ACTIVA)
 
     mov = CajaMovimiento(
         tenant_id   = tenant_id,

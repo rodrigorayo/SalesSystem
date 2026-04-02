@@ -17,6 +17,7 @@ from app.domain.models.user import User, UserRole
 from app.domain.schemas.sale import SaleCreate
 from app.utils.pricing import resolver_precio
 from app.domain.models.base import DecimalMoney
+from app.utils.errors import VentasErrors, handle_service_error
 
 logger = logging.getLogger("SalesService")
 
@@ -261,8 +262,7 @@ class SalesService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"[SalesService.create_sale] Transaction aborted: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Error transaccional al procesar la venta: {str(e)}")
+            raise handle_service_error(e, "al procesar la venta")
 
     @staticmethod
     async def anular_sale(sale_id: str, current_user: User) -> Sale:
@@ -276,10 +276,10 @@ class SalesService:
                     # Using Sale.get() handles the str→ObjectId conversion automatically.
                     sale = await Sale.get(sale_id, session=session)
                     if not sale or sale.tenant_id != tenant_id:
-                        raise HTTPException(status_code=404, detail="Venta no encontrada")
-                        
+                        raise HTTPException(status_code=404, detail=VentasErrors.VENTA_NO_ENCONTRADA)
+
                     if sale.anulada:
-                        raise HTTPException(status_code=400, detail="La venta ya está anulada")
+                        raise HTTPException(status_code=400, detail=VentasErrors.VENTA_YA_ANULADA)
 
                     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO]:
                         if sale.sucursal_id != current_user.sucursal_id:

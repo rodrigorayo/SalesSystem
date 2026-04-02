@@ -9,13 +9,14 @@ from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimient
 from app.domain.models.product import Product
 from app.domain.models.user import User, UserRole
 from app.domain.schemas.inventario import AjusteInventario
+from app.utils.errors import InventarioErrors, handle_service_error
 
 class InventarioService:
 
     @staticmethod
     async def ajustar_inventario(ajuste: AjusteInventario, sucursal_id: str, current_user: User) -> Dict[str, Any]:
         if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Not authorized")
+            raise HTTPException(status_code=403, detail=InventarioErrors.SIN_PERMISO)
 
         if ajuste.cantidad < 0:
             raise HTTPException(status_code=400, detail="La cantidad del ajuste debe ser un valor absoluto (positivo o cero).")
@@ -24,7 +25,7 @@ class InventarioService:
 
         product = await Product.get(ajuste.producto_id)
         if not product or (current_user.role != UserRole.SUPERADMIN and product.tenant_id != tenant_id):
-            raise HTTPException(status_code=404, detail="Product not found")
+            raise HTTPException(status_code=404, detail=InventarioErrors.PRODUCTO_NO_ENCONTRADO)
 
         client = get_client()
         
@@ -53,7 +54,7 @@ class InventarioService:
                     cantidad_cambio = nuevo_stock - stock_anterior
                     tipo_mov = TipoMovimiento.AJUSTE_FISICO
                 else:
-                    raise HTTPException(status_code=400, detail="Tipo de ajuste inválido (ENTRADA, SALIDA, AJUSTE)")
+                    raise HTTPException(status_code=400, detail=InventarioErrors.TIPO_INVALIDO)
 
                 if entry:
                     entry.cantidad = nuevo_stock
@@ -243,14 +244,14 @@ class InventarioService:
     @staticmethod
     async def sincronizar_sucursal(sucursal_id_req: Optional[str], file_bytes: bytes, filename: str, current_user: User) -> Dict[str, Any]:
         if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="No autorizado")
+            raise HTTPException(status_code=403, detail=InventarioErrors.SIN_PERMISO)
 
         sucursal_id_user = current_user.sucursal_id
         if current_user.role in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
              sucursal_id_user = sucursal_id_req or "CENTRAL"
              
         if not sucursal_id_user:
-            raise HTTPException(status_code=400, detail="El usuario no tiene una sucursal asignada")
+            raise HTTPException(status_code=400, detail=InventarioErrors.SIN_SUCURSAL)
 
         tenant_id = current_user.tenant_id or "default"
 
