@@ -7,9 +7,50 @@ Principios:
   - El backend nunca expone stacktraces ni jerga técnica al usuario final
 """
 from fastapi import HTTPException
+import asyncio
 import logging
+from typing import Callable, Awaitable, TypeVar
 
 logger = logging.getLogger("ErrorUtils")
+
+T = TypeVar("T")
+
+_MAX_RETRIES = 3          # intentos totales (1 original + 2 reintentos)
+_RETRY_DELAY = 0.3        # segundos entre reintentos
+
+
+async def retry_on_write_conflict(fn: Callable[[], Awaitable[T]]) -> T:
+    """
+    Ejecuta la corutina `fn` y la reintenta automáticamente si MongoDB
+    lanza WriteConflict (TransientTransactionError).
+
+    Uso:
+        result = await retry_on_write_conflict(lambda: SalesService._run_transaction(...))
+
+    - Hasta 3 intentos totales con pausa progresiva.
+    - Si todos fallan, relanza la excepción original.
+    - Los HTTPException de negocio (400, 403, 404) nunca se reintentan.
+    """
+    last_exc: Exception = RuntimeError("No intentos ejecutados")
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return await fn()
+        except HTTPException:
+            raise  # Errores de negocio: no reintentar
+        except Exception as exc:
+            if is_transient_error(exc):
+                last_exc = exc
+                if attempt < _MAX_RETRIES:
+                    logger.warning(
+                        f"WriteConflict (intento {attempt}/{_MAX_RETRIES}). "
+                        f"Reintentando en {_RETRY_DELAY * attempt:.1f}s..."
+                    )
+                    await asyncio.sleep(_RETRY_DELAY * attempt)
+                    continue
+            raise  # No es transitorio: propagar inmediatamente
+    raise handle_service_error(last_exc, "reintento agotado")
+
+
 
 
 # ─── Detección de errores transitorios de MongoDB ────────────────────────────

@@ -3,6 +3,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 from fastapi import HTTPException
+from bson import ObjectId
 from pymongo import ReturnDocument
 
 from app.domain.models.pedido_interno import PedidoInterno, PedidoItem, EstadoPedido
@@ -11,7 +12,7 @@ from app.domain.models.inventario import Inventario, TipoMovimiento, InventoryLo
 from app.domain.models.product import Product
 from app.domain.models.user import User, UserRole
 from app.domain.schemas.pedidos import PedidoCreate, PedidoRecepcion, PedidoRecepcionItem
-from app.utils.errors import PedidosErrors, handle_service_error
+from app.utils.errors import PedidosErrors, handle_service_error, retry_on_write_conflict
 
 logger = logging.getLogger("PedidosService")
 
@@ -203,20 +204,30 @@ class PedidosService:
         tenant_id = current_user.tenant_id or ""
 
         client = get_client()
-        try:
+
+        async def _run_despacho() -> PedidoInterno:
             async with await client.start_session() as session:
                 async with session.start_transaction():
-                    pedido = await PedidoInterno.find_one(PedidoInterno.id == pedido_id, session=session)
+                    # ✔ Usar .get() para conversión automática str → ObjectId
+                    pedido = await PedidoInterno.get(pedido_id, session=session)
                     if not pedido or pedido.tenant_id != tenant_id:
-                        raise HTTPException(status_code=404, detail="Order not found")
-                        
+                        raise HTTPException(status_code=404, detail=PedidosErrors.PEDIDO_NO_ENCONTRADO)
+
                     if not is_matrix_admin:
-                        if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR] or pedido.sucursal_origen_id != current_user.sucursal_id:
-                            raise HTTPException(status_code=403, detail="No tienes permiso para despachar de esta sucursal origen")
+                        if (
+                            current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR]
+                            or pedido.sucursal_origen_id != current_user.sucursal_id
+                        ):
+                            raise HTTPException(status_code=403, detail=PedidosErrors.SIN_PERMISO_DESPACHAR)
+
                     if pedido.estado not in [EstadoPedido.CREADO, EstadoPedido.ACEPTADO]:
-                        raise HTTPException(status_code=400, detail=f"El pedido debe estar CREADO o ACEPTADO para ser despachado. Actual: {pedido.estado}")
+                        raise HTTPException(
+                            status_code=400,
+                            detail=PedidosErrors.estado_invalido_para("despachar", pedido.estado)
+                        )
 
                     if pedido.sucursal_origen_id != "CENTRAL":
+                        # Verificar stock antes de descontar
                         for item in pedido.items:
                             inv = await Inventario.find_one(
                                 Inventario.tenant_id == tenant_id,
@@ -227,13 +238,19 @@ class PedidosService:
                             stock_disp = inv.cantidad if inv else 0
                             if stock_disp < item.cantidad:
                                 raise HTTPException(
-                                    status_code=400, 
-                                    detail=f"Inventario insuficiente al intentar despachar '{item.descripcion}'. Requerido: {item.cantidad}, Disponible: {stock_disp}"
+                                    status_code=400,
+                                    detail=PedidosErrors.stock_insuficiente_origen(
+                                        item.descripcion, item.cantidad, stock_disp
+                                    )
                                 )
 
                         for item in pedido.items:
                             inv_origen = await Inventario.get_pymongo_collection().find_one_and_update(
-                                {"tenant_id": tenant_id, "sucursal_id": pedido.sucursal_origen_id, "producto_id": item.producto_id},
+                                {
+                                    "tenant_id": tenant_id,
+                                    "sucursal_id": pedido.sucursal_origen_id,
+                                    "producto_id": item.producto_id
+                                },
                                 {"$inc": {"cantidad": -item.cantidad}},
                                 return_document=ReturnDocument.AFTER,
                                 session=session.client_session if hasattr(session, "client_session") else session
@@ -251,20 +268,22 @@ class PedidosService:
                                     usuario_nombre=current_user.username,
                                     notas=f"Despacho Interno hacia {pedido.sucursal_destino_id}"
                                 ).create(session=session)
-                            
-                    total = sum(item.cantidad * item.precio_mayorista for item in pedido.items)
 
+                    total = sum(item.cantidad * item.precio_mayorista for item in pedido.items)
                     pedido.estado = EstadoPedido.DESPACHADO
                     pedido.despachado_at = datetime.utcnow()
                     pedido.despachado_por = str(current_user.id)
                     pedido.total_mayorista = total
                     await pedido.save(session=session)
                     return pedido
+
+        try:
+            return await retry_on_write_conflict(_run_despacho)
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"[PedidosService] Error truncating despachar: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to dispatch due to transactional error: {e}")
+            raise handle_service_error(e, "al despachar el pedido")
+
 
 
     @staticmethod
@@ -275,15 +294,19 @@ class PedidosService:
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
-                    pedido = await PedidoInterno.find_one(PedidoInterno.id == pedido_id, session=session)
+                    # ✔ .get() maneja la conversión str → ObjectId automáticamente
+                    pedido = await PedidoInterno.get(pedido_id, session=session)
                     if not pedido or pedido.tenant_id != tenant_id:
-                        raise HTTPException(status_code=404, detail="Order not found")
-                        
+                        raise HTTPException(status_code=404, detail=PedidosErrors.PEDIDO_NO_ENCONTRADO)
+
                     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and pedido.sucursal_destino_id != current_user.sucursal_id:
-                        raise HTTPException(status_code=403, detail="Not authorized to receive this order")
+                        raise HTTPException(status_code=403, detail=PedidosErrors.SIN_PERMISO_RECIBIR)
 
                     if pedido.estado != EstadoPedido.DESPACHADO:
-                        raise HTTPException(status_code=400, detail="Order must be DESPACHADO before receiving")
+                        raise HTTPException(
+                            status_code=400,
+                            detail=PedidosErrors.estado_invalido_para("recibir", pedido.estado)
+                        )
 
                     recepcion_map = {}
                     if data and data.items:

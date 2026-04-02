@@ -17,7 +17,7 @@ from app.domain.models.user import User, UserRole
 from app.domain.schemas.sale import SaleCreate
 from app.utils.pricing import resolver_precio
 from app.domain.models.base import DecimalMoney
-from app.utils.errors import VentasErrors, handle_service_error
+from app.utils.errors import VentasErrors, handle_service_error, retry_on_write_conflict
 
 logger = logging.getLogger("SalesService")
 
@@ -29,7 +29,7 @@ class SalesService:
         
         client = get_client()
 
-        try:
+        async def _run_transaction() -> Sale:
             async with await client.start_session() as session:
                 async with session.start_transaction():
                     sale_items: List[SaleItem] = []
@@ -76,7 +76,7 @@ class SalesService:
 
                         unit_price = DecimalMoney(await resolver_precio(
                             producto_id=str(product.id),
-                            precio_base=float(unit_price_base), # Legacy helper
+                            precio_base=float(unit_price_base),
                             cliente_id=sale_in.cliente_id,
                             cantidad=item.cantidad,
                             tenant_id=tenant_id
@@ -134,7 +134,7 @@ class SalesService:
                         elif sale_in.descuento.tipo == 'PORCENTAJE':
                             computed_total -= (computed_total * val / Decimal("100"))
                         computed_total = max(Decimal("0.0"), computed_total)
-                        
+
                     int_part = Decimal(math.floor(float(computed_total)))
                     frac = computed_total - int_part
                     frac_fixed = round(float(frac), 2)
@@ -145,14 +145,14 @@ class SalesService:
                         computed_total = int_part + Decimal("1")
                     else:
                         computed_total = int_part + Decimal("0.5")
-                        
+
                     has_credit = any(p.metodo == "CREDITO" for p in sale_in.pagos)
                     if has_credit and not sale_in.cliente_id and not (sale_in.cliente and sale_in.cliente.razon_social):
                         raise HTTPException(status_code=400, detail="Ventas a crédito requieren un cliente registrado")
 
                     actual_pagos = [PagoItem(metodo=p.metodo, monto=DecimalMoney(p.monto)) for p in sale_in.pagos if p.metodo != "CREDITO"]
                     total_pagado = sum((p.monto for p in actual_pagos), Decimal("0"))
-                    
+
                     if has_credit:
                         if total_pagado <= Decimal("0"):
                             estado_pago = EstadoPago.PENDIENTE
@@ -162,7 +162,7 @@ class SalesService:
                             estado_pago = EstadoPago.PAGADO
                     else:
                         estado_pago = EstadoPago.PAGADO
-                        
+
                     cliente_snap = ClienteInfo(**sale_in.cliente.model_dump()) if sale_in.cliente else None
                     has_qr = any(p.metodo == "QR" for p in actual_pagos)
                     qr_init = QRInfo() if has_qr else None
@@ -229,7 +229,7 @@ class SalesService:
                             _total_pagado += monto_p
                             subtipo = _SUBTIPO_MAP.get(metodo, SubtipoMovimiento.VENTA_EFECTIVO)
                             label = {"EFECTIVO": "Efectivo", "QR": "QR", "TARJETA": "Tarjeta"}.get(metodo, metodo)
-                            
+
                             await CajaMovimiento(
                                 tenant_id   = tenant_id,
                                 sucursal_id = sucursal_id,
@@ -259,10 +259,10 @@ class SalesService:
                             ).create(session=session)
 
                     return sale
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise handle_service_error(e, "al procesar la venta")
+
+        # ── Ejecutar con reintento automático ante WriteConflict ──────────────
+        return await retry_on_write_conflict(_run_transaction)
+
 
     @staticmethod
     async def anular_sale(sale_id: str, current_user: User) -> Sale:
