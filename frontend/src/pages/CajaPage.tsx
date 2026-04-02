@@ -912,8 +912,11 @@ export default function CajaPage() {
                                                                         <span className="text-[10px] font-bold text-gray-400 w-6">Bs.{val}</span>
                                                                         <input 
                                                                             type="number" min="0" placeholder="0"
+                                                                            inputMode="numeric"
                                                                             className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
                                                                             value={cant || ''}
+                                                                            onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                            onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                             onChange={e => setBilletes(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
                                                                         />
                                                                     </div>
@@ -929,8 +932,11 @@ export default function CajaPage() {
                                                                         <span className="text-[10px] font-bold text-gray-400 w-7">Bs.{val}</span>
                                                                         <input 
                                                                             type="number" min="0" placeholder="0"
+                                                                            inputMode="numeric"
                                                                             className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
                                                                             value={cant || ''}
+                                                                            onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                            onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                             onChange={e => setMonedas(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
                                                                         />
                                                                     </div>
@@ -945,9 +951,12 @@ export default function CajaPage() {
                                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
                                                             <input 
                                                                 type="number" step="0.01" autoFocus
+                                                                inputMode="decimal"
                                                                 className="w-full bg-white border-2 border-indigo-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-black focus:border-indigo-500 outline-none transition-all placeholder-indigo-200"
                                                                 placeholder="0.00"
                                                                 value={montoFisicoManual}
+                                                                onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                 onChange={e => setMontoFisicoManual(e.target.value)}
                                                             />
                                                         </div>
