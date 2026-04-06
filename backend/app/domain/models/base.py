@@ -1,7 +1,17 @@
 from typing import Optional, Any, Annotated
 from datetime import datetime
 from pydantic import BaseModel, BeforeValidator, PlainSerializer
+import decimal
 from decimal import Decimal, ROUND_HALF_UP
+
+# Configuración Global: Desactivar trampas de Inexact y Rounded.
+# Esto evita que PyMongo lance excepciones al convertir Decimal -> Decimal128
+# cuando hay residuos mínimos de punto flotante en ambientes como Render.
+decimal.getcontext().traps[decimal.Inexact] = False
+decimal.getcontext().traps[decimal.Rounded] = False
+
+
+
 
 # Smart Type: Coerces BSON/floats to Decimal exactly, while satisfying React/Pydantic JSON with floats.
 def _coerce_decimal(v: Any) -> Decimal:
