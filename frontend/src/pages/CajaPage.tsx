@@ -387,12 +387,12 @@ export default function CajaPage() {
     const [billetes, setBilletes] = useState<Record<string, number>>({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
     const [monedas, setMonedas] = useState<Record<string, number>>({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
     
-    // El "Total" final depende de si es detallado o manual
-    const totalFisicoCalculado = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
+    // El "Total" final depende de si es detallado o manual, aproximado a 2 decimales para evitar ruido de punto flotante de JS
+    const totalFisicoCalculadoRaw = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
         Object.entries(monedas).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0);
 
-    const totalAperturaFinal = aperturaDetallada ? totalFisicoCalculado : (parseFloat(montoInicial) || 0);
-    const totalFisicoFinal = conteoDetallado ? totalFisicoCalculado : (parseFloat(montoFisicoManual) || 0);
+    const totalAperturaFinal = Math.round((aperturaDetallada ? totalFisicoCalculadoRaw : (parseFloat(montoInicial) || 0)) * 100) / 100;
+    const totalFisicoFinal   = Math.round((conteoDetallado ? totalFisicoCalculadoRaw : (parseFloat(montoFisicoManual) || 0)) * 100) / 100;
 
     // nueva categoría
     const [catNombre, setCatNombre] = useState('');
