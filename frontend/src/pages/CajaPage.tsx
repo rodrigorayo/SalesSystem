@@ -364,8 +364,9 @@ export default function CajaPage() {
     const [modal, setModal] = useState<ModalType>(null);
     const closeModal = () => setModal(null);
 
-    // abrir caja
+    // apertura
     const [montoInicial, setMontoInicial] = useState('');
+    const [aperturaDetallada, setAperturaDetallada] = useState(true);
 
     // gasto
     const [gastoMonto, setGastoMonto] = useState('');
@@ -390,6 +391,7 @@ export default function CajaPage() {
     const totalFisicoCalculado = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
         Object.entries(monedas).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0);
 
+    const totalAperturaFinal = aperturaDetallada ? totalFisicoCalculado : (parseFloat(montoInicial) || 0);
     const totalFisicoFinal = conteoDetallado ? totalFisicoCalculado : (parseFloat(montoFisicoManual) || 0);
 
     // nueva categoría
@@ -409,9 +411,14 @@ export default function CajaPage() {
     // ── Handlers ──────────────────────────────────────────────────────────
 
     const handleAbrirCaja = () => {
-        if (!montoInicial) return;
-        abrirMut.mutate({ monto_inicial: parseFloat(montoInicial) }, {
-            onSuccess: () => { setMontoInicial(''); closeModal(); },
+        if (totalAperturaFinal <= 0) return;
+        abrirMut.mutate({ monto_inicial: totalAperturaFinal }, {
+            onSuccess: () => { 
+                setMontoInicial(''); 
+                setBilletes({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
+                setMonedas({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
+                closeModal(); 
+            },
         });
     };
 
@@ -700,21 +707,102 @@ export default function CajaPage() {
 
                             {/* ── ABRIR CAJA ── */}
                             {modal === 'abrir' && (
-                                <>
-                                    <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mb-4">
-                                        <Unlock size={22} className="text-green-600" />
+                                <div className="w-full">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
+                                            <Unlock size={22} className="text-green-600" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-black mb-0.5">Apertura de Caja</h2>
+                                            <p className="text-sm text-gray-400">Ingresá el efectivo con el que arranca la caja.</p>
+                                        </div>
                                     </div>
-                                    <h2 className="text-xl font-black mb-1">Apertura de Caja</h2>
-                                    <p className="text-sm text-gray-400 mb-5">Ingresá el efectivo con el que arranca la caja hoy.</p>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto inicial (Bs.)</label>
-                                    <input type="number" step="0.01" autoFocus
-                                        className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-green-400 mb-6 text-gray-900"
-                                        placeholder="0.00" value={montoInicial} onChange={e => setMontoInicial(e.target.value)} />
-                                    <button onClick={handleAbrirCaja} disabled={!montoInicial || abrirMut.isPending}
+
+                                    <div className="flex justify-end mb-4">
+                                        <button 
+                                            onClick={() => setAperturaDetallada(!aperturaDetallada)}
+                                            className="text-[10px] font-black text-green-600 hover:text-green-700 bg-green-50 px-2.5 py-1 rounded-full transition-all"
+                                        >
+                                            {aperturaDetallada ? 'Ingreso Directo' : 'Desglosar Billetes'}
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 relative overflow-hidden mb-6">
+                                        {aperturaDetallada ? (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {/* Billetes */}
+                                                <div>
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase block mb-3 pl-1">Billetes</span>
+                                                    <div className="space-y-2">
+                                                        {Object.entries(billetes).sort((a,b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                            <div key={`ab-b-${val}`} className="flex items-center gap-2 group">
+                                                                <span className="text-[10px] font-bold text-gray-400 w-6">Bs.{val}</span>
+                                                                <input 
+                                                                    type="number" min="0" placeholder="0"
+                                                                    inputMode="numeric"
+                                                                    className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-green-400 outline-none"
+                                                                    value={cant || ''}
+                                                                    onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                    onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
+                                                                    onChange={e => setBilletes(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                {/* Monedas */}
+                                                <div>
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase block mb-3 pl-1">Monedas</span>
+                                                    <div className="space-y-2">
+                                                        {Object.entries(monedas).sort((a,b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                            <div key={`ab-m-${val}`} className="flex items-center gap-2 group">
+                                                                <span className="text-[10px] font-bold text-gray-400 w-7">Bs.{val}</span>
+                                                                <input 
+                                                                    type="number" min="0" placeholder="0"
+                                                                    inputMode="numeric"
+                                                                    className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-green-400 outline-none"
+                                                                    value={cant || ''}
+                                                                    onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                    onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
+                                                                    onChange={e => setMonedas(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="py-2 text-center text-gray-900">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase block mb-2">Monto Inicial (Bs.)</label>
+                                                <div className="relative inline-block w-48">
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
+                                                    <input 
+                                                        type="number" step="0.01" autoFocus
+                                                        inputMode="decimal"
+                                                        className="w-full bg-white border-2 border-green-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-black focus:border-green-500 outline-none transition-all placeholder-green-200"
+                                                        placeholder="0.00"
+                                                        value={montoInicial}
+                                                        onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                        onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
+                                                        onChange={e => setMontoInicial(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
+                                            <span className="text-xs font-black text-gray-900 uppercase">Total Inicial:</span>
+                                            <span className="text-2xl font-black font-mono text-green-600">
+                                                {fmt(totalAperturaFinal)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={handleAbrirCaja} disabled={totalAperturaFinal <= 0 || abrirMut.isPending}
                                         className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-sm disabled:opacity-50 transition-colors">
                                         {abrirMut.isPending ? 'Abriendo...' : 'Confirmar Apertura'}
                                     </button>
-                                </>
+                                </div>
                             )}
 
                             {/* ── GASTO ── */}
