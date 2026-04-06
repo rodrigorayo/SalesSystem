@@ -18,10 +18,12 @@ async def get_descuentos(
     """
     tenant_id = current_user.tenant_id or "default"
     
+    # Roles administrativos ven todos los descuentos de la empresa
     if current_user.role in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ"]:
         descuentos = await Descuento.find(
             Descuento.tenant_id == tenant_id
         ).sort("-created_at").to_list()
+
     else:
         sucursal_id = current_user.sucursal_id or "CENTRAL"
         descuentos = await Descuento.find(
@@ -39,8 +41,10 @@ async def create_descuento(
     """
     Crear un nuevo descuento. Solo Administradores.
     """
-    if current_user.role not in ["ADMIN", "SUPERADMIN", "ADMIN_SUCURSAL"]:
+    # Solo administradores pueden crear descuentos
+    if current_user.role not in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ", "ADMIN_SUCURSAL"]:
         raise HTTPException(status_code=403, detail="No tienes permisos para crear descuentos")
+
         
     tenant_id = current_user.tenant_id or "default"
     
@@ -69,8 +73,10 @@ async def update_descuento(
     """
     Actualizar un descuento existente (ej. desactivarlo). Solo Administradores.
     """
-    if current_user.role not in ["ADMIN", "SUPERADMIN", "ADMIN_SUCURSAL"]:
+    # Solo administradores pueden editar descuentos
+    if current_user.role not in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ", "ADMIN_SUCURSAL"]:
         raise HTTPException(status_code=403, detail="No tienes permisos para editar descuentos")
+
         
     if not ObjectId.is_valid(descuento_id):
         raise HTTPException(status_code=400, detail="ID inválido")
@@ -103,8 +109,10 @@ async def delete_descuento(
     """
     Eliminar un descuento permanentemente. Solo Administradores.
     """
-    if current_user.role not in ["ADMIN", "SUPERADMIN", "ADMIN_SUCURSAL"]:
+    # Solo administradores pueden eliminar descuentos
+    if current_user.role not in ["ADMIN", "SUPERADMIN", "ADMIN_MATRIZ", "ADMIN_SUCURSAL"]:
         raise HTTPException(status_code=403, detail="No tienes permisos para eliminar descuentos")
+
         
     if not ObjectId.is_valid(descuento_id):
         raise HTTPException(status_code=400, detail="ID inválido")
