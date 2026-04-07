@@ -344,7 +344,7 @@ async def get_financial_report(
 
     match_filter = {
         "tenant_id": tenant_id,
-        "sale_date": {"$gte": s_dt, "$lte": e_dt}
+        "sale_date": {"$gte": start_dt, "$lte": end_dt}
     }
     
     if sucursal_id and sucursal_id != "all":
