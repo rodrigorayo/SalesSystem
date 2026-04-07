@@ -351,6 +351,13 @@ class SalesService:
                                 descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reversión de {mov.descripcion.split('— ')[-1] if '— ' in mov.descripcion else 'pago'})",
                                 sale_id     = str(sale.id),
                             ).create(session=session)
+                    else:
+                        # Si no hay caja abierta pero la venta tiene pagos registrados, bloqueamos la anulación pura.
+                        if len(sale.pagos) > 0 and sum(p.monto for p in sale.pagos) > 0:
+                            raise HTTPException(
+                                status_code=400, 
+                                detail="No puedes anular una venta con ingresos (efectivo/qr/tarjeta) sin tener una sesión de caja ABIERTA en tu sucursal.Abre la caja primero para procesar la devolución."
+                            )
 
                     sale.anulada = True
                     await sale.save(session=session)

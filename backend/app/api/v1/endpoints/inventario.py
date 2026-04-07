@@ -10,6 +10,7 @@ from app.domain.models.product import Product
 from app.domain.models.user import User, UserRole
 from app.infrastructure.auth import get_current_active_user
 from app.domain.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
+from app.utils.date_utils import get_day_range_bolivia
 
 router = APIRouter()
 
@@ -199,11 +200,13 @@ async def ajustar_inventario(
 async def get_movimientos(
     producto_id: str = None,
     sucursal_id: str = "CENTRAL",
-    limit: int = 50,
+    start_date: Optional[str] = None, # YYYY-MM-DD
+    end_date: Optional[str] = None,   # YYYY-MM-DD
+    limit: int = 500,
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get the movement history (Kárdex) for a specific branch and optionally filtered by product.
+    Get the movement history (Kárdex) for a specific branch and optionally filtered by product and dates.
     """
     tenant_id = current_user.tenant_id or ""
     
@@ -211,16 +214,24 @@ async def get_movimientos(
     if producto_id:
         query["producto_id"] = producto_id
         
+    if start_date and end_date:
+        try:
+            start_dt, _ = get_day_range_bolivia(start_date)
+            _, end_dt = get_day_range_bolivia(end_date)
+            query["created_at"] = {"$gte": start_dt, "$lte": end_dt}
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+            
     from app.domain.models.inventario import InventoryLog
     
     movimientos = await InventoryLog.find(query).sort("-created_at").limit(limit).to_list()
     
-    # Enrich with product names for UI
+    # Enrich with product names directly from the snapshot stored in InventoryLog
+    # Eliminated N+1 queries here for massive performance boost
     result = []
     for mov in movimientos:
-        prod = await Product.get(mov.producto_id)
         data = mov.model_dump()
-        data["producto_nombre"] = prod.descripcion if prod else "Producto Desconocido"
+        data["producto_nombre"] = mov.descripcion or "Producto Sin Nombre"
         result.append(data)
         
     return result

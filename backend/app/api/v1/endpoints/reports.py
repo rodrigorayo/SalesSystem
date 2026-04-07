@@ -8,7 +8,7 @@ from app.domain.models.sucursal import Sucursal
 from app.domain.models.sale import Sale
 from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento
 from app.utils.serializers import normalize_bson
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, timezone
 from app.utils.date_utils import BOLIVIA_TZ, get_day_range_bolivia
 
 
@@ -33,8 +33,7 @@ async def get_general_reports(
     # 00:00:00 of X days ago in Bolivia time, converted to UTC
     now_bo = datetime.now(BOLIVIA_TZ)
     start_bo = (now_bo - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
-    start_date = start_bo.astimezone(datetime.now().astimezone().tzinfo.utc if hasattr(datetime.now().astimezone().tzinfo, 'utc') else time(0).tzinfo == BOLIVIA_TZ) # Simpler:
-    start_date = start_bo.astimezone(timedelta(hours=0)) # UTC
+    start_date = start_bo.astimezone(timezone.utc) # UTC
 
     
     # ─── 1. KPIs Generales ────────────────────────────────────────────────────────

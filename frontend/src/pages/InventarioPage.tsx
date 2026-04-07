@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
-import { formatFullDate as formatDate } from '../utils/dateUtils';
+import { formatFullDate as formatDate, getBoliviaTodayISO } from '../utils/dateUtils';
 
 
 export default function InventarioPage() {
@@ -24,6 +24,9 @@ export default function InventarioPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [categorySearch, setCategorySearch] = useState('');
     const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
+    const [startDate, setStartDate] = useState(getBoliviaTodayISO());
+    const [endDate, setEndDate] = useState(getBoliviaTodayISO());
+
 
     const { data: sucursales = [] } = useQuery({
         queryKey: ['sucursales'],
@@ -65,8 +68,8 @@ export default function InventarioPage() {
     const totalItemsStock = invData?.total || 0;
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
-        queryKey: ['movimientos', selectedSucursal],
-        queryFn: () => getMovimientosInventario(selectedSucursal),
+        queryKey: ['movimientos', selectedSucursal, startDate, endDate],
+        queryFn: () => getMovimientosInventario(selectedSucursal, undefined, startDate || undefined, endDate || undefined),
         enabled: tab === 'kardex',
     });
 
@@ -155,7 +158,25 @@ export default function InventarioPage() {
                                 ⚠️ <span className="hidden sm:inline">Solo Stock Bajo</span>
                             </button>
                         )}
+                        {tab === 'kardex' && (
+                            <div className="flex bg-gray-50 rounded-xl border border-gray-100 p-1 shadow-inner gap-1">
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
+                                />
+                                <span className="text-gray-400 text-[10px] my-auto">a</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
+                                />
+                            </div>
+                        )}
                     </div>
+
 
                     {/* Tabs e Importar */}
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -352,6 +373,8 @@ export default function InventarioPage() {
                                     <th className="px-3 py-2">Tipo Mov.</th>
                                     <th className="px-3 py-2 text-right">Cantidad</th>
                                     <th className="px-3 py-2 text-right">Stock Final</th>
+                                    <th className="px-3 py-2 text-right">P/C Unit.</th>
+                                    <th className="px-3 py-2 text-right">Valor Total Mov.</th>
                                     <th className="px-3 py-2">Usuario / Notas</th>
                                 </tr>
                             </thead>
@@ -397,10 +420,20 @@ export default function InventarioPage() {
                                                 <td className="px-3 py-2 text-right font-black font-mono text-gray-900">
                                                     {mov.stock_resultante}
                                                 </td>
-                                                <td className="px-3 py-2">
-                                                    <div className="text-gray-900 font-semibold">{mov.usuario_nombre}</div>
-                                                    {mov.notas && <div className="text-[10px] text-gray-500 mt-0.5 max-w-[200px] truncate" title={mov.notas}>{mov.notas}</div>}
+                                                <td className="px-3 py-2 text-right font-mono text-gray-600">
+                                                    {mov.tipo_movimiento.includes('VENTA') ? 
+                                                        <span title="Precio Venta">Bs. {mov.precio_venta_momento?.toFixed(2) || '0.00'}</span> : 
+                                                        <span title="Costo Unitario">Bs. {mov.costo_unitario_momento?.toFixed(2) || '0.00'}</span>
+                                                    }
                                                 </td>
+                                                <td className={`px-3 py-2 text-right font-black font-mono ${isPos ? 'text-green-600' : isNeg ? 'text-red-500' : 'text-gray-900'}`}>
+                                                    {isPos ? '+' : ''} Bs. {(Math.abs(mov.cantidad_movida) * (mov.tipo_movimiento.includes('VENTA') ? (mov.precio_venta_momento || 0) : (mov.costo_unitario_momento || 0))).toFixed(2)}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <div className="text-gray-900 font-semibold text-[11px]">{mov.usuario_nombre}</div>
+                                                    {mov.notas && <div className="text-[9px] text-gray-500 mt-0.5 max-w-[200px] truncate" title={mov.notas}>{mov.notas}</div>}
+                                                </td>
+
                                             </tr>
                                         )
                                     })
