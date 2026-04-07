@@ -113,6 +113,8 @@ export interface InventoryLog {
     stock_resultante: number;
     usuario_nombre: string;
     notas: string;
+    costo_unitario_momento?: number;
+    precio_venta_momento?: number;
     created_at: string;
 }
 
