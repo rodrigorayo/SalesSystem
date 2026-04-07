@@ -1,5 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
+from app.utils.date_utils import convert_to_bolivia
+
 import io
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -173,7 +175,8 @@ async def descargar_pdf_pedido(
     Story.append(Paragraph(f"<b>Sucursal:</b> {pedido.sucursal_id}", normal_style))
     Story.append(Paragraph(f"<b>Estado:</b> {pedido.estado}", normal_style))
     
-    fecha_recibido = pedido.recibido_at.strftime("%Y-%m-%d %H:%M") if pedido.recibido_at else "Pendiente"
+    fecha_recibido = convert_to_bolivia(pedido.recibido_at).strftime("%Y-%m-%d %H:%M") if pedido.recibido_at else "Pendiente"
+
     Story.append(Paragraph(f"<b>Fecha Recibido:</b> {fecha_recibido}", normal_style))
     Story.append(Spacer(1, 20))
     

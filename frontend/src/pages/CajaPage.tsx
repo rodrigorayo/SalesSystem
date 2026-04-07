@@ -16,13 +16,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
+import { formatDate } from '../utils/dateUtils';
+
 
 const fmt = (n?: number) => `Bs. ${(n || 0).toFixed(2)}`;
 
-const formatDate = (dateStr: string, opts?: Intl.DateTimeFormatOptions) => {
-    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
-    return new Date(isoStr).toLocaleString('es-BO', opts);
-};
 
 function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
     const headers = [

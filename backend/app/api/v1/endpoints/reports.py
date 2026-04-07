@@ -9,6 +9,8 @@ from app.domain.models.sale import Sale
 from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento
 from app.utils.serializers import normalize_bson
 from datetime import datetime, timedelta, time
+from app.utils.date_utils import BOLIVIA_TZ, get_day_range_bolivia
+
 
 _ZERO = Decimal("0")  # Constante DRY para el valor cero monetario
 
@@ -28,7 +30,12 @@ async def get_general_reports(
         
     tenant_id = current_user.tenant_id or "default"
     
-    start_date = datetime.utcnow() - timedelta(days=days)
+    # 00:00:00 of X days ago in Bolivia time, converted to UTC
+    now_bo = datetime.now(BOLIVIA_TZ)
+    start_bo = (now_bo - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+    start_date = start_bo.astimezone(datetime.now().astimezone().tzinfo.utc if hasattr(datetime.now().astimezone().tzinfo, 'utc') else time(0).tzinfo == BOLIVIA_TZ) # Simpler:
+    start_date = start_bo.astimezone(timedelta(hours=0)) # UTC
+
     
     # ─── 1. KPIs Generales ────────────────────────────────────────────────────────
     # Según CSV estimado: Fábrica = ~72%, Distribuidor = ~85% del PVP final
@@ -157,8 +164,9 @@ async def get_general_reports(
         },
         {
             "$group": {
-                "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date" } },
+                "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date", "timezone": "-04:00" } },
                 "total_ventas": {"$sum": "$subtotal"},
+
                 "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
                 "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
             }
@@ -206,12 +214,10 @@ async def get_daily_report(
          target_sucursal = "CENTRAL"
 
     try:
-        dt = datetime.strptime(date, "%Y-%m-%d")
+        start_dt, end_dt = get_day_range_bolivia(date)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
-    
-    start_dt = datetime.combine(dt, time.min)
-    end_dt = datetime.combine(dt, time.max)
+
 
     # 1. Sales summary (Pagos)
     sales = await Sale.find(
@@ -330,13 +336,11 @@ async def get_financial_report(
     tenant_id = current_user.tenant_id or "default"
     
     try:
-        s_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        e_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        start_dt, _ = get_day_range_bolivia(start_date)
+        _, end_dt = get_day_range_bolivia(end_date)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
 
-    s_dt = datetime.combine(s_dt, time.min)
-    e_dt = datetime.combine(e_dt, time.max)
 
     match_filter = {
         "tenant_id": tenant_id,
@@ -351,9 +355,10 @@ async def get_financial_report(
         {
             "$group": {
                 "_id": {
-                    "fecha": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date" } },
+                    "fecha": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date", "timezone": "-04:00" } },
                     "sucursal_id": "$sucursal_id"
                 },
+
                 "total_publico": {"$sum": "$subtotal"},
                 "total_fabrica": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
             }

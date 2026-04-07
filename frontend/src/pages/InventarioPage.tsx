@@ -8,10 +8,8 @@ import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
-const formatDate = (dateStr: string) => {
-    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
-    return new Date(isoStr).toLocaleString();
-};
+import { formatFullDate as formatDate } from '../utils/dateUtils';
+
 
 export default function InventarioPage() {
     const { user } = useAuthStore();

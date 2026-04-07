@@ -5,6 +5,7 @@ import {
     Loader2, Calendar, Store, TrendingUp, DollarSign, 
     Download
 } from 'lucide-react';
+import { getBoliviaTodayISO } from '../utils/dateUtils';
 
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -14,8 +15,12 @@ import {
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function FinancialDetailView() {
-    const today = new Date().toISOString().split('T')[0];
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = getBoliviaTodayISO();
+    const sevenDaysAgo = (() => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().split('T')[0];
+    })();
     
     const [startDate, setStartDate] = useState(sevenDaysAgo);
     const [endDate, setEndDate] = useState(today);
@@ -32,7 +37,7 @@ export default function FinancialDetailView() {
         enabled: !!startDate && !!endDate
     });
 
-    const totals = report?.reduce((acc, curr) => ({
+    const totals = report?.reduce((acc: any, curr: any) => ({
         total_publico: acc.total_publico + curr.total_publico,
         total_fabrica: acc.total_fabrica + curr.total_fabrica,
         margen_distribuidor: acc.margen_distribuidor + curr.margen_distribuidor,
@@ -82,7 +87,7 @@ export default function FinancialDetailView() {
                             className="w-full bg-gray-50 border border-gray-100 rounded-xl py-2 pl-10 pr-4 text-sm font-bold text-gray-700 outline-none appearance-none focus:ring-2 focus:ring-indigo-500/20"
                         >
                             <option value="all">Todas las Sucursales</option>
-                            {sucursales?.map(s => (
+                            {sucursales?.map((s: any) => (
                                 <option key={s._id} value={s._id}>{s.nombre}</option>
                             ))}
                         </select>
@@ -210,7 +215,7 @@ export default function FinancialDetailView() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {report?.map((row, i) => (
+                                    {report?.map((row: any, i: number) => (
                                         <tr key={i} className="hover:bg-indigo-50/30 transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-2">
@@ -237,12 +242,12 @@ export default function FinancialDetailView() {
                                 {report && report.length > 0 && (
                                     <tfoot>
                                         <tr className="bg-gray-900 text-white font-black uppercase tracking-tighter shadow-inner">
-                                            <td colSpan={2} className="px-6 py-5 rounded-bl-3xl">TOTALES DEL PERIODO</td>
+                                            <td colSpan={2} className="px-6 py-5 rounded-bl-[32px]">TOTALES DEL PERIODO</td>
                                             <td className="px-6 py-5 text-right">{formatBs(totals?.total_publico)}</td>
                                             <td className="px-6 py-5 text-right text-gray-400 font-bold">{formatBs(totals?.total_fabrica)}</td>
                                             <td className="px-6 py-5 text-right text-emerald-400">{formatBs(totals?.margen_distribuidor)}</td>
                                             <td className="px-6 py-5 text-right text-blue-400">{formatBs(totals?.margen_retail)}</td>
-                                            <td className="px-6 py-5 text-right text-indigo-400 rounded-br-3xl">{formatBs(totals?.margen_total)}</td>
+                                            <td className="px-6 py-5 text-right text-indigo-400 rounded-br-[32px]">{formatBs(totals?.margen_total)}</td>
                                         </tr>
                                     </tfoot>
                                 )}

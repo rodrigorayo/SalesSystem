@@ -6,6 +6,8 @@ import {
     Calendar, Loader2, TrendingUp, Wallet, 
     ShoppingBag, Ban, ArrowDownCircle, Printer, Package
 } from 'lucide-react';
+import { getBoliviaTodayISO, formatFullDate } from '../utils/dateUtils';
+
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -13,7 +15,8 @@ export default function DailyReportView() {
     const { user, role } = useAuthStore();
     const esMatriz = ['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '');
     
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(getBoliviaTodayISO());
+
     const [selectedSucursal, setSelectedSucursal] = useState(user?.sucursal_id || 'CENTRAL');
 
     const { data: sucursales = [] } = useQuery({
@@ -84,8 +87,9 @@ export default function DailyReportView() {
                 <p className="text-lg font-bold text-gray-700">Sucursal: {sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal}</p>
                 <div className="flex justify-center gap-8 mt-4 text-sm font-bold">
                     <span>Fecha: {selectedDate}</span>
-                    <span>Generado: {new Date().toLocaleString()}</span>
+                    <span>Generado: {formatFullDate(new Date())}</span>
                 </div>
+
             </div>
 
             {/* KPIs Grid */}

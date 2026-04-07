@@ -1,5 +1,6 @@
-import React from 'react';
 import type { Sale } from '../api/types';
+import { formatFullDate } from '../utils/dateUtils';
+
 
 interface TicketPrinterProps {
     sale: Sale;
@@ -12,17 +13,7 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
         return new Intl.NumberFormat('es-BO', { style: 'decimal', minimumFractionDigits: 2 }).format(n);
     };
 
-    const formatDate = (dateStr: string) => {
-        try {
-            const d = new Date(dateStr);
-            return new Intl.DateTimeFormat('es-BO', {
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', hour12: false
-            }).format(d);
-        } catch {
-            return dateStr;
-        }
-    };
+
 
     const c = sale.cliente;
     const isFactura = c?.es_factura;
@@ -42,7 +33,8 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
                 {sale.sucursal_id && sale.sucursal_id !== 'CENTRAL' && (
                     <p style={{ margin: '2px 0', fontSize: '10px' }}>Sucursal: {sale.sucursal_id}</p>
                 )}
-                <p style={{ margin: '2px 0', fontSize: '10px' }}>Fecha: {formatDate(sale.created_at || new Date().toISOString())}</p>
+                <p style={{ margin: '2px 0', fontSize: '10px' }}>Fecha: {formatFullDate(sale.created_at || new Date().toISOString())}</p>
+
                 <p style={{ margin: '2px 0', fontSize: '10px' }}>Ticket Nº: {sale._id ? sale._id.slice(-6).toUpperCase() : 'PENDIENTE'}</p>
             </div>
 

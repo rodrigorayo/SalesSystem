@@ -11,11 +11,8 @@ import { TicketPrinter } from '../components/TicketPrinter';
 import Pagination from '../components/Pagination';
 import type { Sale } from '../api/types';
 
-const formatDate = (dateStr: string) => {
-    // Si la fecha no termina en Z, se asume UTC para forzar la compensación horaria 
-    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
-    return new Date(isoStr).toLocaleString();
-};
+import { formatFullDate as formatDate } from '../utils/dateUtils';
+
 
 export default function VentasPage() {
     const qc = useQueryClient();

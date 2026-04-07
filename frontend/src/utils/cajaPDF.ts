@@ -6,6 +6,8 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { CajaSesionResumen, ResumenCaja } from '../hooks/useCaja';
+import { formatFullDate } from './dateUtils';
+
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -49,13 +51,8 @@ function subtipoLabel(subtipo: string): string {
 }
 
 function fmtMoney(n: number) { return `Bs. ${n.toFixed(2)}`; }
-function fmtDate(iso?: string) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString('es-BO', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-    });
-}
+const fmtDate = (iso?: string) => formatFullDate(iso);
+
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export function generarPDFSesion(

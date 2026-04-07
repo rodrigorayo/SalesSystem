@@ -1,4 +1,6 @@
 from datetime import datetime
+from app.utils.date_utils import get_now_bolivia
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -35,7 +37,8 @@ async def get_today_stats(
     current_user: User = Depends(get_current_active_user)
 ):
     """Today's total sales and transaction count for the current tenant."""
-    today = datetime.utcnow().date()
+    today = get_now_bolivia().date()
+
     tenant_id = current_user.tenant_id or ""
     
     filters = [Sale.tenant_id == tenant_id]
