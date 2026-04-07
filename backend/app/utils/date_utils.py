@@ -33,3 +33,6 @@ def get_day_range_bolivia(date_str: str) -> tuple[datetime, datetime]:
     
     # Convert both to UTC for MongoDB queries
     return (start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc))
+# Aliases for better DX and backward compatibility
+get_now_bolivia = now_bolivia
+convert_to_bolivia = utc_to_bolivia
