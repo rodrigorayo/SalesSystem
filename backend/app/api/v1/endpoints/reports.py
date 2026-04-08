@@ -50,18 +50,17 @@ async def get_general_reports(
                 "_id": None,
                 "total_ventas": {"$sum": "$subtotal"},
                 "total_productos": {"$sum": "$cantidad"},
-                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
-                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
+                "costo_total": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+                "ganancia_matriz": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 0.15]}}
             }
         },
         {
             "$project": {
                 "total_ventas": 1,
                 "total_productos": 1,
-                # Ganancia Matriz = (Precio Distribuidor) - (Costo Fabrica)
-                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
-                # Ganancia Sucursal = (Precio Final) - (Precio Distribuidor)
-                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]}
+                "ganancia_matriz": 1,
+                # Ganancia Sucursal = (Precio de Venta Total) - (Costo Unitario * Cantidad)
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$costo_total"]}
             }
         }
     ]
@@ -86,16 +85,16 @@ async def get_general_reports(
             "$group": {
                 "_id": "$sucursal_id",
                 "total_ventas": {"$sum": "$subtotal"},
-                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
-                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
+                "costo_total": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+                "ganancia_matriz": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 0.15]}}
             }
         },
         {
             "$project": {
                 "sucursal_id_raw": "$_id",
                 "total_ventas": 1,
-                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
-                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
+                "ganancia_matriz": 1,
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$costo_total"]},
                 "_id": 0
             }
         },
@@ -133,8 +132,8 @@ async def get_general_reports(
                 "_id": "$descripcion",
                 "cantidad_vendida": {"$sum": "$cantidad"},
                 "total_ventas": {"$sum": "$subtotal"},
-                "costo_fabrica": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
-                "ingreso_distribuidor": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 1.15]}}
+                "costo_total": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+                "ganancia_matriz": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 0.15]}}
             }
         },
         {
@@ -142,8 +141,8 @@ async def get_general_reports(
                 "producto": "$_id",
                 "cantidad_vendida": 1,
                 "total_ventas": 1,
-                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
-                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
+                "ganancia_matriz": 1,
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$costo_total"]},
                 "_id": 0
             }
         },
@@ -165,16 +164,16 @@ async def get_general_reports(
             "$group": {
                 "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date", "timezone": "-04:00" } },
                 "total_ventas": {"$sum": "$subtotal"},
-                "costo_fabrica": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
-                "ingreso_distribuidor": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 1.15]}}
+                "costo_total": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+                "ganancia_matriz": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 0.15]}}
             }
         },
         {
             "$project": {
                 "fecha": "$_id",
                 "total_ventas": 1,
-                "ganancia_matriz": {"$subtract": ["$ingreso_distribuidor", "$costo_fabrica"]},
-                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$ingreso_distribuidor"]},
+                "ganancia_matriz": 1,
+                "ganancia_sucursal": {"$subtract": ["$total_ventas", "$costo_total"]},
                 "_id": 0
             }
         },
