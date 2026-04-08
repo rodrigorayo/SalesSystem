@@ -775,7 +775,7 @@ export default function CajaPage() {
                                                 <div className="relative inline-block w-48">
                                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
                                                     <input 
-                                                        type="number" step="0.01" autoFocus
+                                                        type="number" step="0.1" autoFocus
                                                         inputMode="decimal"
                                                         className="w-full bg-white border-2 border-green-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-black focus:border-green-500 outline-none transition-all placeholder-green-200"
                                                         placeholder="0.00"
@@ -838,7 +838,7 @@ export default function CajaPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto (Bs.)</label>
-                                            <input type="number" step="0.01"
+                                            <input type="number" step="0.1"
                                                 className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-red-300 text-gray-900"
                                                 placeholder="0.00"
                                                 value={gastoMonto} onChange={e => setGastoMonto(e.target.value)} />
@@ -887,7 +887,7 @@ export default function CajaPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto (Bs.)</label>
-                                            <input type="number" step="0.01"
+                                            <input type="number" step="0.1"
                                                 className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-green-300 text-gray-900"
                                                 placeholder="0.00"
                                                 value={ingresoMonto} onChange={e => setIngresoMonto(e.target.value)} />
@@ -1036,7 +1036,7 @@ export default function CajaPage() {
                                                         <div className="relative inline-block w-48">
                                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
                                                             <input 
-                                                                type="number" step="0.01" autoFocus
+                                                                type="number" step="0.1" autoFocus
                                                                 inputMode="decimal"
                                                                 className="w-full bg-white border-2 border-indigo-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-black focus:border-indigo-500 outline-none transition-all placeholder-indigo-200"
                                                                 placeholder="0.00"

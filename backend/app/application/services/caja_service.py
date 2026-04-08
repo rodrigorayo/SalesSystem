@@ -29,7 +29,7 @@ class CajaService:
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
-                    monto = DecimalMoney(body.monto_inicial)
+                    monto = DecimalMoney(str(round(body.monto_inicial, 1)))
                     sesion = CajaSesion(
                         tenant_id    = tenant_id,
                         sucursal_id  = sucursal_id,
@@ -71,7 +71,7 @@ class CajaService:
 
         sesion.estado                = EstadoSesion.CERRADA
         sesion.cerrada_at            = datetime.utcnow()
-        sesion.monto_cierre_fisico   = DecimalMoney(body.monto_fisico_contado)
+        sesion.monto_cierre_fisico   = DecimalMoney(str(round(body.monto_fisico_contado, 1)))
         sesion.notas_cierre          = body.notas
         await sesion.save()
         return sesion

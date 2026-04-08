@@ -133,8 +133,8 @@ async def get_general_reports(
                 "_id": "$descripcion",
                 "cantidad_vendida": {"$sum": "$cantidad"},
                 "total_ventas": {"$sum": "$subtotal"},
-                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
-                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
+                "costo_fabrica": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+                "ingreso_distribuidor": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 1.15]}}
             }
         },
         {
@@ -165,9 +165,8 @@ async def get_general_reports(
             "$group": {
                 "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date", "timezone": "-04:00" } },
                 "total_ventas": {"$sum": "$subtotal"},
-
-                "costo_fabrica": {"$sum": {"$multiply": ["$subtotal", 0.72]}},
-                "ingreso_distribuidor": {"$sum": {"$multiply": ["$subtotal", 0.85]}}
+                "costo_fabrica": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad"]}},
+                "ingreso_distribuidor": {"$sum": {"$multiply": ["$costo_unitario", "$cantidad", 1.15]}}
             }
         },
         {

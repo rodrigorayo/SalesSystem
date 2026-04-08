@@ -52,6 +52,7 @@ async def get_today_stats(
     return {
         "today_sales": sum(s.total for s in today_sales),
         "transaction_count": len(today_sales),
+        "items_count": sum(sum(i.cantidad for i in s.items) for s in today_sales),
     }
 
 

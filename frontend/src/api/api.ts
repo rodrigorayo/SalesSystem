@@ -356,7 +356,7 @@ export const getSaleStatsToday = (sucursal_id?: string) => {
     const params = new URLSearchParams();
     if (sucursal_id) params.set('sucursal_id', sucursal_id);
     const qs = params.toString();
-    return client<{ today_sales: number; transaction_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
+    return client<{ today_sales: number; transaction_count: number; items_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
 };
 export const anularSale = (id: string) => client<Sale>(`/sales/${id}/anular`, { method: 'PATCH' });
 export const toggleFacturaEmitida = (id: string, emitida: boolean) => 
