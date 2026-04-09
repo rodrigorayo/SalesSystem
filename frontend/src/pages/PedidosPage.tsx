@@ -44,6 +44,7 @@ export default function PedidosPage() {
     const [supervisorAction, setSupervisorAction] = useState<'PEDIR' | 'TRANSFERIR' | 'DEVOLVER'>('PEDIR');
     const [orderItems, setOrderItems] = useState<{ producto_id: string; cantidad: number }[]>([]);
     const [notas, setNotas] = useState('');
+    const [searchProd, setSearchProd] = useState('');
 
     const { data: pedidos = [], isLoading } = useQuery({
         queryKey: ['pedidos', tab],
@@ -82,14 +83,25 @@ export default function PedidosPage() {
     });
 
     const availableProducts = useMemo(() => {
+        let list = [];
         if (origenId === 'CENTRAL') {
-            return (productsData?.items || []).map((p: any) => ({
+            list = (productsData?.items || []).map((p: any) => ({
                 producto_id: p._id || p.id,
                 producto_nombre: p.descripcion || p.name,
-                cantidad: '∞'
+                cantidad: '∞',
+                precio: p.costo_unitario ?? p.costo ?? p.precio_venta ?? 0
             }));
+        } else {
+            list = (invData?.items || [])
+                .filter((inv: any) => inv.cantidad > 0)
+                .map((inv: any) => ({
+                    producto_id: inv.producto_id,
+                    producto_nombre: inv.producto_nombre || inv.descripcion || 'Producto',
+                    cantidad: inv.cantidad,
+                    precio: inv.costo_unitario ?? inv.precio_sucursal ?? 0
+                }));
         }
-        return (invData?.items || []).filter((inv: any) => inv.cantidad > 0);
+        return list.sort((a: any, b: any) => a.producto_nombre.localeCompare(b.producto_nombre));
     }, [origenId, invData, productsData]);
 
     const createMut = useMutation({
@@ -114,7 +126,13 @@ export default function PedidosPage() {
         onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al aceptar pedido')
     });
 
-    const resetForm = () => { setSelectedSucursal(''); setOrderItems([]); setNotas(''); };
+    const filteredCatalog = useMemo(() => {
+        if (!searchProd) return availableProducts;
+        const low = searchProd.toLowerCase();
+        return availableProducts.filter((p: any) => p.producto_nombre.toLowerCase().includes(low));
+    }, [availableProducts, searchProd]);
+
+    const resetForm = () => { setSelectedSucursal(''); setOrderItems([]); setNotas(''); setSearchProd(''); };
     const addItem = () => setOrderItems(p => [...p, { producto_id: '', cantidad: 1 }]);
     const updateItem = (i: number, f: 'producto_id' | 'cantidad', v: string | number) =>
         setOrderItems(p => p.map((item, idx) => idx === i ? { ...item, [f]: v } : item));
@@ -469,10 +487,14 @@ export default function PedidosPage() {
                             </div>
 
                             <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="text-xs font-semibold text-gray-700">Productos *</label>
+                                <div className="flex items-center justify-between mb-1.5 gap-2">
+                                    <label className="text-xs font-semibold text-gray-700">Explorar Catálogo *</label>
+                                    <div className="flex-1 px-4">
+                                        <input type="text" placeholder="🔍 Buscar por nombre o código..." value={searchProd} onChange={e => setSearchProd(e.target.value)}
+                                            className="w-full border border-gray-300 rounded px-2 py-1 text-[11px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder-gray-400" />
+                                    </div>
                                     <button type="button" onClick={addItem} className="text-[11px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-bold">
-                                        <Plus size={12} /> Agregar
+                                        <Plus size={12} /> Agregar Ítem Fila
                                     </button>
                                 </div>
                                 <div className="space-y-2">
@@ -480,15 +502,16 @@ export default function PedidosPage() {
                                         <div key={i} className="flex gap-1.5 items-center">
                                             <select required value={item.producto_id} onChange={e => updateItem(i, 'producto_id', e.target.value)}
                                                 className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] bg-white">
-                                                <option value="">Producto…</option>
-                                                {availableProducts.map((p: any) => (
+                                                <option value="">-- Seleccionar Producto --</option>
+                                                {filteredCatalog.map((p: any) => (
                                                     <option key={p.producto_id} value={p.producto_id}>
-                                                        {p.producto_nombre} (Disponibles: {p.cantidad})
+                                                        {p.producto_nombre} (Stock: {p.cantidad}) — Costo: Bs.{(Number(p.precio)||0).toFixed(2)}
                                                     </option>
                                                 ))}
                                             </select>
                                             <input required type="number" min="1" value={item.cantidad} onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
                                                 className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] text-center"
+                                                title="Cantidad solicitada/despachada"
                                             />
                                             <button type="button" onClick={() => removeItem(i)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
                                         </div>
