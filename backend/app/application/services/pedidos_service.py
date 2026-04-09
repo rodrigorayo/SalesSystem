@@ -54,8 +54,11 @@ class PedidosService:
                                     status_code=400,
                                     detail=PedidosErrors.stock_insuficiente_origen(product.descripcion, item.cantidad, stock_disp)
                                 )
+                            # Si sale de Sucursal, se envía a precio público (al cliente)
+                            costo = inv.precio_sucursal if (inv and inv.precio_sucursal is not None) else product.precio_venta
+                        else:
+                            costo = product.costo_producto
                         
-                        costo = product.costo_producto
                         subtotal = item.cantidad * costo
                         items.append(PedidoItem(
                             producto_id=item.producto_id,

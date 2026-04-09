@@ -89,7 +89,7 @@ export default function PedidosPage() {
                 producto_id: p._id || p.id,
                 producto_nombre: p.descripcion || p.name,
                 cantidad: '∞',
-                precio: p.costo_unitario ?? p.costo ?? p.precio_venta ?? 0
+                precio: p.costo_producto ?? p.costo_unitario ?? 0
             }));
         } else {
             list = (invData?.items || [])
@@ -98,7 +98,7 @@ export default function PedidosPage() {
                     producto_id: inv.producto_id,
                     producto_nombre: inv.producto_nombre || inv.descripcion || 'Producto',
                     cantidad: inv.cantidad,
-                    precio: inv.costo_unitario ?? inv.precio_sucursal ?? 0
+                    precio: inv.precio_sucursal ?? inv.precio_venta ?? 0
                 }));
         }
         return list.sort((a: any, b: any) => a.producto_nombre.localeCompare(b.producto_nombre));
@@ -505,7 +505,7 @@ export default function PedidosPage() {
                                                 <option value="">-- Seleccionar Producto --</option>
                                                 {filteredCatalog.map((p: any) => (
                                                     <option key={p.producto_id} value={p.producto_id}>
-                                                        {p.producto_nombre} (Stock: {p.cantidad}) — Costo: Bs.{(Number(p.precio)||0).toFixed(2)}
+                                                        {p.producto_nombre} (Stock: {p.cantidad}) — Valor Unitario: Bs.{(Number(p.precio)||0).toFixed(2)}
                                                     </option>
                                                 ))}
                                             </select>
