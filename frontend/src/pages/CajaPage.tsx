@@ -169,7 +169,7 @@ function SessionTable({ resumen, categoriasGlobal, filterCashOnly }: { resumen: 
             <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50">
                     <tr>
-                        <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Hora</th>
+                        <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Fecha / Hora</th>
                         <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Tipo</th>
                         <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Descripción</th>
                         <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Cajero</th>
@@ -186,8 +186,8 @@ function SessionTable({ resumen, categoriasGlobal, filterCashOnly }: { resumen: 
                                 : 'text-green-600';
                         return (
                             <tr key={m._id} className={isDigital ? 'bg-indigo-50/20' : ''}>
-                                <td className="px-3 py-1.5 font-mono text-[11px] text-gray-400">
-                                    {formatDate(m.fecha, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                <td className="px-3 py-1.5 font-mono text-[10px] text-gray-400 leading-tight">
+                                    {formatDate(m.fecha, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </td>
                                 <td className="px-3 py-1.5"><SubtipoBadge subtipo={m.subtipo} /></td>
                                 <td className="px-3 py-1.5 text-gray-700">
@@ -695,7 +695,7 @@ export default function CajaPage() {
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-gray-50 sticky top-0 z-10">
                                         <tr>
-                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hora</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha / Hora</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Descripción</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cajero</th>
@@ -715,8 +715,8 @@ export default function CajaPage() {
                                             return (
                                                 <tr key={m._id} className={`transition-colors ${isDigital ? 'bg-indigo-50/30 hover:bg-indigo-50/60' : 'hover:bg-gray-50'
                                                     }`}>
-                                                    <td className="px-3 py-1.5 font-mono text-[11px] text-gray-400">
-                                                        {formatDate(m.fecha, { hour: '2-digit', minute: '2-digit' })}
+                                                    <td className="px-3 py-1.5 font-mono text-[10px] text-gray-400 leading-tight">
+                                                        {formatDate(m.fecha, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                     </td>
                                                     <td className="px-3 py-1.5">
                                                         <SubtipoBadge subtipo={m.subtipo} />
