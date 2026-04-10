@@ -154,13 +154,18 @@ function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen
 }
 // ─── Componentes del Reporte (Tab Session) ───────────────────────────────────
 
-function SessionTable({ resumen, categoriasGlobal }: { resumen: ResumenCaja | undefined, categoriasGlobal: CajaGastoCategoria[] }) {
+function SessionTable({ resumen, categoriasGlobal, filterCashOnly }: { resumen: ResumenCaja | undefined, categoriasGlobal: CajaGastoCategoria[], filterCashOnly?: boolean }) {
     if (!resumen || resumen.movimientos.length === 0) {
         return <p className="text-gray-400 text-xs italic">Sin movimientos registrados.</p>;
     }
 
     return (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+            {filterCashOnly && (
+                <div className="px-3 py-1 bg-yellow-50/80 border-b border-yellow-100 text-[10px] text-yellow-800 font-bold flex items-center justify-center">
+                    ⚠️ MODO AUDITORÍA: Mostrando solo transacciones que afectan al cajón de efectivo (Los pagos digitales están ocultos).
+                </div>
+            )}
             <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50">
                     <tr>
@@ -172,7 +177,9 @@ function SessionTable({ resumen, categoriasGlobal }: { resumen: ResumenCaja | un
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                    {resumen.movimientos.map((m: any) => {
+                    {resumen.movimientos
+                        .filter((m: any) => filterCashOnly ? !['VENTA_QR', 'VENTA_TARJETA', 'INGRESO_QR', 'INGRESO_TARJETA'].includes(m.subtipo) : true)
+                        .map((m: any) => {
                         const isDigital = m.subtipo === 'VENTA_QR' || m.subtipo === 'VENTA_TARJETA';
                         const amtColor = m.tipo === 'EGRESO' ? 'text-red-500'
                             : isDigital ? (m.subtipo === 'VENTA_QR' ? 'text-sky-600' : 'text-purple-600')
@@ -371,8 +378,9 @@ export default function CajaPage() {
 
     // cierre
     const [notasCierre, setNotasCierre] = useState('');
-    const [conteoDetallado, setConteoDetallado] = useState(true);
+    const [conteoDetallado, setConteoDetallado] = useState(false);
     const [montoFisicoManual, setMontoFisicoManual] = useState('');
+    const [filterCashOnly, setFilterCashOnly] = useState<boolean>(true);
 
     // Denominaciones (Calculadora de cierre)
     const [billetes, setBilletes] = useState<Record<string, number>>({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
@@ -394,6 +402,14 @@ export default function CajaPage() {
     const saldoActual = resumen
         ? resumen.monto_inicial + resumen.total_efectivo_ventas - resumen.total_cambio - resumen.total_gastos + (resumen.total_ajustes || 0)
         : 0;
+
+    const ventasPuras = (resumen?.movimientos || [])
+        .filter((m: any) => m.subtipo === 'VENTA_EFECTIVO' && m.tipo === 'INGRESO')
+        .reduce((sum: number, m: any) => sum + Number(m.monto), 0);
+        
+    const anulacionesPuras = (resumen?.movimientos || [])
+        .filter((m: any) => m.subtipo === 'VENTA_EFECTIVO' && m.tipo === 'EGRESO')
+        .reduce((sum: number, m: any) => sum + Number(m.monto), 0);
 
     const diferencia = (totalFisicoFinal > 0 || modal === 'cierre')
         ? totalFisicoFinal - (resumen?.saldo_calculado ?? 0)
@@ -572,12 +588,20 @@ export default function CajaPage() {
                                     <p className="text-sm font-black font-mono">{fmt(resumen.monto_inicial)}</p>
                                 </div>
                                 <div className="rounded-xl p-2.5 border border-green-100 bg-green-50 text-green-800 flex flex-col justify-between">
-                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Total Ingresos Efectivo<br/><span className="text-[9px] font-normal opacity-70">(Ventas Netas + Manuales)</span></p>
-                                    <p className="text-sm font-black font-mono">+{fmt(resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0))}</p>
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Total Ingresos Efectivo<br/><span className="text-[9px] font-normal opacity-70">(Ventas Puras + Manuales)</span></p>
+                                    <p className="text-sm font-black font-mono">+{fmt(ventasPuras + (resumen.total_ingresos_efectivo || 0))}</p>
                                 </div>
-                                <div className="rounded-xl p-2.5 border border-red-100 bg-red-50 text-red-800 flex flex-col justify-between">
-                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Total Egresos Efectivo<br/><span className="text-[9px] font-normal opacity-70">(Gastos + Vueltos)</span></p>
-                                    <p className="text-sm font-black font-mono">-{fmt(resumen.total_gastos + resumen.total_cambio - (resumen.total_ajustes || 0))}</p>
+                                <div className="rounded-xl p-2.5 border border-red-100 bg-red-50 text-red-800 flex flex-col justify-between group relative cursor-help">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Salidas y Anulaciones<br/><span className="text-[9px] font-normal opacity-70">(Vueltos + Gast. + Anul.)</span></p>
+                                    <p className="text-sm font-black font-mono">-{fmt(resumen.total_gastos + resumen.total_cambio + Math.abs(anulacionesPuras) - (resumen.total_ajustes || 0))}</p>
+                                    
+                                    {/* Tooltip Hover Explicativo */}
+                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] rounded p-2 z-20 shadow-xl">
+                                        <p className="font-bold border-b border-gray-700 pb-1 mb-1">Desglose de Salidas:</p>
+                                        <div className="flex justify-between"><span>Gastos Físicos:</span><span className="font-mono">{fmt(resumen.total_gastos)}</span></div>
+                                        <div className="flex justify-between"><span>Vueltos/Cambio:</span><span className="font-mono">{fmt(resumen.total_cambio)}</span></div>
+                                        <div className="flex justify-between text-red-300"><span>Ventas Anuladas:</span><span className="font-mono">{fmt(Math.abs(anulacionesPuras))}</span></div>
+                                    </div>
                                 </div>
                                 <div className="rounded-xl p-2.5 border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col justify-between relative overflow-hidden">
                                      <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-600/5 rounded-full blur-xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
@@ -604,6 +628,23 @@ export default function CajaPage() {
                                 </div>
                              </div>
                         </div>
+
+                        {/* Panel de Auditoría / Insights Automáticos */}
+                        {anulacionesPuras > 0 && (
+                            <motion.div initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} className="bg-red-50/80 rounded-xl border border-red-200 p-3 shadow-sm flex items-start gap-3 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+                                <div className="p-2 bg-red-100 text-red-600 rounded-full shrink-0">
+                                    <AlertTriangle size={16} />
+                                </div>
+                                <div className="z-10 relative">
+                                    <h4 className="text-[11px] font-bold text-red-900 leading-tight flex items-center gap-1.5 uppercase tracking-wide">Modo Auditoría <span className="px-1.5 py-0.5 bg-red-200 text-red-800 rounded bg-opacity-50 text-[9px]">Alerta Detectada</span></h4>
+                                    <p className="text-[11px] text-red-800 mt-1.5 font-medium leading-relaxed">
+                                        Se han detectado ventas anuladas (reversiones en efectivo) equivalentes a <strong className="font-mono text-red-900 bg-white/50 px-1 rounded-sm">{fmt(Math.abs(anulacionesPuras))}</strong> durante este turno de caja. Revisa los movimientos marcados en la bitácora.
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+                        
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -630,7 +671,20 @@ export default function CajaPage() {
                             <h3 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
                                 <Receipt size={14} className="text-gray-400" /> Movimientos del día
                             </h3>
-                            <span className="text-xs text-gray-400">{movimientos.length} registros</span>
+                            <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-gray-700 font-bold bg-white border border-gray-200 px-2 py-1 rounded-md shadow-sm select-none hover:bg-gray-50">
+                                    <input 
+                                       type="checkbox" 
+                                       checked={filterCashOnly} 
+                                       onChange={(e) => setFilterCashOnly(e.target.checked)}
+                                       className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                    />
+                                    <span>Solo Efectivo 💵</span>
+                                </label>
+                                <span className="text-xs text-gray-400">
+                                    {movimientos.filter((m: any) => filterCashOnly ? !['VENTA_QR', 'VENTA_TARJETA', 'INGRESO_QR', 'INGRESO_TARJETA'].includes(m.subtipo) : true).length} registros
+                                </span>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-auto">
                             {loadingMov ? (
@@ -649,7 +703,9 @@ export default function CajaPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {movimientos.map((m) => {
+                                        {movimientos
+                                            .filter((m: any) => filterCashOnly ? !['VENTA_QR', 'VENTA_TARJETA', 'INGRESO_QR', 'INGRESO_TARJETA'].includes(m.subtipo) : true)
+                                            .map((m) => {
                                             const isDigital = m.subtipo === 'VENTA_QR' || m.subtipo === 'VENTA_TARJETA';
                                             const amtColor = m.tipo === 'EGRESO'
                                                 ? 'text-red-500'
@@ -1106,15 +1162,17 @@ export default function CajaPage() {
                                                     {/* Margen de error reportado */}
                                                     <motion.div 
                                                         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                                        className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-gray-50 border-gray-200 text-gray-800' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-800'}`}
+                                                        className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-green-50 border-green-200 text-green-800 shadow-sm' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-800 shadow-sm'}`}
                                                     >
                                                         <div className="flex justify-between items-center">
                                                             <div className="flex items-center gap-2">
-                                                                {Math.abs(diferencia ?? 0) < 0.50 ? <div className="w-2 h-2 bg-green-500 rounded-full" /> : <RefreshCw size={14} className="animate-spin" />}
-                                                                <span className="text-[11px] font-bold uppercase tracking-tight">Diferencia de Arqueo</span>
+                                                                {Math.abs(diferencia ?? 0) < 0.50 ? <ShieldCheck size={16} className="text-green-600" /> : <AlertTriangle size={16} />}
+                                                                <span className="text-[11px] font-black uppercase tracking-tight opacity-70">
+                                                                    {Math.abs(diferencia ?? 0) < 0.50 ? 'Estado de Auditoría' : 'Diferencia Detectada'}
+                                                                </span>
                                                             </div>
-                                                            <span className="text-lg font-black font-mono">
-                                                                {Math.abs(diferencia ?? 0) < 0.50 ? 'Cuadrado Perfecto' : (diferencia ?? 0) > 0 ? `+${fmt((diferencia ?? 0))}` : fmt((diferencia ?? 0))}
+                                                            <span className={`text-lg font-black font-mono tracking-tighter ${Math.abs(diferencia ?? 0) < 0.50 ? 'text-green-700' : ''}`}>
+                                                                {Math.abs(diferencia ?? 0) < 0.50 ? '✔️ CAJA CUADRADA' : (diferencia ?? 0) > 0 ? `🟢 SOBRA ${fmt(Math.abs(diferencia ?? 0))}` : `🔴 FALTA ${fmt(Math.abs(diferencia ?? 0))}`}
                                                             </span>
                                                         </div>
                                                         {Math.abs(diferencia ?? 0) >= 0.50 && (
@@ -1149,12 +1207,14 @@ export default function CajaPage() {
                                                         <button 
                                                             onClick={handleCierre} 
                                                             disabled={btnDisabled}
-                                                            className={`w-full mt-4 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2
+                                                            className={`w-full mt-4 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-2
                                                                 ${requiereJustificacion && !notasAceptables 
-                                                                    ? 'bg-red-400 text-white cursor-not-allowed' 
-                                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
+                                                                    ? 'bg-red-100 text-red-400 cursor-not-allowed opacity-70' 
+                                                                    : (requiereJustificacion && notasAceptables) 
+                                                                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200' 
+                                                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
                                                         >
-                                                            {cerrarMut.isPending ? <RefreshCw className="animate-spin" size={18} /> : (requiereJustificacion && !notasAceptables) ? 'Falta justificación' : 'Confirmar y Cerrar Caja'}
+                                                            {cerrarMut.isPending ? <RefreshCw className="animate-spin" size={18} /> : (requiereJustificacion && !notasAceptables) ? 'BLOQUEADO: Falta Justificación' : requiereJustificacion ? 'Registrar Falta y Cerrar' : 'Confirmar Caja Cuadrada'}
                                                         </button>
                                                     </div>
                                                 );
