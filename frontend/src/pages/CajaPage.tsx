@@ -83,14 +83,7 @@ function SubtipoBadge({ subtipo }: { subtipo: string }) {
 
 // ─── Resumen Numbers ───────────────────────────────────────────────────────
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-    return (
-        <div className={`rounded-xl p-2.5 border ${color}`}>
-            <p className="text-[10px] font-semibold text-current opacity-60 mb-0.5">{label}</p>
-            <p className="text-sm font-black font-mono">{fmt(value)}</p>
-        </div>
-    );
-}
+
 
 // ─── Historial Session Detail ────────────────────────────────────────────────
 
