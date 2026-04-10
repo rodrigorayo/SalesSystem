@@ -114,16 +114,17 @@ export function generarPDFSesion(
     y += 34;
 
     // ── KPI grid (6 cards in 2 rows × 3) ─────────────────────────────────────
+    const ef_entregar = Math.max(0, sesion.saldo_calculado - sesion.monto_inicial);
     const kpis = [
-        { label: 'Monto inicial', value: fmtMoney(sesion.monto_inicial), color: C.primary },
-        { label: 'Ef. recibido', value: fmtMoney(sesion.total_efectivo), color: C.green },
-        { label: 'Cambio dado', value: fmtMoney(sesion.total_cambio), color: C.amber },
-        { label: 'QR', value: fmtMoney(sesion.total_qr), color: C.sky },
-        { label: 'Tarjeta', value: fmtMoney(sesion.total_tarjeta), color: C.purple },
-        { label: 'Gastos', value: fmtMoney(sesion.total_gastos), color: C.red },
-        { label: 'Total ventas', value: fmtMoney(sesion.total_ventas), color: C.dark },
+        { label: 'Fondo Fijo Inicial', value: fmtMoney(sesion.monto_inicial), color: C.primary },
+        { label: 'Ingresos Efectivo', value: fmtMoney(resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0)), color: C.green },
+        { label: 'Egresos (Gast+Vuelto)', value: fmtMoney(sesion.total_gastos + sesion.total_cambio), color: C.red },
+        { label: 'Ajustes de Caja', value: fmtMoney(sesion.total_ajustes || 0), color: C.amber },
+        { label: 'Monto a Entregar', value: fmtMoney(ef_entregar), color: C.purple },
+        { label: 'Ventas QR', value: fmtMoney(sesion.total_qr), color: C.sky },
+        { label: 'Ventas Tarjeta', value: fmtMoney(sesion.total_tarjeta), color: C.sky },
+        { label: 'Global Vendido', value: fmtMoney(sesion.total_ventas), color: C.dark },
         { label: 'Transacciones', value: String(sesion.num_transacciones), color: C.gray },
-        { label: 'Ef. neto (caja)', value: fmtMoney(sesion.total_efectivo - sesion.total_cambio), color: C.green },
     ];
 
     const cols = 3;

@@ -565,33 +565,51 @@ export default function CajaPage() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="space-y-2 overflow-hidden mb-2 mt-2"
+                        className="space-y-4 overflow-hidden mb-2 mt-2"
                     >
-                        {/* Cash drawer */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <StatCard label="Inicial" value={resumen.monto_inicial} color="border-blue-200 bg-blue-50 text-blue-800" />
-                            <StatCard label="Ef. Recibido (+Ingresos)" value={resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0)} color="border-green-200 bg-green-50 text-green-800" />
-                            <StatCard label="Cambio" value={resumen.total_cambio} color="border-amber-200 bg-amber-50 text-amber-800" />
-                            <StatCard label="Gastos" value={resumen.total_gastos} color="border-red-200 bg-red-50 text-red-800" />
+                        {/* Bloque Fondo Fijo: Flujo Físico */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-3 shadow-sm">
+                            <h3 className="text-[11px] font-bold text-gray-800 uppercase tracking-wider flex justify-between items-center bg-gray-50/80 p-2 rounded-lg border border-gray-100">
+                                <span>Flujo de Efectivo Físico (Modelo Fondo Fijo)</span>
+                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px]">Saldo Esperado: {fmt(resumen.saldo_calculado)}</span>
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div className="rounded-xl p-2.5 border-l-4 border-blue-400 bg-blue-50 text-blue-900 flex flex-col justify-between">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Monto Inicial<br/><span className="text-[9px] font-normal opacity-70">(Base para mañana)</span></p>
+                                    <p className="text-sm font-black font-mono">{fmt(resumen.monto_inicial)}</p>
+                                </div>
+                                <div className="rounded-xl p-2.5 border border-green-100 bg-green-50 text-green-800 flex flex-col justify-between">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Total Ingresos Efectivo<br/><span className="text-[9px] font-normal opacity-70">(Ventas Netas + Manuales)</span></p>
+                                    <p className="text-sm font-black font-mono">+{fmt(resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0))}</p>
+                                </div>
+                                <div className="rounded-xl p-2.5 border border-red-100 bg-red-50 text-red-800 flex flex-col justify-between">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Total Egresos Efectivo<br/><span className="text-[9px] font-normal opacity-70">(Gastos + Vueltos)</span></p>
+                                    <p className="text-sm font-black font-mono">-{fmt(resumen.total_gastos + resumen.total_cambio - (resumen.total_ajustes || 0))}</p>
+                                </div>
+                                <div className="rounded-xl p-2.5 border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col justify-between relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-600/5 rounded-full blur-xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+                                     <p className="text-[10px] font-bold text-indigo-800/80 mb-1 leading-tight">Monto A Entregar<br/><span className="text-[9px] font-normal text-indigo-700/80">(Ganancia Neta Física)</span></p>
+                                     <p className="text-sm font-black font-mono text-indigo-900">{fmt(Math.max(0, resumen.saldo_calculado - resumen.monto_inicial))}</p>
+                                </div>
+                            </div>
                         </div>
-                        {/* Digital channels + grand total */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div className="rounded-xl p-2.5 border border-sky-200 bg-sky-50 text-sky-800">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">QR (+Ingresos)</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_qr)}</p>
-                            </div>
-                            <div className="rounded-xl p-2.5 border border-purple-200 bg-purple-50 text-purple-800">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Tarjeta (+Ingresos)</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_tarjeta)}</p>
-                            </div>
-                            <div className="rounded-xl p-2.5 border border-gray-200 bg-gray-100 text-gray-600">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Ajustes</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_ajustes || 0)}</p>
-                            </div>
-                            <div className="rounded-xl p-2.5 border-2 border-indigo-200 bg-indigo-50 text-indigo-900 border-dashed">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Calculado {sesion?.estado === 'CERRADA' ? '(Final)' : '(Actual)'}</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.saldo_calculado)}</p>
-                            </div>
+
+                        {/* Canales Digitales y Totales */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+                             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between mb-2 px-1">
+                                 <span>Pagos Digitales (Directo a Banco)</span>
+                                 <span className="text-[9px] lowercase opacity-60">Estos ingresos no se contabilizan en el flujo físico</span>
+                             </h3>
+                             <div className="grid grid-cols-2 gap-2">
+                                <div className="rounded-xl p-2 border border-sky-100 bg-sky-50/50 flex justify-between items-center text-sky-800">
+                                    <span className="text-[11px] font-semibold">QR Total</span>
+                                    <span className="text-xs font-bold font-mono text-sky-900">{fmt(resumen.total_qr)}</span>
+                                </div>
+                                <div className="rounded-xl p-2 border border-purple-100 bg-purple-50/50 flex justify-between items-center text-purple-800">
+                                    <span className="text-[11px] font-semibold">Tarjeta / POS</span>
+                                    <span className="text-xs font-bold font-mono text-purple-900">{fmt(resumen.total_tarjeta)}</span>
+                                </div>
+                             </div>
                         </div>
                     </motion.div>
                 )}
@@ -920,36 +938,52 @@ export default function CajaPage() {
                                         <div className="space-y-4">
                                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-indigo-400 rounded-full" />
-                                                Saldo Esperado (Sistema)
+                                                Flujo Físico Sugerido (Fondo Fijo)
                                             </h3>
                                             
                                             <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-3">
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Fondo Inicial</span>
+                                                    <span className="text-gray-400 font-medium">Fondo Inicial <span className="text-[10px] bg-gray-100 px-1 rounded ml-1">(Fijo)</span></span>
                                                     <span className="font-mono font-bold text-gray-600">{fmt(resumen?.monto_inicial)}</span>
                                                 </div>
+                                                <div className="pt-2 border-t border-gray-50"></div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Ventas en Efectivo</span>
+                                                    <span className="text-gray-400 font-medium">+ Ventas en Efectivo</span>
                                                     <span className="font-mono font-bold text-green-600">+{fmt(resumen?.total_efectivo_ventas)}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center text-sm text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg">
-                                                    <span className="font-medium">Ingresos Manuales</span>
+                                                <div className="flex justify-between items-center text-sm text-indigo-600">
+                                                    <span className="font-medium">+ Ingresos Manuales</span>
                                                     <span className="font-mono font-bold">+{fmt(resumen?.total_ingresos_efectivo)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Cambio Entregado</span>
+                                                    <span className="text-gray-400 font-medium">- Cambio Entregado</span>
                                                     <span className="font-mono font-bold text-amber-600">-{fmt(resumen?.total_cambio)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Gastos Registrados</span>
+                                                    <span className="text-gray-400 font-medium">- Gastos Registrados</span>
                                                     <span className="font-mono font-bold text-red-500">-{fmt(resumen?.total_gastos)}</span>
                                                 </div>
+                                                {((resumen?.total_ajustes) || 0) !== 0 && (
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-gray-400 font-medium">Ajustes</span>
+                                                        <span className="font-mono font-bold text-gray-500">{((resumen?.total_ajustes)||0) > 0 ? '+' : ''}{fmt(resumen?.total_ajustes)}</span>
+                                                    </div>
+                                                )}
                                                 
-                                                <div className="pt-4 border-t border-dashed border-gray-100">
-                                                    <div className="flex justify-between items-end">
-                                                        <span className="text-xs font-black text-gray-900 uppercase">Deben haber:</span>
-                                                        <span className="text-3xl font-black font-mono text-gray-900 tracking-tighter">
+                                                <div className="pt-4 border-t border-dashed border-gray-200 mt-2">
+                                                    <div className="flex justify-between items-end mb-1">
+                                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Físico Esperado Total</span>
+                                                        <span className="text-2xl font-black font-mono text-gray-900 tracking-tighter">
                                                             {fmt(resumen?.saldo_calculado)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-end mt-4 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                                        <div>
+                                                            <span className="text-[10px] font-bold text-indigo-800 uppercase block">Ganancia Neta (A Depositar)</span>
+                                                            <span className="text-[9px] text-indigo-500 font-medium">Lo que deberías entregar idealmente</span>
+                                                        </div>
+                                                        <span className="text-xl font-black font-mono text-indigo-600">
+                                                            {fmt((resumen?.saldo_calculado || 0) - (resumen?.monto_inicial || 0))}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1059,23 +1093,44 @@ export default function CajaPage() {
 
                                             {/* DIFERENCIA Y ANALISIS */}
                                             {totalFisicoFinal > 0 && (
-                                                <motion.div 
-                                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                                    className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-green-50 border-green-100 text-green-800' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-100 text-blue-800' : 'bg-red-50 border-red-100 text-red-800'}`}
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-center gap-2">
-                                                            {Math.abs(diferencia ?? 0) < 0.50 ? <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> : <RefreshCw size={14} className="animate-spin" />}
-                                                            <span className="text-xs font-bold uppercase tracking-tight">Resultado del Arqueo</span>
+                                                <div className="space-y-3">
+                                                    {/* Desglose de Entrega Real */}
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="p-3 bg-green-50 rounded-2xl border border-green-200">
+                                                            <p className="text-[10px] font-black text-green-800 uppercase leading-tight mb-2">Monto a Entregar<br/><span className="text-[9px] font-medium opacity-80">(Efectivo Ganado)</span></p>
+                                                            <p className="text-xl font-black font-mono text-green-700">
+                                                                {fmt(Math.max(0, totalFisicoFinal - (resumen?.monto_inicial || 0)))}
+                                                            </p>
                                                         </div>
-                                                        <span className="text-lg font-black font-mono">
-                                                            {Math.abs(diferencia ?? 0) < 0.50 ? 'OK' : fmt(Math.abs(diferencia ?? 0))}
-                                                        </span>
+                                                        <div className="p-3 bg-yellow-50 rounded-2xl border border-yellow-200">
+                                                            <p className="text-[10px] font-black text-yellow-800 uppercase leading-tight mb-2">Guardar en Caja<br/><span className="text-[9px] font-medium opacity-80">(Para el día sgt.)</span></p>
+                                                            <p className="text-xl font-black font-mono text-yellow-700">
+                                                                {fmt(Math.min(totalFisicoFinal, resumen?.monto_inicial || 0))}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-[10px] opacity-70 mt-1 font-medium">
-                                                        {Math.abs(diferencia ?? 0) < 0.50 ? 'El monto coincide con el sistema (margen 0.50c).' : (diferencia ?? 0) > 0 ? 'Hay más dinero físico de lo que reporta el sistema.' : 'Falta dinero físico respecto al reporte del sistema.'}
-                                                    </p>
-                                                </motion.div>
+                                                    
+                                                    {/* Margen de error reportado */}
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                        className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-gray-50 border-gray-200 text-gray-800' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-800'}`}
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-2">
+                                                                {Math.abs(diferencia ?? 0) < 0.50 ? <div className="w-2 h-2 bg-green-500 rounded-full" /> : <RefreshCw size={14} className="animate-spin" />}
+                                                                <span className="text-[11px] font-bold uppercase tracking-tight">Diferencia de Arqueo</span>
+                                                            </div>
+                                                            <span className="text-lg font-black font-mono">
+                                                                {Math.abs(diferencia ?? 0) < 0.50 ? 'Cuadrado Perfecto' : (diferencia ?? 0) > 0 ? `+${fmt((diferencia ?? 0))}` : fmt((diferencia ?? 0))}
+                                                            </span>
+                                                        </div>
+                                                        {Math.abs(diferencia ?? 0) >= 0.50 && (
+                                                            <p className="text-[10px] opacity-70 mt-1.5 font-medium leading-relaxed">
+                                                                {(diferencia ?? 0) > 0 ? 'Estás declarando que hay MÁS EFECTIVO físico de lo que el sistema contabilizó. El excedente se reportará.' : 'Estás declarando un FALTANTE DE DINERO real. Tendrás que justificarlo obligatoriamente.'}
+                                                            </p>
+                                                        )}
+                                                    </motion.div>
+                                                </div>
                                             )}
 
                                             {/* NOTAS Y CONFIRMACIÓN */}
