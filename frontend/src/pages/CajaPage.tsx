@@ -11,7 +11,7 @@ import { getResumenCaja, getCategoriasGasto } from '../api/api';
 import { generarPDFSesion } from '../utils/cajaPDF';
 import {
     Unlock, Lock, MinusCircle, Plus, X,
-    Receipt, Tag, RefreshCw, AlertCircle,
+    Receipt, Tag, RefreshCw, AlertCircle, AlertTriangle,
     History, ChevronDown, ChevronUp, ShieldCheck, Download, FileText, Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
