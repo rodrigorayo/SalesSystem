@@ -53,8 +53,8 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
     result = []
     for s in sesiones:
         movs = await CajaMovimiento.find(CajaMovimiento.sesion_id == str(s.id)).to_list()
-        ef   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
-        ef_ing = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
+        ef   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
+        ef_ing = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
         cc   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.CAMBIO)
         gs   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.GASTO)
         aj   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.AJUSTE)
@@ -139,14 +139,14 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
         CajaMovimiento.sesion_id == sesion_id
     ).sort("+fecha").to_list()
 
-    total_ventas_ef = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
-    total_ingresos_ef = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
+    total_ventas_ef = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
+    total_ingresos_ef = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
     total_cambio    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.CAMBIO)
     total_gastos    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.GASTO)
     total_ajustes   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.AJUSTE)
     
-    total_ingresos_qr = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
-    total_ingresos_tj = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
+    total_ingresos_qr = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
+    total_ingresos_tj = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
 
     monto_inicial   = float(sesion.monto_inicial)
     saldo_calculado = monto_inicial + total_ventas_ef + total_ingresos_ef - total_cambio - total_gastos + total_ajustes
@@ -176,8 +176,8 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
             else:
                 total_efectivo_sales += v
 
-    total_qr += sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
-    total_tarjeta += sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
+    total_qr += sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
+    total_tarjeta += sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
     total_ventas_general = total_qr + total_tarjeta + total_efectivo_sales
     num_transacciones    = len(sales_in_session)
 
