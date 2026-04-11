@@ -358,7 +358,18 @@ export const getSaleStatsToday = (sucursal_id?: string) => {
     const qs = params.toString();
     return client<{ today_sales: number; transaction_count: number; items_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
 };
-export const anularSale = (id: string) => client<Sale>(`/sales/${id}/anular`, { method: 'PATCH' });
+export type MotivoAnulacion = 'ERROR_COBRO' | 'DEVOLUCION_CLIENTE' | 'PRODUCTO_DEFECTUOSO' | 'VENTA_DUPLICADA' | 'OTRO';
+export const anularSale = ({ id, motivo, notas }: { id: string; motivo: MotivoAnulacion; notas?: string }) =>
+    client<Sale>(`/sales/${id}/anular`, { method: 'PATCH', body: { motivo, notas } });
+export const checkPosibleDuplicado = (id: string) =>
+    client<{
+        tiene_duplicado: boolean;
+        candidato_id?: string;
+        candidato_id_corto?: string;
+        candidato_monto?: number;
+        candidato_fecha?: string;
+        candidato_cajero?: string;
+    }>(`/sales/${id}/posible-duplicado`);
 export const toggleFacturaEmitida = (id: string, emitida: boolean) => 
     client<Sale>(`/sales/${id}/factura?emitida=${emitida}`, { method: 'PATCH' });
 export const updateQRInfo = (id: string, qrData: { banco: string; referencia: string; monto_transferido: number }) => 

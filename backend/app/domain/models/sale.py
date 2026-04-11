@@ -69,6 +69,14 @@ class Sale(Document):
     factura_emitida: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+    # ── Auditoría de anulación ────────────────────────────────────────────────
+    motivo_anulacion: Optional[str] = None          # Categoría del motivo
+    notas_anulacion: Optional[str] = None           # Descripción libre
+    anulada_por_id: Optional[str] = None            # ID del usuario que anuló
+    anulada_por_nombre: Optional[str] = None        # Nombre legible
+    anulada_at: Optional[datetime] = None           # Timestamp de anulación
+
     class Settings:
         name = "sales"
         indexes = ["tenant_id", "created_at", "cliente_id", "cashier_id"]
+

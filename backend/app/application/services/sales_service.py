@@ -265,7 +265,7 @@ class SalesService:
 
 
     @staticmethod
-    async def anular_sale(sale_id: str, current_user: User) -> Sale:
+    async def anular_sale(sale_id: str, current_user: User, motivo: str, notas: Optional[str] = None) -> Sale:
         tenant_id = current_user.tenant_id or "default"
         client = get_client()
 
@@ -320,7 +320,7 @@ class SalesService:
                                 precio_venta_momento=item.precio_unitario,
                                 usuario_id=str(current_user.id),
                                 usuario_nombre=current_user.full_name or current_user.username,
-                                notas=f"Anulación de Venta #{str(sale.id)[-6:]}",
+                                notas=f"Anulación de Venta #{str(sale.id)[-6:]} — Motivo: {motivo}",
                                 referencia_id=str(sale.id)
                             ).create(session=session)
 
@@ -348,7 +348,7 @@ class SalesService:
                                 subtipo     = mov.subtipo,
                                 tipo        = inverse_type,
                                 monto       = mov.monto,
-                                descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reversión de {mov.descripcion.split('— ')[-1] if '— ' in mov.descripcion else 'pago'})",
+                                descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reversión de {mov.descripcion.split('— ')[-1] if '— ' in mov.descripcion else 'pago'}) — {motivo}",
                                 sale_id     = str(sale.id),
                             ).create(session=session)
                     else:
@@ -359,7 +359,13 @@ class SalesService:
                                 detail="No puedes anular una venta con ingresos (efectivo/qr/tarjeta) sin tener una sesión de caja ABIERTA en tu sucursal.Abre la caja primero para procesar la devolución."
                             )
 
-                    sale.anulada = True
+                    # ── Guardar auditoría de anulación ────────────────────────
+                    sale.anulada           = True
+                    sale.motivo_anulacion  = motivo
+                    sale.notas_anulacion   = notas
+                    sale.anulada_por_id    = str(current_user.id)
+                    sale.anulada_por_nombre = current_user.full_name or current_user.username
+                    sale.anulada_at        = datetime.utcnow()
                     await sale.save(session=session)
                     
                     await SaleItemAnalytics.find(
@@ -374,3 +380,4 @@ class SalesService:
         except Exception as e:
             logger.error(f"[SalesService.anular_sale] Transaction aborted: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Error transaccional al anular la venta: {str(e)}")
+

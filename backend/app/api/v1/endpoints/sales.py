@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.utils.date_utils import get_now_bolivia
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.domain.models.sale import Sale, ClienteInfo, PagoItem, SaleItem
@@ -19,7 +19,19 @@ router = APIRouter()
 from app.domain.schemas.sale import SaleCreate, SalesPaginated
 from app.application.services.sales_service import SalesService
 
-from app.application.services.sales_service import SalesService
+
+# ─── Schema: Anulación ──────────────────────────────────────────────────────────────────
+
+class AnularRequest(BaseModel):
+    motivo: Literal[
+        "ERROR_COBRO",
+        "DEVOLUCION_CLIENTE",
+        "PRODUCTO_DEFECTUOSO",
+        "VENTA_DUPLICADA",
+        "OTRO"
+    ]
+    notas: Optional[str] = None  # Obligatorio en frontend si motivo == "OTRO"
+
 
 @router.post("/ventas", response_model=Sale)
 @router.post("/sales", response_model=Sale)
@@ -132,9 +144,56 @@ async def get_sales(
 @router.patch("/sales/{sale_id}/anular", response_model=Sale)
 async def anular_sale(
     sale_id: str,
+    body: AnularRequest,
     current_user: User = Depends(get_current_active_user)
 ):
-    return await SalesService.anular_sale(sale_id, current_user)
+    return await SalesService.anular_sale(
+        sale_id, current_user,
+        motivo=body.motivo,
+        notas=body.notas
+    )
+
+
+# ─── GET /sales/{sale_id}/posible-duplicado ────────────────────────────────────────
+
+@router.get("/sales/{sale_id}/posible-duplicado")
+async def check_posible_duplicado(
+    sale_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Detect if another sale from the same cashier with same total exists within 2 minutes."""
+    tenant_id = current_user.tenant_id or "default"
+    sale = await Sale.get(sale_id)
+    if not sale or sale.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    window_start = sale.created_at - timedelta(minutes=2)
+    window_end   = sale.created_at + timedelta(minutes=2)
+
+    # Find other non-annulled sales from same cashier with same total in the time window
+    candidatos = await Sale.find(
+        Sale.tenant_id   == tenant_id,
+        Sale.cashier_id  == sale.cashier_id,
+        Sale.total       == sale.total,
+        Sale.anulada     == False,
+        Sale.created_at  >= window_start,
+        Sale.created_at  <= window_end,
+    ).to_list()
+
+    # Exclude the sale itself
+    candidatos = [s for s in candidatos if str(s.id) != sale_id]
+
+    if candidatos:
+        c = candidatos[0]
+        return {
+            "tiene_duplicado": True,
+            "candidato_id": str(c.id),
+            "candidato_id_corto": str(c.id)[-6:].upper(),
+            "candidato_monto": float(c.total),
+            "candidato_fecha": c.created_at.isoformat(),
+            "candidato_cajero": c.cashier_name,
+        }
+    return {"tiene_duplicado": False}
 
 # ─── PATCH /sales/{sale_id}/factura ───────────────────────────────────────────
 

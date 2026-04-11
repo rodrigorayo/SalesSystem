@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSales, anularSale, getSucursales, toggleFacturaEmitida } from '../api/api';
+import { getSales, anularSale, getSucursales, toggleFacturaEmitida, checkPosibleDuplicado, type MotivoAnulacion } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import {
     Receipt, Loader2, ChevronRight, ChevronDown,
-    Search, Ban, CalendarDays, ScrollText, AlertTriangle
+    Search, Ban, CalendarDays, ScrollText, AlertTriangle, ShieldCheck, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TicketPrinter } from '../components/TicketPrinter';
@@ -13,6 +13,200 @@ import type { Sale } from '../api/types';
 
 import { formatFullDate as formatDate } from '../utils/dateUtils';
 
+// ─── Motivos de anulación ────────────────────────────────────────────────────
+
+const MOTIVOS: { value: MotivoAnulacion; label: string; icon: string; desc: string }[] = [
+    { value: 'ERROR_COBRO',          label: 'Error de cobro',            icon: '💸', desc: 'Se cobró mal el monto o el método' },
+    { value: 'DEVOLUCION_CLIENTE',   label: 'Devolución de cliente',     icon: '↩️', desc: 'El cliente devuelve el producto' },
+    { value: 'PRODUCTO_DEFECTUOSO',  label: 'Producto defectuoso',       icon: '⚠️', desc: 'El artículo presentó fallas' },
+    { value: 'VENTA_DUPLICADA',      label: 'Venta duplicada',           icon: '🔁', desc: 'Esta venta fue registrada dos veces' },
+    { value: 'OTRO',                 label: 'Otro motivo',               icon: '📝', desc: 'Especificar en el campo de notas' },
+];
+
+// ─── AnularModal ─────────────────────────────────────────────────────────────
+
+function AnularModal({
+    venta,
+    onClose,
+    onConfirm,
+    isPending,
+}: {
+    venta: Sale;
+    onClose: () => void;
+    onConfirm: (motivo: MotivoAnulacion, notas?: string) => void;
+    isPending: boolean;
+}) {
+    const [motivo, setMotivo] = useState<MotivoAnulacion | ''>('');
+    const [notas, setNotas] = useState('');
+    const [dupData, setDupData] = useState<Awaited<ReturnType<typeof checkPosibleDuplicado>> | null>(null);
+    const [checkingDup, setCheckingDup] = useState(false);
+
+    // Auto-check for duplicate on mount
+    useState(() => {
+        setCheckingDup(true);
+        checkPosibleDuplicado(venta._id)
+            .then(d => setDupData(d))
+            .catch(() => {})
+            .finally(() => setCheckingDup(false));
+    });
+
+    // Financial impact analysis
+    const metodosEfectivo = (venta.pagos || []).filter(p => p.metodo === 'EFECTIVO');
+    const metodosDigital = (venta.pagos || []).filter(p => ['QR', 'TARJETA', 'TRANSFERENCIA'].includes(p.metodo));
+    const montoEfectivo = metodosEfectivo.reduce((s, p) => s + Number(p.monto), 0);
+    const montoDigital = metodosDigital.reduce((s, p) => s + Number(p.monto), 0);
+
+    const requiereNotas = motivo === 'OTRO';
+    const notasOk = !requiereNotas || notas.trim().length >= 10;
+    const canConfirm = motivo !== '' && notasOk && !isPending;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="bg-red-600 px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-xl">
+                            <Ban size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-white font-bold text-base">Anular Venta</h2>
+                            <p className="text-red-200 text-[11px]">Ticket #{venta._id.slice(-6).toUpperCase()} — Bs. {Number(venta.total).toFixed(2)}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-all">
+                        ✕
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+
+                    {/* Alerta de duplicado detectado */}
+                    {checkingDup && (
+                        <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
+                            <Loader2 size={12} className="animate-spin" /> Verificando posibles duplicados...
+                        </div>
+                    )}
+                    {dupData?.tiene_duplicado && (
+                        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                            className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-3">
+                            <div className="p-1.5 bg-amber-100 rounded-lg shrink-0"><Copy size={14} className="text-amber-700" /></div>
+                            <div>
+                                <p className="text-xs font-bold text-amber-900 mb-0.5">⚠️ Posible venta duplicada detectada</p>
+                                <p className="text-[11px] text-amber-800">
+                                    Hay otra venta similar (Ticket <strong>#{dupData.candidato_id_corto}</strong> — Bs. {dupData.candidato_monto?.toFixed(2)}) del mismo cajero hace menos de 2 minutos. ¿Es esta la que querías anular?
+                                </p>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Impacto financiero */}
+                    <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Impacto Financiero de la Anulación</p>
+                        {montoEfectivo > 0 && (
+                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-2">
+                                <Ban size={14} className="text-red-600 shrink-0" />
+                                <p className="text-[11px] text-red-800 font-medium">
+                                    <strong>Bs. {montoEfectivo.toFixed(2)} en EFECTIVO</strong> saldrá del cajón de la caja activa.
+                                </p>
+                            </div>
+                        )}
+                        {montoDigital > 0 && (
+                            <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-lg p-2">
+                                <ShieldCheck size={14} className="text-sky-600 shrink-0" />
+                                <p className="text-[11px] text-sky-800 font-medium">
+                                    <strong>Bs. {montoDigital.toFixed(2)} digital (QR/Tarjeta)</strong> no afecta el cajón.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Selector de motivo */}
+                    <div>
+                        <p className="text-[10px] font-black text-gray-600 uppercase tracking-wider mb-2">
+                            Motivo de Anulación <span className="text-red-500">*</span>
+                        </p>
+                        <div className="space-y-2">
+                            {MOTIVOS.map(m => (
+                                <button
+                                    key={m.value}
+                                    onClick={() => setMotivo(m.value)}
+                                    className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-sm ${
+                                        motivo === m.value
+                                            ? 'border-red-400 bg-red-50 text-red-900 ring-2 ring-red-200'
+                                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <span className="text-base">{m.icon}</span>
+                                    <div>
+                                        <p className="font-bold text-[12px]">{m.label}</p>
+                                        <p className="text-[10px] opacity-60">{m.desc}</p>
+                                    </div>
+                                    {motivo === m.value && (
+                                        <div className="ml-auto text-red-500">
+                                            <ShieldCheck size={16} />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Notas adicionales */}
+                    <div>
+                        <label className={`block text-[10px] font-black uppercase tracking-wider mb-1.5 ${requiereNotas ? 'text-red-600' : 'text-gray-500'}`}>
+                            {requiereNotas ? 'Detalle del motivo *' : 'Notas adicionales (opcional)'}
+                        </label>
+                        <textarea
+                            value={notas}
+                            onChange={e => setNotas(e.target.value)}
+                            placeholder={requiereNotas ? 'Describe el motivo con al menos 10 caracteres...' : 'Observaciones adicionales...'}
+                            className={`w-full text-sm rounded-xl border p-3 outline-none focus:ring-2 resize-none h-20 transition-all ${
+                                requiereNotas && notas.trim().length < 10 && notas.length > 0
+                                    ? 'border-red-300 bg-red-50 focus:ring-red-200'
+                                    : 'border-gray-200 bg-white focus:ring-indigo-200'
+                            }`}
+                        />
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 pb-5 pt-2 flex gap-3 border-t border-gray-100">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined)}
+                        disabled={!canConfirm}
+                        className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                            canConfirm
+                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 active:scale-95'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                    >
+                        {isPending ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+                        {isPending ? 'Procesando...' : motivo ? 'Confirmar Anulación' : 'Selecciona un motivo'}
+                    </button>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function VentasPage() {
     const qc = useQueryClient();
@@ -27,13 +221,9 @@ export default function VentasPage() {
     const [printSale, setPrintSale] = useState<Sale | null>(null);
     const [page, setPage] = useState(1);
     const limit = 50;
-    const [confirmModal, setConfirmModal] = useState<{
-        isOpen: boolean;
-        title: string;
-        message: string;
-        action: () => void;
-        type: 'danger' | 'info' | 'success';
-    }>({ isOpen: false, title: '', message: '', action: () => {}, type: 'danger' });
+
+    // Estado del nuevo modal de anulación
+    const [anularVenta, setAnularVenta] = useState<Sale | null>(null);
 
     const { data: sucursales = [] } = useQuery({
         queryKey: ['sucursales'],
@@ -54,6 +244,7 @@ export default function VentasPage() {
             qc.invalidateQueries({ queryKey: ['sales-history'] });
             qc.invalidateQueries({ queryKey: ['sales-stats-today'] });
             qc.invalidateQueries({ queryKey: ['inventario'] });
+            setAnularVenta(null);
         },
         onError: (err: any) => alert(err.message || 'Error al anular la venta.')
     });
@@ -64,21 +255,9 @@ export default function VentasPage() {
         onError: (err: any) => alert(err.message || 'Error al actualizar el estado de la factura.')
     });
 
-    const handleAnular = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setConfirmModal({
-            isOpen: true,
-            title: 'Anular Venta',
-            message: '¿Estás seguro de ANULAR esta venta? Esto devolverá el stock y registrará un egreso en la caja abierta. Esta acción NO se puede deshacer.',
-            type: 'danger',
-            action: () => anularMut.mutate(id)
-        });
-    };
-
     const filteredVentas = ventas.filter(v => {
         if (!searchTerm) return true;
         const search = searchTerm.toLowerCase();
-        // search by ticket id or partial cashier name
         return (v._id || '').toLowerCase().includes(search) || (v.cashier_name || '').toLowerCase().includes(search);
     });
 
@@ -226,6 +405,24 @@ export default function VentasPage() {
                                                 )}
                                             </div>
                                         )}
+
+                                        {/* Log de auditoría en ventas anuladas */}
+                                        {isAnulado && (venta as any).motivo_anulacion && (
+                                            <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3">
+                                                <div className="p-1.5 bg-red-100 rounded-lg shrink-0">
+                                                    <AlertTriangle size={14} className="text-red-600" />
+                                                </div>
+                                                <div className="text-xs">
+                                                    <p className="font-black text-red-900 uppercase tracking-wide mb-1">Registro de Anulación</p>
+                                                    <div className="space-y-0.5 text-red-800">
+                                                        <p><span className="font-bold">Motivo:</span> {MOTIVOS.find(m => m.value === (venta as any).motivo_anulacion)?.label || (venta as any).motivo_anulacion}</p>
+                                                        {(venta as any).notas_anulacion && <p><span className="font-bold">Notas:</span> {(venta as any).notas_anulacion}</p>}
+                                                        {(venta as any).anulada_por_nombre && <p><span className="font-bold">Autorizado por:</span> {(venta as any).anulada_por_nombre}</p>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {/* Detalle Productos */}
                                             <div>
@@ -273,11 +470,11 @@ export default function VentasPage() {
                                                     </button>
                                                     {!isAnulado && role !== 'CAJERO' && (
                                                         <button
-                                                            onClick={(e) => handleAnular(venta._id, e)}
+                                                            onClick={(e) => { e.stopPropagation(); setAnularVenta(venta); }}
                                                             disabled={anularMut.isPending}
                                                             className="flex items-center gap-1.5 bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all"
                                                         >
-                                                            {anularMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+                                                            <Ban size={16} />
                                                             Anular Venta
                                                         </button>
                                                     )}
@@ -304,61 +501,18 @@ export default function VentasPage() {
                 </>
             )}
 
-            {/* Confirmation Modal */}
+            {/* AnularModal PRO */}
             <AnimatePresence>
-                {confirmModal.isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
-                            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl relative"
-                        >
-                            <button onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} className="absolute right-4 top-4 text-gray-400 hover:bg-gray-100 p-1 rounded-lg transition-colors">
-                                <span className="text-xl leading-none">&times;</span>
-                            </button>
-                            
-                            <div className="flex flex-col items-center text-center">
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 
-                                    ${confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' :
-                                      confirmModal.type === 'success' ? 'bg-green-100 text-green-600' :
-                                      'bg-blue-100 text-blue-600'}`}
-                                >
-                                    {confirmModal.type === 'danger' ? <AlertTriangle size={32} /> : 
-                                     confirmModal.type === 'success' ? <Receipt size={32} /> : 
-                                     <ScrollText size={32} />}
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
-                                <p className="text-sm text-gray-600 mb-6 px-2">{confirmModal.message}</p>
-                                
-                                <div className="flex gap-3 w-full">
-                                    <button 
-                                        onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            confirmModal.action();
-                                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                                        }}
-                                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-colors
-                                            ${confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
-                                              confirmModal.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
-                                              'bg-blue-600 hover:bg-blue-700'}`}
-                                    >
-                                        Confirmar
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
+                {anularVenta && (
+                    <AnularModal
+                        venta={anularVenta}
+                        onClose={() => setAnularVenta(null)}
+                        onConfirm={(motivo, notas) => anularMut.mutate({ id: anularVenta._id, motivo, notas })}
+                        isPending={anularMut.isPending}
+                    />
                 )}
             </AnimatePresence>
+
             {/* Hidden Ticket Wrapper for Re-printing */}
             <div className="print-only">
                 {printSale && <TicketPrinter sale={printSale} tenantName={user?.tenant_id || "Mi Tienda"} />}
