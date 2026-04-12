@@ -3,12 +3,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
 from app.domain.models.tenant import Tenant, PlanType
+from app.domain.models.plan import Plan
+from app.domain.models.plan_feature import PlanFeature
 from app.domain.models.user import User, UserRole
 from app.domain.models.product import Product
 from app.domain.models.sale import Sale
 from app.infrastructure.auth import get_current_active_user, get_password_hash
 
 router = APIRouter()
+
+# ─── Todos los features disponibles (usado para ILIMITADO / sin plan) ──────────
+ALL_FEATURES: List[str] = [f.value for f in PlanFeature]
+
 
 # Schemas
 class TenantCreate(BaseModel):
@@ -40,11 +46,50 @@ class TenantUpdate(BaseModel):
     is_active: bool | None = None
 
 # Endpoints
+@router.get("/tenants/my-features")
+async def get_my_features(current_user: User = Depends(get_current_active_user)):
+    """
+    Returns the list of active feature flags for the current user's tenant.
+    - SUPERADMIN: siempre tiene todos los módulos.
+    - Tenant con plan ILIMITADO: todos los módulos.
+    - Tenant sin plan_id asignado: todos los módulos (fallback seguro, no rompe legacy).
+    - Tenant con plan específico: solo los módulos de ese plan.
+    """
+    # SUPERADMIN siempre ve todo
+    if current_user.role == UserRole.SUPERADMIN:
+        return {"features": ALL_FEATURES, "plan": "SUPERADMIN"}
+
+    tenant_id = current_user.tenant_id
+    if not tenant_id:
+        return {"features": ALL_FEATURES, "plan": "NONE"}
+
+    tenant = await Tenant.get(tenant_id)
+    if not tenant:
+        return {"features": ALL_FEATURES, "plan": "NONE"}
+
+    # Plan ILIMITADO o plan no asignado → acceso total
+    if not tenant.plan_id or tenant.plan == PlanType.ILIMITADO:
+        return {"features": ALL_FEATURES, "plan": tenant.plan.value if tenant.plan else "NONE"}
+
+    # Buscar el plan en la colección
+    plan = await Plan.get(tenant.plan_id)
+    if not plan:
+        # Plan no encontrado → fallback seguro: acceso total
+        return {"features": ALL_FEATURES, "plan": "UNKNOWN"}
+
+    return {
+        "features": [f.value for f in plan.features],
+        "plan": plan.code,
+        "plan_name": plan.name,
+    }
+
+
 @router.get("/tenants", response_model=List[Tenant])
 async def get_tenants(current_user: User = Depends(get_current_active_user)):
     if current_user.role != UserRole.SUPERADMIN:
         raise HTTPException(status_code=403, detail="Not authorized")
     return await Tenant.find_all().to_list()
+
 
 @router.post("/tenants", response_model=Tenant)
 async def create_tenant(tenant_in: TenantCreate, current_user: User = Depends(get_current_active_user)):

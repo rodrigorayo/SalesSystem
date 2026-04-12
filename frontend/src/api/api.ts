@@ -28,6 +28,8 @@ export const getTenants = () => client<Tenant[]>('/tenants');
 export const createTenant = (data: TenantCreate) => client<Tenant>('/tenants', { body: data });
 export const updateTenant = (id: string, data: TenantUpdate) => client<Tenant>(`/tenants/${id}`, { method: 'PUT', body: data });
 export const deleteTenant = (id: string) => client<{message: string}>(`/tenants/${id}`, { method: 'DELETE' });
+export const getMyFeatures = () => client<{ features: string[]; plan: string; plan_name?: string }>('/tenants/my-features');
+
 export const getTenantStats = () =>
     client<{ total_sales: number; active_products: number; active_employees: number }>('/tenants/stats');
 

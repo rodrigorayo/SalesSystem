@@ -21,7 +21,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
     const location = useLocation();
-    const { logout, user, role } = useAuthStore();
+    const { logout, user, role, hasFeature } = useAuthStore();
+
     const navigate = useNavigate();
     const [isCollapsed, setIsCollapsed] = useLocalStorage('choco-sidebar-collapsed', false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -38,62 +39,35 @@ export default function Layout({ children }: LayoutProps) {
             return [
                 { icon: LayoutDashboard, label: 'Panel SaaS', path: '/admin' },
             ];
-        } else if (['ADMIN_MATRIZ', 'ADMIN'].includes(role ?? '')) {
-            return [
-                { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-                { icon: BarChart3, label: 'Reportes', path: '/reportes' },
-                { icon: Store, label: 'Sucursales', path: '/sucursales' },
-                { icon: Package, label: 'Catálogo', path: '/catalogo' },
-                { icon: Warehouse, label: 'Inventario', path: '/inventario' },
-                { icon: ClipboardList, label: 'Pedidos', path: '/pedidos' },
-                { icon: Users, label: 'Personal', path: '/usuarios' },
-                { icon: Percent, label: 'Descuentos', path: '/descuentos' },
-                { icon: Tag, label: 'Precios', path: '/solicitudes-precio' },
-                { icon: Tag, label: 'Categorías', path: '/categories' },
-                { icon: Banknote, label: 'Créditos', path: '/creditos' },
-                { icon: Wallet, label: 'Caja', path: '/caja' },
-                { icon: ShoppingBag, label: 'POS', path: '/pos' },
-                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
-            ];
-        } else if (role === 'ADMIN_SUCURSAL') {
-            return [
-                { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard-sucursal' },
-                { icon: BarChart3, label: 'Reportes', path: '/reportes' },
-                { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
-                { icon: Package, label: 'Catálogo', path: '/catalogo' },
-                { icon: ClipboardList, label: 'Pedidos', path: '/pedidos' },
-                { icon: Warehouse, label: 'Inventario', path: '/inventario' },
-                { icon: Users, label: 'Personal', path: '/usuarios' },
-                { icon: Percent, label: 'Descuentos', path: '/descuentos' },
-                { icon: Banknote, label: 'Créditos', path: '/creditos' },
-                { icon: ShoppingBag, label: 'POS', path: '/pos' },
-                { icon: Wallet, label: 'Caja', path: '/caja' },
-                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
-            ];
-        } else if (role === 'SUPERVISOR') {
-            return [
-                { icon: Warehouse, label: 'Inventario', path: '/inventario' },
-                { icon: ClipboardList, label: 'Pedidos', path: '/pedidos' },
-                { icon: Users, label: 'Mi Equipo', path: '/usuarios' },
-                { icon: Package, label: 'Catálogo', path: '/catalogo' },
-                { icon: ShoppingBag, label: 'POS', path: '/pos' },
-                { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
-                { icon: Banknote, label: 'Créditos', path: '/creditos' },
-                { icon: Wallet, label: 'Caja', path: '/caja' },
-                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
-            ];
-        } else {
-            // CAJERO / VENDEDOR / USER
-            return [
-                { icon: ShoppingBag, label: 'POS', path: '/pos' },
-                { icon: RotateCcw, label: 'Ventas', path: '/ventas' },
-                { icon: Banknote, label: 'Créditos', path: '/creditos' },
-                { icon: Warehouse, label: 'Inventario', path: '/inventario' },
-                { icon: Wallet, label: 'Caja', path: '/caja' },
-                { icon: QrCode, label: 'Control QR', path: '/qr-control' },
-            ];
         }
+
+        // Todas las rutas posibles con su feature requerido y los roles que pueden verlo
+        const allItems = [
+            // Dashboard (sin feature — siempre visible según rol)
+            { icon: LayoutDashboard, label: 'Dashboard',    path: '/dashboard',          feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN'] },
+            { icon: LayoutDashboard, label: 'Dashboard',    path: '/dashboard-sucursal', feature: null,                   roles: ['ADMIN_SUCURSAL'] },
+            // Módulos con feature flag
+            { icon: ShoppingBag,     label: 'POS',          path: '/pos',                feature: 'VENTAS',               roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: RotateCcw,       label: 'Ventas',       path: '/ventas',             feature: 'VENTAS',               roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Wallet,          label: 'Caja',         path: '/caja',               feature: 'CAJA',                 roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Package,         label: 'Catálogo',     path: '/catalogo',           feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Warehouse,       label: 'Inventario',   path: '/inventario',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Banknote,        label: 'Créditos',     path: '/creditos',           feature: 'CREDITOS',             roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: BarChart3,       label: 'Reportes',     path: '/reportes',           feature: 'REPORTES_AVANZADOS',   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERADMIN'] },
+            { icon: Percent,         label: 'Descuentos',   path: '/descuentos',         feature: 'DESCUENTOS_AVANZADOS', roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL'] },
+            { icon: Tag,             label: 'Precios',      path: '/solicitudes-precio', feature: 'LISTAS_PRECIOS',       roles: ['ADMIN_MATRIZ', 'ADMIN'] },
+            { icon: Tag,             label: 'Categorías',   path: '/categories',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN'] },
+            { icon: Store,           label: 'Sucursales',   path: '/sucursales',         feature: 'MULTI_SUCURSAL',       roles: ['ADMIN_MATRIZ', 'ADMIN'] },
+            { icon: ClipboardList,   label: 'Pedidos',      path: '/pedidos',            feature: 'PEDIDOS_INTERNOS',     roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
+            { icon: Users,           label: 'Personal',     path: '/usuarios',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
+            { icon: QrCode,          label: 'Control QR',   path: '/qr-control',         feature: 'CONTROL_QR',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR'] },
+        ];
+
+        return allItems
+            .filter(item => item.roles.includes(role ?? ''))
+            .filter(item => !item.feature || hasFeature(item.feature));
     };
+
 
     const navItems = getNavItems();
     // Mobile bottom bar shows just top 4 items (most used)
