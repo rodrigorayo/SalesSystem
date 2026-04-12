@@ -92,17 +92,22 @@ class ProductService:
         if changes:
             # P-02: Cost History Trigger
             if "costo_producto" in changes:
+                from decimal import Decimal
+                costo_ant = Decimal(str(old.get("costo_producto") or 0))
+                costo_nue = Decimal(str(updates.get("costo_producto") or 0))
+                
                 await ProductCostHistory(
                     tenant_id=product.tenant_id,
                     producto_id=str(product.id),
                     descripcion=product.descripcion,
-                    costo_anterior=old.get("costo_producto"),
-                    costo_nuevo=updates.get("costo_producto"),
-                    diferencia=round(updates.get("costo_producto") - old.get("costo_producto"), 4),
+                    costo_anterior=costo_ant,
+                    costo_nuevo=costo_nue,
+                    diferencia=round(costo_nue - costo_ant, 4),
                     motivo=None, # Motivo from Request could be added in schema later
                     cambiado_por=str(current_user.id),
                     cambiado_por_nombre=current_user.full_name or current_user.username
                 ).create()
+
     
             await AuditLog(
                 tenant_id=current_user.tenant_id,
