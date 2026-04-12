@@ -201,3 +201,140 @@ async def delete_tenant(tenant_id: str, current_user: User = Depends(get_current
     await Sale.find(Sale.tenant_id == tenant_id).delete()
 
     return {"message": "Tenant and all associated data deleted successfully"}
+
+
+# ─── Admin: Seed Plans ───────────────────────────────────────────────────────
+
+_PLAN_DEFINITIONS = [
+    {
+        "code": "BASICO",
+        "name": "Plan Básico",
+        "max_sucursales": 1,
+        "max_usuarios": 5,
+        "precio_mensual": "150.00",
+        "is_public": True,
+        "features": [
+            PlanFeature.VENTAS, PlanFeature.INVENTARIO, PlanFeature.CAJA,
+            PlanFeature.CLIENTES, PlanFeature.CREDITOS,
+        ],
+    },
+    {
+        "code": "PRO",
+        "name": "Plan Profesional",
+        "max_sucursales": 3,
+        "max_usuarios": 20,
+        "precio_mensual": "350.00",
+        "is_public": True,
+        "features": [
+            PlanFeature.VENTAS, PlanFeature.INVENTARIO, PlanFeature.CAJA,
+            PlanFeature.CAJA_AVANZADA, PlanFeature.CLIENTES, PlanFeature.CREDITOS,
+            PlanFeature.DESCUENTOS_AVANZADOS, PlanFeature.LISTAS_PRECIOS,
+            PlanFeature.PRICE_REQUESTS, PlanFeature.REPORTES_AVANZADOS, PlanFeature.AUDITORIA,
+        ],
+    },
+    {
+        "code": "ENTERPRISE",
+        "name": "Plan Enterprise",
+        "max_sucursales": -1,
+        "max_usuarios": -1,
+        "precio_mensual": "800.00",
+        "is_public": True,
+        "features": [
+            PlanFeature.VENTAS, PlanFeature.INVENTARIO, PlanFeature.CAJA,
+            PlanFeature.CAJA_AVANZADA, PlanFeature.CLIENTES, PlanFeature.CREDITOS,
+            PlanFeature.DESCUENTOS_AVANZADOS, PlanFeature.LISTAS_PRECIOS,
+            PlanFeature.PRICE_REQUESTS, PlanFeature.REPORTES_AVANZADOS, PlanFeature.AUDITORIA,
+            PlanFeature.MULTI_SUCURSAL, PlanFeature.PEDIDOS_INTERNOS,
+            PlanFeature.CONTROL_QR, PlanFeature.API_ACCESO,
+        ],
+    },
+    {
+        "code": "ILIMITADO",
+        "name": "Plan Ilimitado (Interno)",
+        "max_sucursales": -1,
+        "max_usuarios": -1,
+        "precio_mensual": "0.00",
+        "is_public": False,
+        "features": list(PlanFeature),
+    },
+]
+
+
+@router.post("/tenants/admin/seed-plans")
+async def seed_plans(current_user: User = Depends(get_current_active_user)):
+    """
+    [SUPERADMIN] Siembra los 4 planes base en MongoDB.
+    Es idempotente: si el plan ya existe, lo actualiza; si no, lo crea.
+    """
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    from decimal import Decimal
+    results = []
+    for plan_data in _PLAN_DEFINITIONS:
+        existing = await Plan.find_one({"code": plan_data["code"]})
+        if existing:
+            existing.name           = plan_data["name"]
+            existing.max_sucursales = plan_data["max_sucursales"]
+            existing.max_usuarios   = plan_data["max_usuarios"]
+            existing.precio_mensual = Decimal(plan_data["precio_mensual"])
+            existing.is_public      = plan_data["is_public"]
+            existing.features       = plan_data["features"]
+            await existing.save()
+            results.append({"code": plan_data["code"], "action": "updated"})
+        else:
+            plan = Plan(
+                code            = plan_data["code"],
+                name            = plan_data["name"],
+                max_sucursales  = plan_data["max_sucursales"],
+                max_usuarios    = plan_data["max_usuarios"],
+                precio_mensual  = Decimal(plan_data["precio_mensual"]),
+                is_public       = plan_data["is_public"],
+                features        = plan_data["features"],
+            )
+            await plan.create()
+            results.append({"code": plan_data["code"], "action": "created"})
+
+    return {"ok": True, "results": results}
+
+
+@router.post("/tenants/admin/assign-ilimitado")
+async def assign_ilimitado_to_taboada(current_user: User = Depends(get_current_active_user)):
+    """
+    [SUPERADMIN] Busca el tenant de Taboada y le asigna el plan ILIMITADO.
+    El nombre del tenant se busca de forma case-insensitive con 'taboada'.
+    """
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Buscar el plan ILIMITADO
+    plan_ilimitado = await Plan.find_one({"code": "ILIMITADO"})
+    if not plan_ilimitado:
+        raise HTTPException(status_code=404, detail="Plan ILIMITADO no encontrado. Ejecuta seed-plans primero.")
+
+    # Buscar el tenant de Taboada (case-insensitive)
+    import re
+    taboada = await Tenant.find_one({"name": re.compile("taboada", re.IGNORECASE)})
+    if not taboada:
+        raise HTTPException(status_code=404, detail="Tenant 'Taboada' no encontrado. Verifica el nombre exacto.")
+
+    taboada.plan_id = str(plan_ilimitado.id)
+    taboada.plan    = PlanType.ILIMITADO
+    await taboada.save()
+
+    return {
+        "ok": True,
+        "tenant": taboada.name,
+        "plan_asignado": "ILIMITADO",
+        "plan_id": str(plan_ilimitado.id),
+    }
+
+
+@router.get("/tenants/admin/list-plans")
+async def list_plans(current_user: User = Depends(get_current_active_user)):
+    """[SUPERADMIN] Lista todos los planes con sus features."""
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    plans = await Plan.find_all().to_list()
+    return [{"code": p.code, "name": p.name, "is_public": p.is_public, "features": [f.value for f in p.features]} for p in plans]
+

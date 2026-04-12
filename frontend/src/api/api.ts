@@ -2,7 +2,9 @@
  * Centralized API service layer.
  * All backend route strings are defined here — never scattered in components.
  */
+export { client } from './client';
 import { client } from './client';
+
 import type {
     Tenant, TenantCreate, TenantUpdate,
     Product, ProductCreate,

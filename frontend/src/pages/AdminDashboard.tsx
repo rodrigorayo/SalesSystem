@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/api';
-import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, KeyRound, AlertTriangle, Copy } from 'lucide-react';
+import { getTenants, createTenant, updateTenant, deleteTenant, client } from '../api/api';
+import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, KeyRound, AlertTriangle, Copy, Zap, Star } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import type { Tenant, TenantCreate, TenantUpdate } from '../api/types';
 import { toast } from 'sonner';
@@ -70,6 +70,26 @@ export default function AdminDashboard() {
             toast.success("Empresa eliminada exitosamente");
         }
     });
+
+    // ─── Setup Inicial: Seed y asignación de plan ILIMITADO ────────────────
+    const seedPlansMutation = useMutation({
+        mutationFn: () => client<{ok: boolean; results: {code: string; action: string}[]}>('/tenants/admin/seed-plans', { method: 'POST' }),
+        onSuccess: (res) => {
+            const summary = res.results.map(r => `${r.code}: ${r.action}`).join(', ');
+            toast.success(`✅ Planes sembrados: ${summary}`);
+        },
+        onError: () => toast.error('Error al sembrar los planes')
+    });
+
+    const assignIlimitadoMutation = useMutation({
+        mutationFn: () => client<{ok: boolean; tenant: string; plan_asignado: string}>('/tenants/admin/assign-ilimitado', { method: 'POST' }),
+        onSuccess: (res) => {
+            queryClient.invalidateQueries({ queryKey: ['tenants'] });
+            toast.success(`🌟 Plan ILIMITADO asignado a "${res.tenant}" exitosamente`);
+        },
+        onError: () => toast.error('Error: asegúrate de haber ejecutado "Sembrar Planes" primero y que el tenant se llame Taboada')
+    });
+
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -192,7 +212,49 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
+            {/* Setup Inicial — Botones de administración de planes */}
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-[32px] p-6 border border-gray-700 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center">
+                        <Zap size={20} className="text-yellow-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-white font-bold text-lg">Setup Inicial del Sistema</h3>
+                        <p className="text-gray-400 text-xs">Ejecuta estos pasos una sola vez al iniciar el sistema en producción.</p>
+                    </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Paso 1: Seed planes */}
+                    <button
+                        onClick={() => seedPlansMutation.mutate()}
+                        disabled={seedPlansMutation.isPending}
+                        className="flex items-center gap-2 px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-2xl font-semibold text-sm transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {seedPlansMutation.isPending
+                            ? <Loader2 size={16} className="animate-spin" />
+                            : <Zap size={16} className="text-yellow-400" />}
+                        1. Sembrar Planes (BASICO / PRO / ENTERPRISE / ILIMITADO)
+                    </button>
+
+                    {/* Paso 2: Asignar ILIMITADO a Taboada */}
+                    <button
+                        onClick={() => assignIlimitadoMutation.mutate()}
+                        disabled={assignIlimitadoMutation.isPending}
+                        className="flex items-center gap-2 px-5 py-3 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 rounded-2xl font-semibold text-sm transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {assignIlimitadoMutation.isPending
+                            ? <Loader2 size={16} className="animate-spin" />
+                            : <Star size={16} />}
+                        2. Asignar Plan ILIMITADO a Taboada
+                    </button>
+                </div>
+                <p className="text-gray-500 text-xs mt-3">
+                    💡 El Paso 1 es idempotente — puedes ejecutarlo varias veces sin problema. El Paso 2 busca automáticamente el tenant cuyo nombre contenga "taboada".
+                </p>
+            </div>
+
             {/* Tenants List */}
+
             <div className="bg-white rounded-[40px] p-8 shadow-sm border border-gray-200/60">
                 <h3 className="text-xl font-bold mb-6">Empresas Registradas</h3>
                 {isLoading ? (
