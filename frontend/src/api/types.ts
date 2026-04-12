@@ -12,21 +12,21 @@ export interface User {
 export interface Tenant {
     _id: string;
     name: string;
-    plan: 'BASIC' | 'PRO';
+    plan: string;
     is_active: boolean;
     created_at: string;
 }
 
 export interface TenantCreate {
     name: string;
-    plan: 'BASIC' | 'PRO';
+    plan: string;
     admin_username: string;
     admin_password: string;
 }
 
 export interface TenantUpdate {
     name?: string;
-    plan?: 'BASIC' | 'PRO';
+    plan?: string;
     is_active?: boolean;
 }
 
