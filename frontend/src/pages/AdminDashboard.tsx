@@ -116,6 +116,7 @@ export default function AdminDashboard() {
         }
     });
 
+    /*
     const syncAbonosMutation = useMutation({
         mutationFn: () => client<{ ok: boolean, synced_count: number }>('/sales/admin/sync-orphan-abonos', { method: 'POST' }),
         onSuccess: (res) => {
@@ -124,6 +125,7 @@ export default function AdminDashboard() {
         },
         onError: () => toast.error('Error al sincronizar abonos')
     });
+    */
 
 
     // Fallback de planes por si el API aún no cargó o está fallando

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getValuedInventory } from '../api/api';
 import { Loader2, Package, Store, TrendingUp, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -8,7 +8,6 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function ValuedInventoryView() {
-    const { role } = useAuthStore();
     const { data: valuatedData, isLoading, isError } = useQuery({
         queryKey: ['valued-inventory'],
         queryFn: getValuedInventory,
