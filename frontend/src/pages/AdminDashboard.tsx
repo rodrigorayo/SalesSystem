@@ -116,6 +116,16 @@ export default function AdminDashboard() {
         }
     });
 
+    const syncAbonosMutation = useMutation({
+        mutationFn: () => client<{ ok: boolean, synced_count: number }>('/sales/admin/sync-orphan-abonos', { method: 'POST' }),
+        onSuccess: (res) => {
+            queryClient.invalidateQueries({ queryKey: ['tenants'] }); 
+            toast.success(`Sincronización completa: ${res.synced_count} abonos recuperados.`);
+        },
+        onError: () => toast.error('Error al sincronizar abonos')
+    });
+
+
     // Fallback de planes por si el API aún no cargó o está fallando
     const plansList = useMemo(() => {
         if (dbPlans && dbPlans.length > 0) return dbPlans;

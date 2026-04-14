@@ -45,6 +45,10 @@ export const getDailyReport = (date: string, sucursal_id?: string) => {
     return client<any>(`/reports/daily-report?${params.toString()}`);
 };
 
+export const getValuedInventory = () => 
+    client<{total_general_valor: number; por_sucursal: any[]}>('/reports/valued-inventory');
+
+
 export const getFinancialReport = (startDate: string, endDate: string, sucursal_id: string = 'all') => {
     const params = new URLSearchParams({ 
         start_date: startDate, 

@@ -258,7 +258,7 @@ export default function FinancialDetailView() {
                     {/* ── Footer / Printing Disclaimer ──────────────────────── */}
                     <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 flex items-center gap-4 text-indigo-700 text-sm italic font-medium">
                         <div className="p-2 bg-white rounded-full"><DollarSign size={20} /></div>
-                        El Margen Retail se calcula como: [Venta Público] - ([Costo Fábrica] * 1.15). El Margen Distribuidor es el 15% retenido sobre el precio de fábrica. El Margen Total es la utilidad bruta proyectada del periodo.
+                        El Margen Retail se calcula como: [Venta Público] - [Costo Fábrica]. El Margen Distribuidor (Utilidad 15%) es el 15% sobre el precio de fábrica. El Margen Total es la suma de ambos márgenes.
                     </div>
                 </div>
             )}

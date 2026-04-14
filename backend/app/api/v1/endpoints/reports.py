@@ -7,6 +7,8 @@ from app.domain.models.sale_item import SaleItem
 from app.domain.models.sucursal import Sucursal
 from app.domain.models.sale import Sale
 from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento
+from app.domain.models.inventario import Inventario
+from app.domain.models.product import Product
 from app.utils.serializers import normalize_bson
 from datetime import datetime, timedelta, time, timezone
 from app.utils.date_utils import BOLIVIA_TZ, get_day_range_bolivia
@@ -368,8 +370,8 @@ async def get_financial_report(
                 "total_fabrica": 1,
                 # Margen 15% (Distribuidor) = 15% del costo de fabrica
                 "margen_distribuidor": {"$multiply": ["$total_fabrica", 0.15]},
-                # Margen Utilidad (Retail) = Venta al publico - (Costo fabrica + Margen Distribuidor)
-                "margen_retail": {"$subtract": ["$total_publico", {"$multiply": ["$total_fabrica", 1.15]}]},
+                # Margen Utilidad (Retail) = Venta al publico - Costo fabrica
+                "margen_retail": {"$subtract": ["$total_publico", "$total_fabrica"]},
                 "_id": 0
             }
         },
@@ -398,3 +400,86 @@ async def get_financial_report(
         r["sucursal_nombre"] = map_sucursales.get(r["sucursal_id"], r["sucursal_id"])
 
     return results
+
+@router.get("/valued-inventory")
+async def get_valued_inventory(current_user: User = Depends(get_current_active_user)):
+    """
+    Returns the total value of inventory (cantidad * costo_producto)
+    grouped by branch, plus a detailed breakdown.
+    Admin Sucursal can see their own branch.
+    Admin Matriz/SuperAdmin can see all branches.
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    match_filter = {"tenant_id": tenant_id}
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
+        match_filter["sucursal_id"] = current_user.sucursal_id
+
+    # Pipeline to join with Products and calculate value
+    pipeline = [
+        {"$match": match_filter},
+        # Join with products to get the cost
+        {
+            "$lookup": {
+                "from": "products",
+                "localField": "producto_id",
+                "foreignField": "_id",
+                "as": "product_info"
+            }
+        },
+        {"$unwind": "$product_info"},
+        {
+            "$project": {
+                "sucursal_id": 1,
+                "producto_id": 1,
+                "cantidad": 1,
+                "producto_nombre": "$product_info.descripcion",
+                "costo_producto": "$product_info.costo_producto",
+                "valor_total": {
+                    "$multiply": ["$cantidad", "$product_info.costo_producto"]
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$sucursal_id",
+                "total_items": {"$sum": "$cantidad"},
+                "valor_total_sucursal": {"$sum": "$valor_total"},
+                "desglose": {
+                    "$push": {
+                        "producto_id": "$producto_id",
+                        "producto_nombre": "$producto_nombre",
+                        "cantidad": "$cantidad",
+                        "costo_unitario": "$costo_producto",
+                        "valor_total": "$valor_total"
+                    }
+                }
+            }
+        },
+        {"$sort": {"valor_total_sucursal": -1}}
+    ]
+
+    cursor = Inventario.get_pymongo_collection().aggregate(pipeline)
+    raw_results = await cursor.to_list(length=100)
+    
+    # Resolve sucursal names
+    todas_sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
+    map_sucursales = {str(s.id): s.nombre for s in todas_sucursales}
+    map_sucursales["CENTRAL"] = "Almacén Central (Matriz)"
+
+    results = []
+    total_general = Decimal("0")
+
+    for r in raw_results:
+        norm = normalize_bson(r)
+        sid = norm.get("_id")
+        norm["sucursal_id"] = sid
+        norm["sucursal_nombre"] = map_sucursales.get(str(sid), str(sid))
+        total_general += Decimal(str(norm.get("valor_total_sucursal", 0)))
+        del norm["_id"]
+        results.append(norm)
+
+    return {
+        "total_general_valor": float(total_general),
+        "por_sucursal": results
+    }
