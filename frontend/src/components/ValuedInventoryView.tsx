@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getValuedInventory } from '../api/api';
-import { Loader2, Package, Store, TrendingUp, AlertTriangle, ChevronDown, ChevronUp, DollarSign, Gem, ShieldCheck } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Loader2, Package, Store, AlertTriangle, ChevronDown, ChevronUp, DollarSign, Gem, ShieldCheck, Tag } from 'lucide-react';
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -39,13 +38,6 @@ export default function ValuedInventoryView() {
 
     const { total_general_fabrica, total_general_publico, ganancia_potencial, por_sucursal } = valuatedData;
 
-    // Chart Data Preparation
-    const chartData = por_sucursal.map((s: any) => ({
-        name: s.sucursal_nombre,
-        valorF: s.valor_total_fabrica_sucursal,
-        valorP: s.valor_total_publico_sucursal
-    })).sort((a: any, b: any) => b.valorF - a.valorF);
-
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 mt-6">
             
@@ -55,132 +47,122 @@ export default function ValuedInventoryView() {
                 {/* Fábrica */}
                 <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-8 rounded-[32px] text-white shadow-xl shadow-indigo-200">
                     <div className="flex items-center gap-3 mb-2 opacity-80">
-                        <ShieldCheck size={24} /> <span className="font-bold uppercase tracking-wider text-xs">Alineado a Costo Fábrica</span>
+                        <ShieldCheck size={24} /> <span className="font-bold uppercase tracking-wider text-xs">Costo Inmovilizado</span>
                     </div>
                     <h2 className="text-4xl font-black mb-2">{formatBs(total_general_fabrica)}</h2>
-                    <p className="opacity-90 text-sm font-medium">Costo real de adquisición o producción. Este es tu verdadero "capital congelado".</p>
+                    <p className="opacity-90 text-[11px] font-medium leading-tight">Valor real (precio costo) del stock actual que se encuentra guardado o en vitrina.</p>
                 </div>
 
                 {/* Cliente / Público */}
-                <div className="bg-white border-2 border-indigo-100 p-8 rounded-[32px] flex flex-col justify-center relative overflow-hidden group hover:border-indigo-300 transition-colors">
-                    <div className="absolute -top-10 -right-10 text-indigo-50 opacity-50 group-hover:scale-110 transition-transform"><Store size={150} /></div>
+                <div className="bg-white border text-gray-800 p-8 rounded-[32px] flex flex-col justify-center relative overflow-hidden group hover:border-gray-300 transition-colors">
+                    <div className="absolute -top-6 -right-6 text-gray-50 opacity-40 group-hover:scale-110 transition-transform"><Store size={150} /></div>
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-2 text-indigo-600">
-                            <DollarSign size={20} className="p-0.5 bg-indigo-100 rounded-full" /> <span className="font-bold uppercase tracking-wider text-xs text-gray-500">Valor Potencial Cliente</span>
+                            <DollarSign size={20} className="p-1 bg-indigo-50 text-indigo-600 rounded-full" /> <span className="font-bold uppercase tracking-wider text-[10px] text-gray-500">Valor Esperado Cliente</span>
                         </div>
-                        <h2 className="text-3xl font-black mb-1 text-gray-900">{formatBs(total_general_publico)}</h2>
-                        <p className="text-xs text-gray-400 font-bold">Si se vende todo, esto ingresaría a caja.</p>
+                        <h2 className="text-3xl font-black mb-1">{formatBs(total_general_publico)}</h2>
+                        <p className="text-[11px] text-gray-400 font-bold leading-tight">Si se vende todo el inventario hoy al precio de venta asignado a público.</p>
                     </div>
                 </div>
 
                 {/* Ganancia Potencial */}
-                <div className="bg-emerald-50 border-2 border-emerald-200 p-8 rounded-[32px] flex flex-col justify-center">
-                    <div className="flex items-center gap-3 mb-2 text-emerald-700">
-                        <Gem size={20} className="p-0.5 bg-emerald-100 rounded-full" /> <span className="font-bold uppercase tracking-wider text-xs">Ganancia Proyectada</span>
+                <div className="bg-emerald-50 border-2 border-emerald-100 p-8 rounded-[32px] flex flex-col justify-center relative overflow-hidden">
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-2 text-emerald-700">
+                            <Gem size={20} className="p-1 bg-emerald-100 text-emerald-700 rounded-full" /> <span className="font-bold uppercase tracking-wider text-[10px]">Brecha de Ganancia</span>
+                        </div>
+                        <h2 className="text-3xl font-black mb-1 text-emerald-600">{formatBs(ganancia_potencial)}</h2>
+                        <p className="text-[11px] text-emerald-600/70 font-bold leading-tight">Total de Rentabilidad (Público - Costo).</p>
                     </div>
-                    <h2 className="text-3xl font-black mb-1 text-emerald-600">{formatBs(ganancia_potencial)}</h2>
-                    <p className="text-xs text-emerald-600/70 font-bold">Diferencia neta (Público - Fábrica).</p>
                 </div>
 
             </div>
 
-            {/* ── Gráfico Comparativo ─────────────────────────────────────── */}
-            {chartData.length > 0 && (
-                <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm w-full overflow-hidden">
-                    <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2 px-2">
-                        <TrendingUp size={18} className="text-indigo-500" /> Comparativa Costo vs Público (por Sucursal)
-                    </h3>
-                    <div className="h-[350px] w-full min-w-full relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280', fontWeight: 'bold' }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" />
-                                <YAxis tickFormatter={(val) => `Bs ${val}`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={100} />
-                                <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 10px 20px -5px rgb(0 0 0 / 0.1)' }} formatter={(val: any) => `Bs. ${Number(val).toFixed(2)}`} />
-                                <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
-                                <Bar dataKey="valorF" name="Costo (Fábrica)" fill="#818cf8" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                <Bar dataKey="valorP" name="Potencial (Público)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Lista de Sucursales ───────────────────────── */}
-            <div className="space-y-6">
-                <h3 className="font-black text-gray-900 text-xl pl-2">Desglose Detallado</h3>
+            {/* ── Lista de Sucursales (Resumida) ───────────────────────── */}
+            <div className="space-y-4">
                 {por_sucursal.map((sucursal: any, index: number) => {
                     const isExpanded = expandedBranches[sucursal.sucursal_id] || (por_sucursal.length === 1);
+                    
+                    // Solo mantenemos el TOP 10 de productos más caros dentro del inventario para no saturar.
+                    const productosOrdenados = [...sucursal.desglose].sort((a: any, b: any) => b.valor_fabrica - a.valor_fabrica);
+                    const topItems = productosOrdenados.slice(0, 15);
+                    const hasMore = productosOrdenados.length > 15;
+
                     return (
                         <div key={index} className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden group">
                             <button
                                 onClick={() => toggleBranch(sucursal.sucursal_id)}
-                                className="w-full text-left p-6 flex flex-col md:flex-row md:items-center justify-between hover:bg-gray-50/50 transition-colors gap-6"
+                                className="w-full text-left px-8 py-6 flex flex-col md:flex-row md:items-center justify-between hover:bg-gray-50/50 transition-colors gap-6"
                             >
-                                <div className="flex items-center gap-5">
-                                    <div className="w-16 h-16 rounded-[22px] bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 shadow-inner">
-                                        <Store size={28} className={isExpanded ? "scale-110 transition-transform" : "transition-transform"} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-2xl font-black text-gray-900 leading-none mb-1.5">{sucursal.sucursal_nombre}</h3>
-                                        <p className="text-xs font-bold uppercase tracking-wider text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md inline-block">{sucursal.total_items} items físicos en Almacén</p>
-                                    </div>
+                                <div className="flex flex-col">
+                                    <h3 className="text-2xl font-black text-gray-900 leading-none mb-2 flex items-center gap-2">
+                                        <Store className="text-indigo-400" size={24} /> {sucursal.sucursal_nombre}
+                                    </h3>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 inline-flex items-center gap-1.5"><Package size={14}/> {sucursal.total_items} articulos</p>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-4 md:gap-8 bg-gray-50 p-4 rounded-3xl border border-gray-100 w-full md:w-auto">
+                                <div className="flex flex-wrap items-center gap-4 md:gap-8 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 w-full md:w-auto">
                                     <div className="text-left md:text-right flex-1 md:flex-none">
-                                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">A Precio Fábrica</p>
-                                        <p className="text-xl font-black text-indigo-600">{formatBs(sucursal.valor_total_fabrica_sucursal)}</p>
+                                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Base P.Costo</p>
+                                        <p className="text-base font-black text-indigo-600">{formatBs(sucursal.valor_total_fabrica_sucursal)}</p>
                                     </div>
-                                    <div className="w-px h-10 bg-gray-200 hidden md:block" />
+                                    <div className="w-px h-8 bg-gray-200 hidden md:block" />
                                     <div className="text-left md:text-right flex-1 md:flex-none">
-                                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">A Precio Público</p>
-                                        <p className="text-xl font-black text-emerald-600">{formatBs(sucursal.valor_total_publico_sucursal)}</p>
+                                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Base P.Venta</p>
+                                        <p className="text-base font-black text-emerald-600">{formatBs(sucursal.valor_total_publico_sucursal)}</p>
                                     </div>
-                                    <div className="bg-white border border-gray-200 p-2.5 rounded-full text-gray-400 shadow-sm group-hover:text-black transition-colors w-min ml-auto">
-                                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    <div className="bg-white border border-gray-200 p-2 rounded-full text-gray-400 shadow-sm group-hover:text-black group-hover:bg-gray-100 transition-colors w-min ml-auto">
+                                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                     </div>
                                 </div>
                             </button>
 
                             {isExpanded && (
                                 <div className="border-t border-gray-100 bg-white">
-                                    <div className="overflow-x-auto p-4">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="text-[10px] text-gray-500 font-bold uppercase tracking-widest bg-gray-50">
-                                                <tr>
-                                                    <th className="px-6 py-4 rounded-l-2xl">Producto</th>
-                                                    <th className="px-6 py-4 text-center">Cant. Física</th>
-                                                    <th className="px-6 py-4 text-right">P. Fábrica</th>
-                                                    <th className="px-6 py-4 text-right">P. Público</th>
-                                                    <th className="px-6 py-4 text-right bg-indigo-50/50 text-indigo-700">Total Fábrica</th>
-                                                    <th className="px-6 py-4 text-right bg-emerald-50/50 text-emerald-700 rounded-r-2xl">Total Público</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {sucursal.desglose.map((item: any, i: number) => (
-                                                    <tr key={i} className="hover:bg-gray-50/80 transition-colors group/row">
-                                                        <td className="px-6 py-4">
-                                                            <p className="font-bold text-gray-900 group-hover/row:text-indigo-600 transition-colors">{item.producto_nombre}</p>
-                                                            <p className="text-xs text-gray-400 font-mono mt-0.5">#{item.producto_id.slice(-6).toUpperCase()}</p>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-black text-xs">{item.cantidad}</span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right font-medium text-gray-400">{formatBs(item.costo_unitario)}</td>
-                                                        <td className="px-6 py-4 text-right font-medium text-gray-400">{formatBs(item.precio_publico_unitario)}</td>
-                                                        <td className="px-6 py-4 text-right font-black text-indigo-600 bg-indigo-50/10">{formatBs(item.valor_fabrica)}</td>
-                                                        <td className="px-6 py-4 text-right font-black text-emerald-600 bg-emerald-50/10">{formatBs(item.valor_publico)}</td>
-                                                    </tr>
-                                                ))}
-                                                {sucursal.desglose.length === 0 && (
+                                    <div className="overflow-x-auto p-4 md:p-6 pb-8">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 px-2">
+                                            <Tag size={14} /> Resumen: TOP {topItems.length} items de mayor valor en esta sucursal
+                                        </div>
+                                        <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 border-b border-gray-100">
                                                     <tr>
-                                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic font-medium">
-                                                            No hay stock físico registrado en esta sucursal actual.
-                                                        </td>
+                                                        <th className="px-5 py-3">Referencia</th>
+                                                        <th className="px-5 py-3 text-center">Unidades</th>
+                                                        <th className="px-5 py-3 text-right">P. Costo</th>
+                                                        <th className="px-5 py-3 text-right">P. Público</th>
+                                                        <th className="px-5 py-3 text-right text-indigo-700 bg-indigo-50/30">Total Costo</th>
                                                     </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-50">
+                                                    {topItems.map((item: any, i: number) => (
+                                                        <tr key={i} className="hover:bg-gray-50/50 transition-colors group/row">
+                                                            <td className="px-5 py-2.5">
+                                                                <p className="font-bold text-gray-800 text-[13px]">{item.producto_nombre}</p>
+                                                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">#{item.producto_id.slice(-6).toUpperCase()}</p>
+                                                            </td>
+                                                            <td className="px-5 py-2.5 text-center">
+                                                                <span className="bg-gray-100/80 text-gray-600 px-2.5 py-1 rounded-md font-black text-xs">{item.cantidad}</span>
+                                                            </td>
+                                                            <td className="px-5 py-2.5 text-right font-medium text-gray-400 text-xs">{formatBs(item.costo_unitario)}</td>
+                                                            <td className="px-5 py-2.5 text-right font-medium text-gray-400 text-xs">{formatBs(item.precio_publico_unitario)}</td>
+                                                            <td className="px-5 py-2.5 text-right font-black text-indigo-600 bg-indigo-50/10 text-[13px]">{formatBs(item.valor_fabrica)}</td>
+                                                        </tr>
+                                                    ))}
+                                                    {sucursal.desglose.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={5} className="px-5 py-8 text-center text-gray-400 italic font-medium">
+                                                                Vacío (Sin productos).
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                            {hasMore && (
+                                                <div className="bg-gray-50 py-3 text-center text-xs font-bold text-indigo-600 border-t border-gray-100">
+                                                    + {productosOrdenados.length - 15} productos de menor valor omitidos del resumen.
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -188,10 +170,10 @@ export default function ValuedInventoryView() {
                     );
                 })}
                 {por_sucursal.length === 0 && (
-                    <div className="text-center py-32 bg-white rounded-[40px] border border-gray-100 shadow-sm">
-                        <Package size={64} className="mx-auto text-gray-200 mb-6" />
-                        <h3 className="font-black text-gray-900 text-2xl mb-2">Sin inventario físico</h3>
-                        <p className="text-sm font-medium text-gray-400">No hay datos de stock en las bases de datos para analizar.</p>
+                    <div className="text-center py-20 bg-white rounded-[40px] border border-gray-100 shadow-sm">
+                        <Package size={48} className="mx-auto text-gray-200 mb-4" />
+                        <h3 className="font-black text-gray-900 text-xl">Sin inventario</h3>
+                        <p className="text-sm font-medium text-gray-400">No hay datos de stock para calcular.</p>
                     </div>
                 )}
             </div>

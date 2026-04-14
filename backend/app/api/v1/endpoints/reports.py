@@ -438,12 +438,25 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
                 "cantidad": 1,
                 "producto_nombre": {"$ifNull": ["$product_info.descripcion", "Producto Desconocido"]},
                 "costo_producto": {"$ifNull": ["$product_info.costo_producto", 0]},
-                "precio_venta": {"$ifNull": ["$product_info.precio_venta", 0]},
+                "precio_venta": {
+                    "$ifNull": [
+                        "$precio_sucursal", 
+                        {"$ifNull": ["$product_info.precio_venta", 0]}
+                    ]
+                },
                 "valor_fabrica": {
                     "$multiply": ["$cantidad", {"$ifNull": ["$product_info.costo_producto", 0]}]
                 },
                 "valor_publico": {
-                    "$multiply": ["$cantidad", {"$ifNull": ["$product_info.precio_venta", 0]}]
+                    "$multiply": [
+                        "$cantidad", 
+                        {
+                            "$ifNull": [
+                                "$precio_sucursal", 
+                                {"$ifNull": ["$product_info.precio_venta", 0]}
+                            ]
+                        }
+                    ]
                 }
             }
         },
