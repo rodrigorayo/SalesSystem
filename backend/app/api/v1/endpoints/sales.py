@@ -282,12 +282,13 @@ async def registrar_abono(sale_id: str, abono: AbonoCreate, current_user: User =
     sale.pagos.append(nuevo_pago)
     
     # Recalculate state
-    # Due to floating point math, check against a small epsilon
+    from decimal import Decimal
     total_pagado = sum(p.monto for p in sale.pagos)
-    if total_pagado >= sale.total - 0.01:
+    if total_pagado >= sale.total - Decimal("0.01"):
         sale.estado_pago = EstadoPago.PAGADO
     else:
         sale.estado_pago = EstadoPago.PARCIAL
+
         
     await sale.save()
     return sale
