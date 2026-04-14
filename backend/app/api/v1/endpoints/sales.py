@@ -312,7 +312,7 @@ async def registrar_abono(sale_id: str, abono: AbonoCreate, current_user: User =
         subtipo=subtipo,
         tipo="INGRESO",
         monto=monto_abono,
-        descripcion=f"Abono a Crédito - Venta #{sale._id.binary.hex() if hasattr(sale._id, 'binary') else str(sale._id)[-6:].upper()}",
+        descripcion=f"Abono a Crédito - Venta #{str(sale.id)[-6:].upper()}",
         sale_id=str(sale.id)
     ).insert()
 
