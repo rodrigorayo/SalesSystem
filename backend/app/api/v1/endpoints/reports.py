@@ -418,16 +418,21 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
     # Pipeline to join with Products and calculate value
     pipeline = [
         {"$match": match_filter},
+        {
+            "$addFields": {
+                "producto_id_obj": { "$toObjectId": "$producto_id" }
+            }
+        },
         # Join with products to get the cost
         {
             "$lookup": {
                 "from": "products",
-                "localField": "producto_id",
+                "localField": "producto_id_obj",
                 "foreignField": "_id",
                 "as": "product_info"
             }
         },
-        {"$unwind": "$product_info"},
+        {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": False }},
         {
             "$project": {
                 "sucursal_id": 1,
@@ -435,8 +440,12 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
                 "cantidad": 1,
                 "producto_nombre": "$product_info.descripcion",
                 "costo_producto": "$product_info.costo_producto",
-                "valor_total": {
+                "precio_venta": {"$ifNull": ["$product_info.precio_venta", 0]},
+                "valor_fabrica": {
                     "$multiply": ["$cantidad", "$product_info.costo_producto"]
+                },
+                "valor_publico": {
+                    "$multiply": ["$cantidad", {"$ifNull": ["$product_info.precio_venta", 0]}]
                 }
             }
         },
@@ -444,19 +453,22 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
             "$group": {
                 "_id": "$sucursal_id",
                 "total_items": {"$sum": "$cantidad"},
-                "valor_total_sucursal": {"$sum": "$valor_total"},
+                "valor_total_fabrica_sucursal": {"$sum": "$valor_fabrica"},
+                "valor_total_publico_sucursal": {"$sum": "$valor_publico"},
                 "desglose": {
                     "$push": {
                         "producto_id": "$producto_id",
                         "producto_nombre": "$producto_nombre",
                         "cantidad": "$cantidad",
                         "costo_unitario": "$costo_producto",
-                        "valor_total": "$valor_total"
+                        "precio_publico_unitario": "$precio_venta",
+                        "valor_fabrica": "$valor_fabrica",
+                        "valor_publico": "$valor_publico"
                     }
                 }
             }
         },
-        {"$sort": {"valor_total_sucursal": -1}}
+        {"$sort": {"valor_total_fabrica_sucursal": -1}}
     ]
 
     cursor = Inventario.get_pymongo_collection().aggregate(pipeline)
@@ -468,18 +480,22 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
     map_sucursales["CENTRAL"] = "Almacén Central (Matriz)"
 
     results = []
-    total_general = Decimal("0")
+    total_general_fabrica = Decimal("0")
+    total_general_publico = Decimal("0")
 
     for r in raw_results:
         norm = normalize_bson(r)
         sid = norm.get("_id")
         norm["sucursal_id"] = sid
         norm["sucursal_nombre"] = map_sucursales.get(str(sid), str(sid))
-        total_general += Decimal(str(norm.get("valor_total_sucursal", 0)))
+        total_general_fabrica += Decimal(str(norm.get("valor_total_fabrica_sucursal", 0)))
+        total_general_publico += Decimal(str(norm.get("valor_total_publico_sucursal", 0)))
         del norm["_id"]
         results.append(norm)
 
     return {
-        "total_general_valor": float(total_general),
+        "total_general_fabrica": float(total_general_fabrica),
+        "total_general_publico": float(total_general_publico),
+        "ganancia_potencial": float(total_general_publico - total_general_fabrica),
         "por_sucursal": results
     }

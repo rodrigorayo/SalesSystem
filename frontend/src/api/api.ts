@@ -46,7 +46,7 @@ export const getDailyReport = (date: string, sucursal_id?: string) => {
 };
 
 export const getValuedInventory = () => 
-    client<{total_general_valor: number; por_sucursal: any[]}>('/reports/valued-inventory');
+    client<{total_general_fabrica: number; total_general_publico: number; ganancia_potencial: number; por_sucursal: any[]}>('/reports/valued-inventory');
 
 
 export const getFinancialReport = (startDate: string, endDate: string, sucursal_id: string = 'all') => {
