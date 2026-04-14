@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getValuedInventory } from '../api/api';
 import { Loader2, Package, Store, TrendingUp, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
