@@ -409,7 +409,7 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
     Admin Sucursal can see their own branch.
     Admin Matriz/SuperAdmin can see all branches.
     """
-    tenant_id = current_user.tenant_id or "default"
+    tenant_id = current_user.tenant_id or ""
     
     match_filter = {"tenant_id": tenant_id}
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
@@ -419,30 +419,28 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
     pipeline = [
         {"$match": match_filter},
         {
-            "$addFields": {
-                "producto_id_obj": { "$toObjectId": "$producto_id" }
-            }
-        },
-        # Join with products to get the cost
-        {
             "$lookup": {
-                "from": "products",
-                "localField": "producto_id_obj",
-                "foreignField": "_id",
+                "from": Product.get_collection_name(),
+                "let": {"pid": "$producto_id"},
+                "pipeline": [
+                    {"$match": {
+                        "$expr": {"$eq": [{"$toString": "$_id"}, "$$pid"]}
+                    }}
+                ],
                 "as": "product_info"
             }
         },
-        {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": False }},
+        {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": True }},
         {
             "$project": {
                 "sucursal_id": 1,
                 "producto_id": 1,
                 "cantidad": 1,
-                "producto_nombre": "$product_info.descripcion",
-                "costo_producto": "$product_info.costo_producto",
+                "producto_nombre": {"$ifNull": ["$product_info.descripcion", "Producto Desconocido"]},
+                "costo_producto": {"$ifNull": ["$product_info.costo_producto", 0]},
                 "precio_venta": {"$ifNull": ["$product_info.precio_venta", 0]},
                 "valor_fabrica": {
-                    "$multiply": ["$cantidad", "$product_info.costo_producto"]
+                    "$multiply": ["$cantidad", {"$ifNull": ["$product_info.costo_producto", 0]}]
                 },
                 "valor_publico": {
                     "$multiply": ["$cantidad", {"$ifNull": ["$product_info.precio_venta", 0]}]
