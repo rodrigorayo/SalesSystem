@@ -276,19 +276,52 @@ async def registrar_abono(sale_id: str, abono: AbonoCreate, current_user: User =
         raise HTTPException(status_code=400, detail="Esta venta ya está completamente pagada.")
         
     # Append the payment
-    nuevo_pago = PagoItem(metodo=abono.metodo, monto=abono.monto)
+    from decimal import Decimal
+    from app.domain.models.caja import CajaSesion, CajaMovimiento, EstadoSesion, SubtipoMovimiento
+
+    monto_abono = Decimal(str(abono.monto))
+    nuevo_pago = PagoItem(metodo=abono.metodo, monto=monto_abono)
+    
+    # Check for active cash box session to register the movement
+    caja = await CajaSesion.find_one(
+        CajaSesion.tenant_id == sale.tenant_id,
+        CajaSesion.sucursal_id == sale.sucursal_id,
+        CajaSesion.cajero_id == str(current_user.id),
+        CajaSesion.estado == EstadoSesion.ABIERTA
+    )
+    
+    if not caja:
+         raise HTTPException(
+             status_code=400, 
+             detail="No tienes una sesión de caja abierta. Debes abrir caja para recibir pagos."
+         )
+
     if not sale.pagos:
         sale.pagos = []
     sale.pagos.append(nuevo_pago)
     
+    # Register the movement in Caja
+    subtipo = SubtipoMovimiento.INGRESO_EFECTIVO if abono.metodo == "EFECTIVO" else SubtipoMovimiento.INGRESO_QR
+    
+    await CajaMovimiento(
+        tenant_id=sale.tenant_id,
+        sucursal_id=sale.sucursal_id,
+        sesion_id=str(caja.id),
+        cajero_id=str(current_user.id),
+        cajero_name=current_user.full_name or current_user.username,
+        subtipo=subtipo,
+        tipo="INGRESO",
+        monto=monto_abono,
+        descripcion=f"Abono a Crédito - Venta #{sale._id.binary.hex() if hasattr(sale._id, 'binary') else str(sale._id)[-6:].upper()}",
+        sale_id=str(sale.id)
+    ).insert()
+
     # Recalculate state
-    from decimal import Decimal
     total_pagado = sum(p.monto for p in sale.pagos)
     if total_pagado >= sale.total - Decimal("0.01"):
         sale.estado_pago = EstadoPago.PAGADO
     else:
         sale.estado_pago = EstadoPago.PARCIAL
-
         
     await sale.save()
     return sale
