@@ -10,6 +10,33 @@ const formatDate = (dateStr: string) => {
     return new Date(isoStr).toLocaleString();
 };
 
+interface CuentaCredito {
+    id: string;
+    cliente_nombre: string;
+    cliente_nit: string;
+    cliente_telefono?: string;
+    saldo_total: number;
+    estado_cuenta: 'AL_DIA' | 'MOROSO';
+}
+
+interface Deuda {
+    id: string;
+    sale_id_corto: string;
+    estado: string;
+    fecha_emision: string;
+    monto_original: number;
+    saldo_pendiente: number;
+}
+
+interface Transaccion {
+    id: string;
+    tipo: 'ABONO' | 'CARGO';
+    monto: number;
+    created_at: string;
+    pagos?: any[];
+    notas?: string;
+}
+
 export default function CreditosPage() {
     const qc = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,21 +44,22 @@ export default function CreditosPage() {
     const limit = 20;
 
     // Side panel state
-    const [selectedCuenta, setSelectedCuenta] = useState<any>(null);
+    const [selectedCuenta, setSelectedCuenta] = useState<CuentaCredito | null>(null);
     const [activeTab, setActiveTab] = useState<'DEUDAS' | 'HISTORIAL'>('DEUDAS');
 
     // Drawer Queries
-    const { data: deudas = [], isLoading: loadingDeudas } = useQuery({
+    const { data: deudas = [], isLoading: loadingDeudas } = useQuery<Deuda[]>({
         queryKey: ['deudas', selectedCuenta?.id],
-        queryFn: () => getDeudasPorCuenta(selectedCuenta?.id),
+        queryFn: () => getDeudasPorCuenta(selectedCuenta?.id as string),
         enabled: !!selectedCuenta
     });
 
-    const { data: transacciones = [], isLoading: loadingHistorial } = useQuery({
+    const { data: transacciones = [], isLoading: loadingHistorial } = useQuery<Transaccion[]>({
         queryKey: ['transacciones', selectedCuenta?.id],
-        queryFn: () => getTransaccionesCuenta(selectedCuenta?.id),
+        queryFn: () => getTransaccionesCuenta(selectedCuenta?.id as string),
         enabled: !!selectedCuenta && activeTab === 'HISTORIAL'
     });
+
 
     const { data: creditosRes, isLoading } = useQuery({
         queryKey: ['cuentas-credito', page, searchTerm],
@@ -108,7 +136,7 @@ export default function CreditosPage() {
             ) : (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {cuentas.map(cuenta => (
+                        {cuentas.map((cuenta: CuentaCredito) => (
                             <motion.div 
                                 whileHover={{ scale: 1.01 }}
                                 key={cuenta.id} 
@@ -226,7 +254,7 @@ export default function CreditosPage() {
                                     <div className="space-y-4">
                                         {loadingDeudas ? <Loader2 className="animate-spin text-indigo-500 mx-auto mt-10" /> : 
                                          deudas.length === 0 ? <p className="text-center text-gray-500 mt-10">No hay deudas registradas.</p> :
-                                         deudas.map((d: any) => (
+                                         deudas.map((d: Deuda) => (
                                             <div key={d.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                 <div>
                                                     <div className="flex items-center gap-3 mb-1">
@@ -250,7 +278,7 @@ export default function CreditosPage() {
                                     <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
                                         {loadingHistorial ? <Loader2 className="animate-spin text-indigo-500 mx-auto mt-10" /> : 
                                          transacciones.length === 0 ? <p className="text-center text-gray-500 mt-10">No hay historial.</p> :
-                                         transacciones.map((t: any) => (
+                                         transacciones.map((t: Transaccion) => (
                                             <div key={t.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                                                 <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-gray-50 bg-white text-gray-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                                                     {t.tipo === 'ABONO' ? <CheckCircle2 className="text-emerald-500" size={18} /> : <FileText className="text-rose-500" size={18} />}
