@@ -15,7 +15,7 @@ from app.infrastructure.core.config import settings
 
 async def migrate_credits():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
-    await init_beanie(database=client.taboada, document_models=[Sale, CuentaCredito, Deuda, TransaccionCredito])
+    await init_beanie(database=client.salessystem, document_models=[Sale, CuentaCredito, Deuda, TransaccionCredito])
 
     print("Iniciando migración de cuentas y deudas de ventas históricas...")
 
