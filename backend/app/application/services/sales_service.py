@@ -203,6 +203,11 @@ class SalesService:
                             Set({Cliente.ultima_compra_at: sale.created_at}),
                             session=session
                         )
+                        
+                        if sale.estado_pago in [EstadoPago.PENDIENTE, EstadoPago.PARCIAL]:
+                            from app.application.services.credito_service import CreditoService
+                            monto_deuda = computed_total - total_pagado
+                            await CreditoService.registrar_deuda_desde_venta(sale, monto_deuda, sale.cliente_id, session=session)
 
                     _SUBTIPO_MAP = {
                         "EFECTIVO": SubtipoMovimiento.VENTA_EFECTIVO,

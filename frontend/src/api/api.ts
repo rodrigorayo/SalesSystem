@@ -464,3 +464,28 @@ export const getListaPreciosItems = (lista_id: string) => client<any[]>(`/listas
 export const addListaPrecioItem = (lista_id: string, data: any) => client<any>(`/listas-precios/${lista_id}/items`, { method: 'POST', body: data });
 export const updateListaPrecioItem = (lista_id: string, item_id: string, data: any) => client<any>(`/listas-precios/${lista_id}/items/${item_id}`, { method: 'PUT', body: data });
 export const deleteListaPrecioItem = (lista_id: string, item_id: string) => client(`/listas-precios/${lista_id}/items/${item_id}`, { method: 'DELETE' });
+
+// ── Gestión de Créditos ───────────────────────────────────────────────────
+export const getCuentasCredito = (q?: string, estado?: string, page: number = 1, limit: number = 50) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (q) params.set('q', q);
+    if (estado) params.set('estado', estado);
+    const qs = params.toString();
+    return client<any>(`/creditos${qs ? '?' + qs : ''}`);
+};
+
+export const getDeudasPorCuenta = (cuenta_id: string, estado?: string) => {
+    const params = new URLSearchParams();
+    if (estado) params.set('estado', estado);
+    const qs = params.toString();
+    return client<any[]>(`/creditos/${cuenta_id}/deudas${qs ? '?' + qs : ''}`);
+};
+
+export const getTransaccionesCuenta = (cuenta_id: string) => {
+    return client<any[]>(`/creditos/${cuenta_id}/transacciones`);
+};
+
+export const registrarAbonosMultiple = (cuenta_id: string, data: { pagos: any[], deuda_id?: string, notas?: string }) => {
+    return client<any>(`/creditos/${cuenta_id}/abonos`, { method: 'POST', body: data });
+};
+
