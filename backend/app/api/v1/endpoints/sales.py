@@ -241,29 +241,24 @@ async def update_qr_info(
         
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes confirmar pagos de tu propia sucursal")
-    current_user: User = Depends(get_current_active_user)
-):
-    """Today's total sales and transaction count for the current tenant."""
-    today = get_now_bolivia().date()
-
-    tenant_id = current_user.tenant_id or ""
-    
-    filters = [Sale.tenant_id == tenant_id]
-    if sucursal_id:
-        filters.append(Sale.sucursal_id == sucursal_id)
+    if not sale.qr_info:
+        from app.domain.models.sale import QRInfo
+        sale.qr_info = QRInfo()
         
-    all_sales = await Sale.find(*filters).to_list()
-    # Filter by date and NOT voided
-    today_sales = [s for s in all_sales if s.created_at.date() == today and not s.anulada]
+    sale.qr_info.banco = qr_data.banco
+    sale.qr_info.referencia = qr_data.referencia
+    sale.qr_info.monto_transferido = qr_data.monto_transferido
+    sale.qr_info.confirmado = True
+    sale.qr_info.confirmado_at = datetime.utcnow()
+    sale.qr_info.confirmado_por = current_user.full_name or current_user.username
     
-    return {
-        "today_sales": sum(s.total for s in today_sales),
-        "transaction_count": len(today_sales),
-        "items_count": sum(sum(i.cantidad for i in s.items) for s in today_sales),
-    }
+    await sale.save()
+    
+    return sale
 
 
 # ─── GET /sales ───────────────────────────────────────────────────────────────
+
 
 @router.get("/sales", response_model=SalesPaginated)
 async def get_sales(

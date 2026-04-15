@@ -12,3 +12,4 @@ pandas
 openpyxl
 reportlab
 slowapi
+httpx
