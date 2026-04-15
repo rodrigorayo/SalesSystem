@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCuentasCredito, getDeudasPorCuenta, getTransaccionesCuenta, registrarAbonosMultiple } from '../api/api';
 import { Loader2, Search, Wallet, User as UserIcon, PlusCircle, X, History, FileText, ChevronRight, CheckCircle2 } from 'lucide-react';
