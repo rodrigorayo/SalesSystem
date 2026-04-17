@@ -235,6 +235,14 @@ export interface SaleCreate {
     payment_method: 'EFECTIVO' | 'TARJETA' | 'QR' | 'CREDITO';
     cashier_name: string;
     sucursal_id?: string;
+    cliente_id?: string;
+    cliente?: {
+        nit?: string;
+        razon_social?: string;
+        email?: string;
+        telefono?: string;
+        es_factura: boolean;
+    };
 }
 
 export interface PagoItem {

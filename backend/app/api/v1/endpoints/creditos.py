@@ -36,7 +36,8 @@ async def get_cuentas_credito(
         if (q):
            if not cli or not (
                (cli.nombre and q.lower() in cli.nombre.lower()) or 
-               (cli.nit_ci and q in cli.nit_ci)
+               (cli.nit_ci and q in cli.nit_ci) or
+               (cli.telefono and q in cli.telefono)
            ): continue # skip if search query provided
             
         result_items.append({

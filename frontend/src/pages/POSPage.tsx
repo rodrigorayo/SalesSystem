@@ -18,6 +18,7 @@ import { useLocalStorage } from 'usehooks-ts';
 import { toast } from 'sonner';
 import Pagination from '../components/Pagination';
 import { TicketPrinter } from '../components/TicketPrinter';
+import { ClientCombobox } from '../components/ClientCombobox';
 import type { Sale } from '../api/types';
 
 const fmt = (n?: number) => (n || 0).toFixed(2);
@@ -146,7 +147,8 @@ export default function POSPage() {
                 items: items.map(i => ({ producto_id: i.product._id, cantidad: i.quantity, precio: i.precio })),
                 pagos: pagos.map(p => ({ metodo: p.metodo, monto: p.monto })),
                 descuento: descuento.valor ? { nombre: descuento.nombre, tipo: descuento.tipo, valor: parseFloat(descuento.valor) } : undefined,
-                cliente: cliente.es_factura || cliente.nit ? {
+                cliente_id: cliente.cliente_id || undefined,
+                cliente: cliente.es_factura || cliente.nit || cliente.razon_social ? {
                     nit: cliente.nit || undefined,
                     razon_social: cliente.razon_social || undefined,
                     email: cliente.email || undefined,
@@ -460,15 +462,26 @@ export default function POSPage() {
                             className="shrink-0 border-t border-gray-100 overflow-hidden"
                         >
                             {/* Cliente/Factura */}
-                            <div className="px-3 py-1.5">
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                    <input type="checkbox" checked={cliente.es_factura}
-                                        onChange={e => setCliente({ ...cliente, es_factura: e.target.checked })}
-                                        className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 shrink-0" />
-                                    <span className="text-[11px] text-gray-600 font-medium">Solicitar factura (NIT)</span>
-                                </label>
+                            <div className="px-3 py-1.5 flex flex-col gap-1.5">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Asignar Cliente / Factura</span>
+                                
+                                <ClientCombobox 
+                                    selectedClient={cliente}
+                                    onSelect={(c) => setCliente(c)}
+                                    onClear={() => setCliente({ cliente_id: undefined, nit: '', razon_social: '', email: '', telefono: '', es_factura: false })}
+                                    disabled={ticketCovered}
+                                />
+
+                                <div className="flex items-center justify-between mt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                        <input type="checkbox" checked={cliente.es_factura}
+                                            onChange={e => setCliente({ es_factura: e.target.checked })}
+                                            className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 shrink-0" />
+                                        <span className="text-[11px] text-gray-600 font-medium">Solicitar factura (NIT)</span>
+                                    </label>
+                                </div>
                                 <AnimatePresence>
-                                    {cliente.es_factura && (
+                                    {(cliente.es_factura || (!cliente.cliente_id && cliente.razon_social)) && (
                                         <motion.div
                                             initial={{ height: 0, opacity: 0 }}
                                             animate={{ height: 'auto', opacity: 1 }}
@@ -480,20 +493,18 @@ export default function POSPage() {
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
                                                 value={cliente.nit} 
-                                                onChange={e => setCliente({ ...cliente, nit: e.target.value.replace(/\D/g, '') })}
+                                                onChange={e => setCliente({ nit: e.target.value.replace(/\D/g, '') })}
                                                 onKeyDown={e => {
-                                                    // Allow backspace, delete, tab, escape, enter, arrows
                                                     if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
-                                                    // Prevent any non-digit char
                                                     if (!/^[0-9]$/.test(e.key)) e.preventDefault();
                                                 }}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="NIT" 
                                             />
-                                            <input value={cliente.email} onChange={e => setCliente({ ...cliente, email: e.target.value })}
+                                            <input value={cliente.email} onChange={e => setCliente({ email: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Email" />
-                                            <input value={cliente.razon_social} onChange={e => setCliente({ ...cliente, razon_social: e.target.value })}
+                                            <input value={cliente.razon_social} onChange={e => setCliente({ razon_social: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Razón Social" />
                                             <input 
@@ -501,7 +512,7 @@ export default function POSPage() {
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
                                                 value={cliente.telefono} 
-                                                onChange={e => setCliente({ ...cliente, telefono: e.target.value.replace(/\D/g, '') })}
+                                                onChange={e => setCliente({ telefono: e.target.value.replace(/\D/g, '') })}
                                                 onKeyDown={e => {
                                                     if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
                                                     if (!/^[0-9]$/.test(e.key)) e.preventDefault();
