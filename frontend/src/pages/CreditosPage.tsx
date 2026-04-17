@@ -20,6 +20,7 @@ export default function CreditosPage() {
 
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? '' : (user?.sucursal_id || ''));
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterEstado, setFilterEstado] = useState<'' | 'AL_DIA' | 'MOROSO'>('');
     const [page, setPage] = useState(1);
     const limit = 50;
     
@@ -40,8 +41,13 @@ export default function CreditosPage() {
     });
 
     const { data: creditosRes, isLoading } = useQuery({
+<<<<<<< Updated upstream
         queryKey: ['sales-credits', selectedSucursal, page],
         queryFn: () => getSales(selectedSucursal || undefined, page, limit, undefined, undefined, undefined, 'DEUDA')
+=======
+        queryKey: ['cuentas-credito', page, searchTerm, filterEstado],
+        queryFn: () => getCuentasCredito(searchTerm || undefined, filterEstado || undefined, page, limit)
+>>>>>>> Stashed changes
     });
 
     const creditos = creditosRes?.items || [];
@@ -103,6 +109,27 @@ export default function CreditosPage() {
                         </select>
                     )}
                 </div>
+            </div>
+
+            <div className="flex gap-2 pb-2">
+                <button 
+                    onClick={() => { setFilterEstado(''); setPage(1); }}
+                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${filterEstado === '' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                >
+                    Todos
+                </button>
+                <button 
+                    onClick={() => { setFilterEstado('MOROSO'); setPage(1); }}
+                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${filterEstado === 'MOROSO' ? 'bg-red-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                >
+                    Con Mora / Pendientes
+                </button>
+                <button 
+                    onClick={() => { setFilterEstado('AL_DIA'); setPage(1); }}
+                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${filterEstado === 'AL_DIA' ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                >
+                    Al Día
+                </button>
             </div>
 
             {isLoading ? (
