@@ -5,64 +5,106 @@ from decimal import Decimal
 import os
 import sys
 
-# Agrega la raíz del proyecto al path
+# Add project root to path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.domain.models.sale import Sale, EstadoPago
+from app.domain.models.cliente import Cliente
 from app.domain.models.credito import CuentaCredito, Deuda, TransaccionCredito, EstadoCuenta, EstadoDeuda
 from app.domain.models.base import DecimalMoney
 from app.infrastructure.core.config import settings
 
-async def migrate_credits():
-    client = AsyncIOMotorClient(settings.MONGODB_URL)
-    await init_beanie(database=client.salessystem, document_models=[Sale, CuentaCredito, Deuda, TransaccionCredito])
+async def master_migration():
+    uri = settings.MONGODB_URL
+    client = AsyncIOMotorClient(uri)
+    db = client.salessystem
 
-    print("Iniciando migración de cuentas y deudas de ventas históricas...")
+    print("--- INICIANDO MIGRACIÓN MAESTRA (ULTRA ROBUSTA) ---")
 
-    # Buscamos todas las ventas que están o estuvieron a crédito:
-    # 1. Ventas que tienen estado_pago PENDIENTE o PARCIAL
-    # 2. Ventas que tienen estado_pago PAGADO pero tienen "CREDITO" en sus métodos (fueron deudas, pagadas)
+    # 1. FIX: Assign default tenant_id to older sales (Raw Motor to avoid validation errors)
+    main_tenant = "69a7cb3ba61102aca89bd271" # Taboada
+    print(f"Normalizando tenant_id para ventas antiguas -> {main_tenant}")
+    result = await db.sales.update_many(
+        {"tenant_id": None},
+        {"$set": {"tenant_id": main_tenant}}
+    )
+    print(f"Ventas normalizadas: {result.modified_count}")
+
+    # 2. Init Beanie
+    await init_beanie(
+        database=db, 
+        document_models=[Sale, Cliente, CuentaCredito, Deuda, TransaccionCredito]
+    )
+
+    # 3. SCAN SALES TO GENERATE CLIENTS
+    print("Escaneando ventas para identificar y crear clientes faltantes...")
+    todas_ventas = await Sale.find({}).to_list()
     
-    ventas = await Sale.find({"pagos.metodo": "CREDITO"}).to_list()
-    print(f"Total ventas con historial de crédito encontradas: {len(ventas)}")
-    
-    cuentas_creadas = 0
-    deudas_creadas = 0
-    
-    for sale in ventas:
+    clientes_mapeados = {} # (nombre, telf) -> id
+    stats_clientes = 0
+    stats_vinculos = 0
+
+    for sale in todas_ventas:
+        if not sale.cliente or not (sale.cliente.razon_social or sale.cliente.telefono):
+            continue
+            
+        nombre = (sale.cliente.razon_social or "CONSUMIDOR FINAL").strip().upper()
+        telf = (sale.cliente.telefono or "").strip()
+        key = (nombre, telf)
+        
+        if key not in clientes_mapeados:
+            # Re-check in DB
+            db_cliente = await Cliente.find_one({
+                "tenant_id": sale.tenant_id,
+                "nombre": nombre,
+                "telefono": telf if telf else None
+            })
+            
+            if not db_cliente:
+                db_cliente = Cliente(
+                    tenant_id=sale.tenant_id,
+                    nombre=nombre,
+                    telefono=telf if telf else None,
+                    nit_ci=sale.cliente.nit,
+                    email=sale.cliente.email
+                )
+                await db_cliente.insert()
+                stats_clientes += 1
+            
+            clientes_mapeados[key] = str(db_cliente.id)
+        
+        # Link Sale to Client
         if not sale.cliente_id:
-            print(f"Ignorando venta {sale.id} - estado {sale.estado_pago} (No tiene cliente_id)")
+            sale.cliente_id = clientes_mapeados[key]
+            await sale.save()
+            stats_vinculos += 1
+
+    print(f"Total Clientes en sistema: {len(clientes_mapeados)} (Nuevos creados: {stats_clientes})")
+    print(f"Ventas vinculadas a clientes: {stats_vinculos}")
+
+    # 4. MIGRATE DEBTS
+    print("\nProcesando deudas pendientes hacia el nuevo módulo...")
+    
+    query_deudas = {"estado_pago": {"$in": ["PENDIENTE", "PARCIAL"]}}
+    ventas_deuda = await Sale.find(query_deudas).to_list()
+    
+    stats_deudas = 0
+    stats_cuentas = 0
+    
+    for sale in ventas_deuda:
+        if not sale.cliente_id:
             continue
             
         cuenta = await CuentaCredito.find_one({"tenant_id": sale.tenant_id, "cliente_id": sale.cliente_id})
+        
         computed_total = Decimal(str(sale.total))
-        pagado_al_contado = sum(Decimal(str(p.monto)) for p in sale.pagos if p.metodo != "CREDITO" and getattr(p, '_id', None) is None) # simplificacion
+        # Logic: Current state uses sum of pagos vs total to define debt
+        pagos_reales = sum(Decimal(str(p.monto)) for p in sale.pagos if p.metodo != "CREDITO")
+        saldo_pendiente = max(Decimal("0"), computed_total - pagos_reales)
         
-        # actually pagado_al_contado = todo lo pagado menos CREDITO original
-        # Wait, en el modelo anterior, ¿cómo se diferenciaba el CREDITO inicial del abono posterior?
-        # El pago "CREDITO" solía ser el monto que se mandaba a crédito en la VentaOriginal.
-        # Los abonos se guardaban como EFECTIVO, QR, etc., con fechas posteriores.
-        
-        monto_credito_original = sum(Decimal(str(p.monto)) for p in sale.pagos if p.metodo == "CREDITO")
-        monto_abonado = sum(Decimal(str(p.monto)) for p in sale.pagos if p.metodo != "CREDITO" and getattr(p, 'is_abono', True)) # Es complicado saber.
-        
-        # Una aproximación segura: la deuda original fue Total - Pagos hechos *en el mismo minuto*? 
-        # O podemos usar la fórmula: deuda original = total
-        # Simplificación para migración:
-        # Si estado es PENDIENTE / PARCIAL, creamos Deuda.
-        
-        pagos_abonos = sum((Decimal(str(p.monto)) for p in sale.pagos if getattr(p, "metodo", "") != "CREDITO"))
-        
-        # Asumiremos monto de deuda original = Sale.total (esto podría no ser exacto si dio enganche)
-        # Es mejor: Monto Credito Original = Sum(pagos con metodo CREDITO).
-        # Ah! en app.domain.models.sale.py PagoItem no guarda si es enganche vs abono explícitamente, pero podemos ver la fecha. Si hay pagos EFECTIVO, QR con la misma fecha de la venta, son enganches. Si son distintos, son abonos.
-        
-        if monto_credito_original == 0:
-            monto_credito_original = computed_total # default
-            
-        saldo_pendiente = monto_credito_original - pagos_abonos
-        if saldo_pendiente < 0: saldo_pendiente = Decimal("0")
-        
+        if saldo_pendiente <= 0:
+            continue
+
         deuda_existente = await Deuda.find_one(Deuda.sale_id == str(sale.id))
         
         if not deuda_existente:
@@ -74,31 +116,30 @@ async def migrate_credits():
                     estado_cuenta=EstadoCuenta.AL_DIA
                 )
                 await cuenta.insert()
-                cuentas_creadas += 1
+                stats_cuentas += 1
 
-            deuda_estado = EstadoDeuda.PAGADA
-            if sale.estado_pago == EstadoPago.PENDIENTE: deuda_estado = EstadoDeuda.PENDIENTE
-            if sale.estado_pago == EstadoPago.PARCIAL: deuda_estado = EstadoDeuda.PARCIAL
-            
             deuda = Deuda(
                 tenant_id=sale.tenant_id,
                 sucursal_id=sale.sucursal_id,
                 cuenta_id=str(cuenta.id),
                 cliente_id=sale.cliente_id,
                 sale_id=str(sale.id),
-                monto_original=DecimalMoney(str(monto_credito_original)),
+                monto_original=DecimalMoney(str(saldo_pendiente)),
                 saldo_pendiente=DecimalMoney(str(saldo_pendiente)),
                 fecha_emision=sale.created_at,
-                estado=deuda_estado
+                estado=EstadoDeuda.PENDIENTE if sale.estado_pago == EstadoPago.PENDIENTE else EstadoDeuda.PARCIAL
             )
             await deuda.insert()
-            deudas_creadas += 1
+            stats_deudas += 1
             
-            if deuda_estado in [EstadoDeuda.PENDIENTE, EstadoDeuda.PARCIAL]:
-                cuenta.saldo_total = DecimalMoney(str(Decimal(str(cuenta.saldo_total)) + saldo_pendiente))
-                await cuenta.save()
+            # Update Account Total
+            curr_saldo = Decimal(str(cuenta.saldo_total))
+            cuenta.saldo_total = DecimalMoney(str(curr_saldo + saldo_pendiente))
+            await cuenta.save()
 
-    print(f"Migración completada. Cuentas creadas: {cuentas_creadas}, Deudas creadas: {deudas_creadas}")
+    print(f"Deudas migradas exitosamente: {stats_deudas}")
+    print(f"Cuentas de crédito activadas: {stats_cuentas}")
+    print("--- MIGRACIÓN MAESTRA COMPLETADA ---")
 
 if __name__ == "__main__":
-    asyncio.run(migrate_credits())
+    asyncio.run(master_migration())

@@ -195,6 +195,32 @@ class SalesService:
                         session=session
                     ).update({"$set": {"referencia_id": str(sale.id)}}, session=session)
 
+                    # --- Resolución de cliente_id para créditos ---
+                    # Si la venta es a crédito y no tiene cliente_id formal,
+                    # creamos el cliente desde el snapshot de nombre/teléfono.
+                    if sale.estado_pago in [EstadoPago.PENDIENTE, EstadoPago.PARCIAL] and not sale.cliente_id:
+                        if sale.cliente and (sale.cliente.razon_social or sale.cliente.telefono):
+                            nombre = (sale.cliente.razon_social or "CONSUMIDOR FINAL").strip().upper()
+                            telf = (sale.cliente.telefono or "").strip() or None
+                            # Buscar si ya existe
+                            cliente_existente = await Cliente.find_one({
+                                "tenant_id": sale.tenant_id,
+                                "nombre": nombre,
+                                "telefono": telf
+                            }, session=session)
+                            if not cliente_existente:
+                                cliente_existente = Cliente(
+                                    tenant_id=sale.tenant_id,
+                                    nombre=nombre,
+                                    telefono=telf,
+                                    nit_ci=sale.cliente.nit,
+                                    email=sale.cliente.email
+                                )
+                                await cliente_existente.insert(session=session)
+                            # Vincular el cliente a la venta
+                            sale.cliente_id = str(cliente_existente.id)
+                            await sale.save(session=session)
+
                     if sale.cliente_id:
                         from beanie.operators import Inc, Set
                         await Cliente.find_one(Cliente.id == sale.cliente_id, session=session).update(
