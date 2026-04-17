@@ -3,6 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from bson import ObjectId
+from pydantic import Annotated, BeforeValidator
+
+# Helper to capture ObjectId and convert to string for the API response
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 from app.domain.models.cliente import Cliente
 from app.domain.models.user import User
@@ -30,7 +34,7 @@ class ClienteUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class ClienteResponse(BaseModel):
-    id: str = Field(..., alias="_id")
+    id: PyObjectId = Field(..., alias="_id")
     tenant_id: str
     nombre: str
     telefono: Optional[str] = None
@@ -78,7 +82,7 @@ async def listar_clientes(
         
     clientes = await clientes_cursor.skip(skip).limit(limit).sort("-created_at").to_list()
     
-    return [c.model_dump(by_alias=True) for c in clientes]
+    return clientes
 
 
 @router.post("/clientes", response_model=ClienteResponse)
@@ -105,7 +109,7 @@ async def crear_cliente(
         lista_precio_id=data.lista_precio_id
     )
     await cliente.create()
-    return cliente.model_dump(by_alias=True)
+    return cliente
 
 
 @router.get("/clientes/{cliente_id}", response_model=ClienteResponse)
@@ -116,7 +120,7 @@ async def obtener_cliente(
     cliente = await Cliente.get(cliente_id)
     if not cliente or cliente.tenant_id != (current_user.tenant_id or "default"):
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    return cliente.model_dump(by_alias=True)
+    return cliente
 
 
 @router.put("/clientes/{cliente_id}", response_model=ClienteResponse)
@@ -141,7 +145,7 @@ async def actualizar_cliente(
         setattr(cliente, field, value)
         
     await cliente.save()
-    return cliente.model_dump(by_alias=True)
+    return cliente
 
 
 @router.delete("/clientes/{cliente_id}")
