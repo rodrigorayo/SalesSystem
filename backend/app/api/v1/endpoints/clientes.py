@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from bson import ObjectId
-from pydantic import Annotated, BeforeValidator
+from typing import Annotated
+from pydantic import BeforeValidator
 
 # Helper to capture ObjectId and convert to string for the API response
 PyObjectId = Annotated[str, BeforeValidator(str)]
