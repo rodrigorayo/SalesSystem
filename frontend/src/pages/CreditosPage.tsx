@@ -109,40 +109,40 @@ export default function CreditosPage() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 pb-20 md:pb-6 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3 py-4 md:p-4 space-y-4 pb-20 md:pb-4 relative overflow-hidden">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">Créditos de Clientes</h1>
-                    <p className="text-gray-500 mt-1">Gestión profesional de cuentas por cobrar e historial de pagos.</p>
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Créditos de Clientes</h1>
+                    <p className="text-gray-500 mt-1 text-sm">Gestión profesional de cuentas por cobrar e historial de pagos.</p>
                 </div>
                 <div className="relative w-full md:w-80">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                     <input
                         type="text"
                         placeholder="Buscar por Teléfono / Nombre / NIT..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white text-gray-900 border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl outline-none text-sm font-medium shadow-sm transition-all"
+                        className="w-full pl-9 pr-3 py-1.5 bg-white text-gray-900 border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg outline-none text-xs font-medium shadow-sm transition-all"
                     />
                 </div>
             </div>
 
-            <div className="flex gap-2 pb-2">
+            <div className="flex gap-2">
                 <button 
                     onClick={() => { setFilterEstado(''); setPage(1); }}
-                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${filterEstado === '' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterEstado === '' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
                 >
                     Todos
                 </button>
                 <button 
                     onClick={() => { setFilterEstado('MOROSO'); setPage(1); }}
-                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${filterEstado === 'MOROSO' ? 'bg-red-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterEstado === 'MOROSO' ? 'bg-red-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
                 >
                     Con Mora / Pendientes
                 </button>
                 <button 
                     onClick={() => { setFilterEstado('AL_DIA'); setPage(1); }}
-                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${filterEstado === 'AL_DIA' ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterEstado === 'AL_DIA' ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
                 >
                     Al Día
                 </button>
@@ -157,13 +157,13 @@ export default function CreditosPage() {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {cuentas.map((cuenta: CuentaCredito) => (
                             <motion.div 
                                 whileHover={{ scale: 1.01 }}
                                 key={cuenta.id} 
                                 onClick={() => setSelectedCuenta(cuenta)}
-                                className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all cursor-pointer relative overflow-hidden group"
+                                className="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer relative overflow-hidden group"
                             >
                                 <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none">
                                     <div className={`absolute top-4 -right-8 transform rotate-45 text-[9px] font-black tracking-widest py-1 px-10 text-white uppercase shadow-md ${cuenta.estado_cuenta === 'MOROSO' ? 'bg-red-500' : 'bg-emerald-500'}`}>
@@ -171,20 +171,20 @@ export default function CreditosPage() {
                                     </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-4 mb-5">
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                        <UserIcon size={24} />
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <UserIcon size={20} />
                                     </div>
                                     <div className="pr-8">
-                                        <h3 className="font-bold text-gray-900 text-lg leading-tight line-clamp-1">{cuenta.cliente_nombre || 'Desconocido'}</h3>
-                                        <p className="text-xs text-gray-500 font-mono mt-1">CI/NIT: {cuenta.cliente_nit || 'N/A'}</p>
+                                        <h3 className="font-bold text-gray-900 text-base leading-tight line-clamp-1">{cuenta.cliente_nombre || 'Desconocido'}</h3>
+                                        <p className="text-[10px] text-gray-500 font-mono mt-0.5">CI/NIT: {cuenta.cliente_nit || 'N/A'}</p>
                                     </div>
                                 </div>
 
-                                <div className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100">
+                                <div className="bg-gray-50/50 rounded-xl p-3 border border-gray-100">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Deuda Total</span>
-                                        <span className={`text-2xl font-black font-mono ${cuenta.saldo_total > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>
+                                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Deuda Total</span>
+                                        <span className={`text-xl font-black font-mono ${cuenta.saldo_total > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>
                                             Bs. {cuenta.saldo_total.toFixed(2)}
                                         </span>
                                     </div>
@@ -224,34 +224,34 @@ export default function CreditosPage() {
                         <motion.div
                             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-[70] flex flex-col"
+                            className="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[70] flex flex-col"
                         >
-                            <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                            <div className="p-4 md:p-5 border-b border-gray-100 bg-gray-50/50">
                                 <div className="flex items-start justify-between">
-                                    <div className="flex gap-4 items-center">
-                                        <div className="h-16 w-16 bg-white border border-gray-200 rounded-full flex items-center justify-center text-indigo-600 shadow-sm">
-                                            <UserIcon size={32} />
+                                    <div className="flex gap-3 items-center">
+                                        <div className="h-14 w-14 bg-white border border-gray-200 rounded-full flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                                            <UserIcon size={28} />
                                         </div>
                                         <div>
-                                            <h2 className="text-2xl font-black text-gray-900">{selectedCuenta.cliente_nombre}</h2>
-                                            <p className="text-sm font-mono text-gray-500 mt-1">NIT: {selectedCuenta.cliente_nit || 'N/A'} | Tel: {selectedCuenta.cliente_telefono || 'N/A'}</p>
+                                            <h2 className="text-xl font-bold text-gray-900 leading-tight">{selectedCuenta.cliente_nombre}</h2>
+                                            <p className="text-[11px] font-mono text-gray-500 mt-0.5">NIT: {selectedCuenta.cliente_nit || 'N/A'} | Tel: {selectedCuenta.cliente_telefono || 'N/A'}</p>
                                         </div>
                                     </div>
                                     <button onClick={() => setSelectedCuenta(null)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
                                         <X size={24} />
                                     </button>
                                 </div>
-                                <div className="mt-6 flex gap-4">
-                                    <div className="flex-1 bg-white p-4 rounded-2xl border border-rose-100 shadow-sm flex justify-between items-center">
-                                        <span className="text-sm font-bold text-gray-500">Saldo Total</span>
-                                        <span className="text-xl font-black font-mono text-rose-600">Bs. {selectedCuenta.saldo_total.toFixed(2)}</span>
+                                <div className="mt-5 flex gap-3">
+                                    <div className="flex-1 bg-white p-3 rounded-xl border border-rose-100 shadow-sm flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Saldo Total</span>
+                                        <span className="text-lg font-black font-mono text-rose-600">Bs. {selectedCuenta.saldo_total.toFixed(2)}</span>
                                     </div>
                                     <button 
                                         onClick={() => { setPagosIn([{metodo:'EFECTIVO', monto: ''}]); setAbonoDrawer({isOpen: true, cuenta: selectedCuenta}); }}
                                         disabled={selectedCuenta.saldo_total <= 0}
-                                        className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-2xl font-bold transition-colors flex items-center gap-2 shadow-md shadow-indigo-200"
+                                        className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl font-bold transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 text-xs"
                                     >
-                                        <PlusCircle size={20} /> Abonar General
+                                        <PlusCircle size={16} /> Abonar General
                                     </button>
                                 </div>
                             </div>
@@ -271,7 +271,7 @@ export default function CreditosPage() {
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-auto p-6 bg-gray-50/30">
+                            <div className="flex-1 overflow-auto p-4 md:p-5 bg-gray-50/30">
                                 {activeTab === 'DEUDAS' ? (
                                     <div className="space-y-4">
                                         {loadingDeudas ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-600" /></div> : deudas.length === 0 ? <p className="text-center py-10 text-gray-500 italic">No hay deudas pendientes.</p> : (
@@ -330,7 +330,7 @@ export default function CreditosPage() {
                     >
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
                         >
                             <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                                 <div>
@@ -342,7 +342,7 @@ export default function CreditosPage() {
                                 </button>
                             </div>
 
-                            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                            <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                                 {pagosIn.map((pago, index) => (
                                     <div key={index} className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3 relative group">
                                         {pagosIn.length > 1 && (
@@ -411,25 +411,25 @@ export default function CreditosPage() {
                                 </button>
                             </div>
 
-                            <div className="p-6 bg-gray-50 border-t border-gray-100">
-                                <div className="flex items-center justify-between mb-6">
+                            <div className="p-5 bg-gray-50 border-t border-gray-100">
+                                <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Amortización</span>
-                                        <span className={`text-2xl font-black font-mono ${getTotalAbono() > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>Bs. {getTotalAbono().toFixed(2)}</span>
+                                        <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest">Total Amortización</span>
+                                        <span className={`text-xl font-black font-mono ${getTotalAbono() > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>Bs. {getTotalAbono().toFixed(2)}</span>
                                     </div>
                                     <div className="text-right">
-                                        <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Restante</span>
+                                        <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest">Saldo Restante</span>
                                         <span className="text-sm font-bold text-rose-500 font-mono">Bs. {Math.max(0, abonoDrawer.cuenta.saldo_total - getTotalAbono()).toFixed(2)}</span>
                                     </div>
                                 </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => setAbonoDrawer({isOpen: false, cuenta: null})} className="flex-1 py-3 text-sm font-bold text-gray-400 hover:text-gray-600 transition-colors">Descartar</button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setAbonoDrawer({isOpen: false, cuenta: null})} className="flex-1 py-2 text-[11px] font-bold text-gray-400 hover:text-gray-600 transition-colors">Descartar</button>
                                     <button 
                                         onClick={handleAbonoSubmit}
                                         disabled={abonoMut.isPending || getTotalAbono() <= 0 || getTotalAbono() > (abonoDrawer.cuenta?.saldo_total + 1)}
-                                        className="flex-[2] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2 capitalize"
+                                        className="flex-[2] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black text-xs shadow-lg shadow-indigo-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2 capitalize"
                                     >
-                                        {abonoMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Confirmar Abono
+                                        {abonoMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Confirmar Abono
                                     </button>
                                 </div>
                             </div>
