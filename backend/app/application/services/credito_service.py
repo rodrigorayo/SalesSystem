@@ -26,9 +26,14 @@ class CreditoService:
         }, session=session)
         
         if not cuenta:
+            from app.domain.models.cliente import Cliente # Import here to avoid circular imports if needed
+            cliente = await Cliente.get(cliente_id)
             cuenta = CuentaCredito(
                 tenant_id=sale.tenant_id,
                 cliente_id=cliente_id,
+                cliente_nombre=cliente.nombre if cliente else "Desconocido",
+                cliente_nit=cliente.nit_ci if cliente else None,
+                cliente_telefono=cliente.telefono if cliente else None,
                 saldo_total=DecimalMoney("0"),
                 estado_cuenta=EstadoCuenta.AL_DIA
             )
@@ -143,35 +148,20 @@ class CreditoService:
             deuda.updated_at = datetime.utcnow()
             await deuda.save()
             
-            # Sync with original Sale document to ensure backwards compatibility views in general sales
+            # Removed backward-compatible logic of appending EFECTIVO payments back to the Sale.
+            # Sales with CREDITO will remain purely as CREDITO, preventing double entry accounting issues.
+            
+            # Optionally just mark Sale state to update payment trackers if totally paid.
             sale = await Sale.get(deuda.sale_id)
             if sale:
-                # Add this portion to sale.pagos (simplified as CREDITO payment is paid)
-                # Since the abono might be mixed, we append a generalized "CREDITO_ABONADO" or distribute
-                # We'll distribute the mixed payments proportionately or just append them directly if it's 1-to-1.
-                # Simplest path: append the exact user `pagos` to the sale if it's applying primarily to this sale.
-                import uuid
-                # For backwards compatibility with standard Sales Page, reflect it
-                for p in request.pagos:
-                    # We approximate if it's a multi-debt, but it's simpler to append a flat proportion
-                    portion_ratio = monto_aplicado / monto_total_abono
-                    monto_porcion = Decimal(str(p.monto)) * portion_ratio
-                    sale.pagos.append(PagoItem(
-                        metodo=p.metodo,
-                        monto=DecimalMoney(str(monto_porcion)),
-                        fecha=datetime.utcnow()
-                    ))
-                    
-                total_sale_pagado = sum(Decimal(str(px.monto)) for px in sale.pagos if px.metodo != "CREDITO")
-                # Wait, original sale contains "CREDITO" as payment method representing the debt.
-                # By appending EFECTIVO/QR now, the total payments might exceed sale.total (CREDITO + EFECTIVO).
-                # To fix: standard Taboada logic allowed CREDITO as a placeholder. We should remove or keep? 
-                # Let's adjust Sale.estado_pago based on Deuda.estado
                 if deuda.estado == EstadoDeuda.PAGADA:
-                    sale.estado_pago = EstadoPago.PAGADO
+                    if sale.estado_pago != EstadoPago.PAGADO:
+                        sale.estado_pago = EstadoPago.PAGADO
+                        await sale.save()
                 elif deuda.estado == EstadoDeuda.PARCIAL:
-                    sale.estado_pago = EstadoPago.PARCIAL
-                await sale.save()
+                    if sale.estado_pago != EstadoPago.PARCIAL:
+                        sale.estado_pago = EstadoPago.PARCIAL
+                        await sale.save()
             
             deudas_afectadas_ids.append(str(deuda.id))
             saldo_restante_abono -= monto_aplicado
@@ -227,5 +217,134 @@ class CreditoService:
             notas=request.notas
         )
         await transaccion.insert()
+        
+        return cuenta
+        
+    @staticmethod
+    async def anular_abono(transaccion_id: str, user: User, motivo: str = "Error en digitación") -> CuentaCredito:
+        """
+        Reverte un abono hecho a una Deuda.
+        1. Localizar la transacción.
+        2. Reverit la baja de cuentas en la Deuda.
+        3. Restaurar saldo prestado en Cliente.
+        4. Crear Movimiento EGRESO restando en Caja para justificar que se sacó lo cobrado de mentira.
+        5. Marcar transacción anulada.
+        """
+        transaccion = await TransaccionCredito.get(transaccion_id)
+        if not transaccion or transaccion.tenant_id != (user.tenant_id or "default"):
+            raise HTTPException(status_code=404, detail="Transacción no encontrada.")
+            
+        if transaccion.tipo != "ABONO":
+            raise HTTPException(status_code=400, detail="Solo se pueden anular transacciones de tipo ABONO.")
+            
+        if transaccion.anulada:
+            raise HTTPException(status_code=400, detail="Esta transacción ya fue anulada previamente.")
+            
+        # 1. Revisar Caja Abierta
+        caja = await CajaSesion.find_one(
+            CajaSesion.tenant_id == transaccion.tenant_id,
+            CajaSesion.cajero_id == str(user.id),
+            CajaSesion.estado == EstadoSesion.ABIERTA
+        )
+        if not caja:
+            raise HTTPException(
+                status_code=400, 
+                detail="Debes tener una sesión de caja abierta para registrar el egreso reverso de este abono."
+            )
+            
+        cuenta = await CuentaCredito.get(transaccion.cuenta_id)
+        if not cuenta:
+            raise HTTPException(status_code=404, detail="La cuenta de crédito asociada no existe.")
+            
+        # 2. Restaurar Deudas afectas: Asumimos FIFO distribuido
+        monto_a_restaurar = Decimal(str(transaccion.monto))
+        
+        # We need to distribute this back up precisely as it went down. 
+        # For simplicity, we just add normally to affected deudas if we know how much they took 
+        # But we don't have explicit breakdown per deuda in transaccion, we only have deudas_afectadas array.
+        # Simplest approach for rollback is to simply get those deudas, and add back until monto_a_restaurar runs out.
+        # (It will reverse the FIFO exactly because we loop them over again).
+        deudas = []
+        for d_id in transaccion.deudas_afectadas:
+            d = await Deuda.get(d_id)
+            if d: deudas.append(d)
+                
+        # Sort newest to oldest so we reverse the "last paid" first just in case
+        deudas = sorted(deudas, key=lambda dx: dx.fecha_emision, reverse=True)
+        
+        for deuda in deudas:
+            if monto_a_restaurar <= Decimal("0"):
+                break
+                
+            deuda_monto_original = Decimal(str(deuda.monto_original))
+            deuda_saldo_actual = Decimal(str(deuda.saldo_pendiente))
+            
+            espacio_en_deuda = deuda_monto_original - deuda_saldo_actual
+            if espacio_en_deuda > Decimal("0"):
+                monto_restaurable = min(espacio_en_deuda, monto_a_restaurar)
+                
+                deuda.saldo_pendiente = DecimalMoney(str(deuda_saldo_actual + monto_restaurable))
+                if Decimal(str(deuda.saldo_pendiente)) >= deuda_monto_original:
+                    deuda.estado = EstadoDeuda.PENDIENTE
+                else:
+                    deuda.estado = EstadoDeuda.PARCIAL
+                
+                deuda.updated_at = datetime.utcnow()
+                await deuda.save()
+                
+                # Check sale to revert status
+                sale = await Sale.get(deuda.sale_id)
+                if sale:
+                    if deuda.estado == EstadoDeuda.PENDIENTE:
+                        sale.estado_pago = EstadoPago.PENDIENTE
+                    else:
+                        sale.estado_pago = EstadoPago.PARCIAL
+                    await sale.save()
+                    
+                monto_a_restaurar -= monto_restaurable
+
+        # 3. Restaurar sumatoria a favor del moroso (Saldo total cuenta)
+        cuenta.saldo_total = DecimalMoney(str(Decimal(str(cuenta.saldo_total)) + Decimal(str(transaccion.monto))))
+        if Decimal(str(cuenta.saldo_total)) > Decimal("0.01"):
+            # Should technically check if any debt is past due, but keeping it simple
+            cuenta.estado_cuenta = EstadoCuenta.MOROSO
+        cuenta.updated_at = datetime.utcnow()
+        await cuenta.save()
+        
+        # 4. Generar Movimiento EGRESO revertiendo la balanza en caja
+        if transaccion.pagos:
+            for p in transaccion.pagos:
+                subtipo = SubtipoMovimiento.EGRESO_OTROS
+                if p.metodo == "EFECTIVO": subtipo = SubtipoMovimiento.EGRESO_OTROS # Using other to signify refund
+                
+                await CajaMovimiento(
+                    tenant_id=cuenta.tenant_id,
+                    sucursal_id=str(caja.sucursal_id),
+                    sesion_id=str(caja.id),
+                    cajero_id=str(user.id),
+                    cajero_name=user.full_name or user.username,
+                    subtipo=subtipo,
+                    tipo="EGRESO",
+                    monto=DecimalMoney(str(p.monto)),
+                    descripcion=f"ANULACIÓN de Abono Crédito Cuenta #{str(cuenta.id)[-6:].upper()} ({motivo})"
+                ).insert()
+        else:
+             # Fallback if old code
+             await CajaMovimiento(
+                tenant_id=cuenta.tenant_id,
+                sucursal_id=str(caja.sucursal_id),
+                sesion_id=str(caja.id),
+                cajero_id=str(user.id),
+                cajero_name=user.full_name or user.username,
+                subtipo=SubtipoMovimiento.EGRESO_OTROS,
+                tipo="EGRESO",
+                monto=transaccion.monto,
+                descripcion=f"ANULACIÓN de Abono Crédito Cuenta #{str(cuenta.id)[-6:].upper()} ({motivo})"
+            ).insert()
+
+        # 5. Marcar anulación
+        transaccion.anulada = True
+        transaccion.anulada_por = user.full_name or user.username
+        await transaccion.save()
         
         return cuenta

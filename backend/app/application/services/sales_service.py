@@ -147,8 +147,33 @@ class SalesService:
                         computed_total = int_part + Decimal("0.5")
 
                     has_credit = any(p.metodo == "CREDITO" for p in sale_in.pagos)
-                    if has_credit and not sale_in.cliente_id and not (sale_in.cliente and sale_in.cliente.razon_social):
-                        raise HTTPException(status_code=400, detail="Ventas a crédito requieren un cliente registrado")
+                    if has_credit:
+                        if not sale_in.cliente_id and not (sale_in.cliente and sale_in.cliente.razon_social):
+                            raise HTTPException(status_code=400, detail="Ventas a crédito requieren un cliente registrado")
+                        
+                        # Validar estado crediticio si el cliente ya existe
+                        if sale_in.cliente_id:
+                            from app.domain.models.credito import CuentaCredito, EstadoCuenta
+                            cuenta_existente = await CuentaCredito.find_one(
+                                CuentaCredito.tenant_id == tenant_id,
+                                CuentaCredito.cliente_id == sale_in.cliente_id,
+                                session=session
+                            )
+                            if cuenta_existente:
+                                if cuenta_existente.estado_cuenta == EstadoCuenta.MOROSO:
+                                    logger.warning(f"Venta a crédito rechazada: Cliente {sale_in.cliente_id} está MOROSO.")
+                                    raise HTTPException(status_code=400, detail="Este cliente tiene estado MOROSO en su cuenta y no puede comprar a crédito hasta regularizar sus deudas.")
+                                
+                                if cuenta_existente.limite_credito is not None:
+                                    # Cuanto adeuda ahorita + Cuanto endeudará en esta venta (total de la venta menos los pagos parciales hechos)
+                                    actual_pagos_validar = [p.monto for p in sale_in.pagos if p.metodo != "CREDITO"]
+                                    pagado_ahora = sum((p for p in actual_pagos_validar), Decimal("0"))
+                                    nueva_deuda = computed_total - pagado_ahora
+                                    if Decimal(str(cuenta_existente.saldo_total)) + nueva_deuda > Decimal(str(cuenta_existente.limite_credito)):
+                                        raise HTTPException(
+                                            status_code=400, 
+                                            detail=f"Esta venta excede el límite de crédito del cliente (Límite: Bs. {cuenta_existente.limite_credito}, Nuevo total proyectado: Bs. {Decimal(str(cuenta_existente.saldo_total)) + nueva_deuda})."
+                                        )
 
                     actual_pagos = [PagoItem(metodo=p.metodo, monto=DecimalMoney(p.monto)) for p in sale_in.pagos if p.metodo != "CREDITO"]
                     total_pagado = sum((p.monto for p in actual_pagos), Decimal("0"))

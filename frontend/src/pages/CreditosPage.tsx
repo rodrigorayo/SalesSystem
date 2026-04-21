@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCuentasCredito, getDeudasPorCuenta, getTransaccionesCuenta, registrarAbonosMultiple } from '../api/api';
-import { Loader2, Search, Wallet, User as UserIcon, PlusCircle, X, History, FileText, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { getCuentasCredito, getDeudasPorCuenta, getTransaccionesCuenta, registrarAbonosMultiple, anularAbono } from '../api/api';
+import { Loader2, Search, Wallet, User as UserIcon, PlusCircle, X, History, FileText, ChevronRight, CheckCircle2, Printer, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../components/Pagination';
 
@@ -35,6 +35,8 @@ interface Transaccion {
     created_at: string;
     pagos?: any[];
     notas?: string;
+    anulada?: boolean;
+    anulada_por?: string;
 }
 
 export default function CreditosPage() {
@@ -77,18 +79,97 @@ export default function CreditosPage() {
 
     const abonoMut = useMutation({
         mutationFn: (data: any) => registrarAbonosMultiple(abonoDrawer.cuenta.id, data),
-        onSuccess: () => {
+        onSuccess: (res) => {
             qc.invalidateQueries({ queryKey: ['cuentas-credito'] });
-            qc.invalidateQueries({ queryKey: ['deudas'] });
-            qc.invalidateQueries({ queryKey: ['transacciones'] });
+            qc.invalidateQueries({ queryKey: ['deudas', selectedCuenta?.id] });
+            qc.invalidateQueries({ queryKey: ['transacciones', selectedCuenta?.id] });
             setAbonoDrawer({ isOpen: false, cuenta: null });
             if (selectedCuenta) {
-                // update local balance hack or just refetch
-                setSelectedCuenta({ ...selectedCuenta, saldo_total: selectedCuenta.saldo_total - getTotalAbono()});
+                setSelectedCuenta({ ...selectedCuenta, saldo_total: res.nuevo_saldo });
             }
         },
         onError: (err: any) => alert(err.message || 'Error al registrar el abono.')
     });
+
+    const anularMut = useMutation({
+        mutationFn: ({ transaccionId, motivo }: { transaccionId: string, motivo: string }) => 
+            anularAbono(selectedCuenta!.id, transaccionId, motivo),
+        onSuccess: (res) => {
+            qc.invalidateQueries({ queryKey: ['cuentas-credito'] });
+            qc.invalidateQueries({ queryKey: ['deudas', selectedCuenta?.id] });
+            qc.invalidateQueries({ queryKey: ['transacciones', selectedCuenta?.id] });
+            if (selectedCuenta) {
+                setSelectedCuenta({ ...selectedCuenta, saldo_total: res.nuevo_saldo });
+            }
+        },
+        onError: (err: any) => alert(err.message || 'Error al anular el abono.')
+    });
+
+    const handleAnularAbono = (t: Transaccion) => {
+        if (t.anulada) return;
+        const motivo = window.prompt("Escriba el motivo de la anulación (Ej. Cobro duplicado, error de monto):");
+        if (!motivo) return;
+        if (window.confirm("¿Está seguro de anular este abono? El dinero se restará de caja y la deuda retornará.")) {
+            anularMut.mutate({ transaccionId: t.id, motivo });
+        }
+    };
+
+    const printAbonoTicket = (t: Transaccion) => {
+        if (!selectedCuenta) return;
+        const printWindow = document.createElement('iframe');
+        printWindow.style.position = 'absolute';
+        printWindow.style.top = '-1000px';
+        document.body.appendChild(printWindow);
+        const doc = printWindow.contentWindow?.document;
+        if (doc) {
+            doc.write(`
+                <html>
+                <head>
+                    <style>
+                        body { font-family: monospace; font-size: 12px; margin: 0; padding: 10px; width: 300px; color: #000; }
+                        .text-center { text-align: center; }
+                        .font-bold { font-weight: bold; }
+                        .title { font-size: 16px; margin-bottom: 5px; }
+                        .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+                        table { width: 100%; border-collapse: collapse; }
+                        td { padding: 3px 0; }
+                        .right { text-align: right; }
+                        .text-xs { font-size: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="text-center font-bold title">COMPROBANTE DE PAGO</div>
+                    <div class="text-center text-xs">Pago a Crédito / Abono de Cuenta</div>
+                    <div class="divider"></div>
+                    <table>
+                        <tr><td>Fecha:</td><td class="right">${formatDate(t.created_at)}</td></tr>
+                        <tr><td>Cliente:</td><td class="right font-bold">${selectedCuenta.cliente_nombre.substring(0,25)}</td></tr>
+                        <tr><td>Transacción:</td><td class="right text-xs">#${t.id.substring(t.id.length - 8).toUpperCase()}</td></tr>
+                    </table>
+                    <div class="divider"></div>
+                    <table style="margin-bottom: 10px;">
+                        ${(t.pagos || []).map(p => `<tr><td>${p.metodo}</td><td class="right">Bs. ${p.monto.toFixed(2)}</td></tr>`).join('')}
+                    </table>
+                    <div class="divider"></div>
+                    <table>
+                        <tr><td class="font-bold">TOTAL ABONADO:</td><td class="right font-bold" style="font-size: 14px;">Bs. ${t.monto.toFixed(2)}</td></tr>
+                        <tr><td class="text-xs">SALDO RESTANTE CUENTA:</td><td class="right text-xs">Bs. ${selectedCuenta.saldo_total.toFixed(2)}</td></tr>
+                    </table>
+                    <div class="divider"></div>
+                    <div class="text-center text-xs" style="margin-top:20px;">
+                        Verifique su comprobante.<br/>Gracias por su preferencia.
+                    </div>
+                </body>
+                </html>
+            `);
+            doc.close();
+            setTimeout(() => {
+                printWindow.contentWindow?.focus();
+                printWindow.contentWindow?.print();
+                setTimeout(() => document.body.removeChild(printWindow), 1000);
+            }, 500);
+        }
+    };
 
     const getTotalAbono = () => pagosIn.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0);
 
@@ -299,16 +380,40 @@ export default function CreditosPage() {
                                     <div className="space-y-4">
                                         {loadingHistorial ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-600" /></div> : transacciones.length === 0 ? <p className="text-center py-10 text-gray-500 italic">No hay historial de movimientos.</p> : (
                                             transacciones.map(h => (
-                                                <div key={h.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex justify-between items-center shadow-sm">
+                                                <div key={h.id} className={`bg-white border rounded-2xl p-4 flex justify-between items-center shadow-sm ${h.anulada ? 'border-rose-100 opacity-60' : 'border-gray-200'}`}>
                                                     <div>
-                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${h.tipo === 'ABONO' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{h.tipo}</span>
-                                                        <p className="text-[10px] text-gray-400 mt-1 uppercase font-medium">{formatDate(h.created_at)}</p>
-                                                        {h.notas && <p className="text-[11px] text-gray-600 mt-1 italic">"{h.notas}"</p>}
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${h.anulada ? 'bg-rose-100 text-rose-500' : h.tipo === 'ABONO' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                                {h.anulada ? 'ANULADO' : h.tipo}
+                                                            </span>
+                                                            {h.tipo === 'ABONO' && !h.anulada && (
+                                                                <div className="flex gap-1">
+                                                                    <button onClick={() => printAbonoTicket(h)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100" title="Imprimir Ticket">
+                                                                        <Printer size={12} />
+                                                                    </button>
+                                                                    <button onClick={() => handleAnularAbono(h)} disabled={anularMut.isPending} className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100" title="Anular Pago">
+                                                                        {anularMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-400 mt-1.5 uppercase font-medium">{formatDate(h.created_at)}</p>
+                                                        {h.notas && <p className="text-[11px] text-gray-600 mt-1 italic leading-tight">"{h.notas}"</p>}
+                                                        {h.anulada && <p className="text-[9px] text-rose-500 mt-0.5 font-bold">Por: {h.anulada_por || 'Sistema'}</p>}
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className={`font-black font-mono ${h.tipo === 'ABONO' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                        <span className={`font-black tracking-tight ${h.anulada ? 'text-gray-400 line-through' : h.tipo === 'ABONO' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                             {h.tipo === 'ABONO' ? '-' : '+'} Bs. {h.monto.toFixed(2)}
                                                         </span>
+                                                        {h.pagos && h.pagos.length > 0 && !h.anulada && (
+                                                            <div className="mt-1 flex flex-col items-end gap-0.5">
+                                                                {h.pagos.map((p, idx) => (
+                                                                    <span key={idx} className="text-[8px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                                                                        {p.metodo}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))

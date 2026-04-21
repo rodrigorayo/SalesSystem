@@ -12,6 +12,9 @@ class EstadoCuenta(str, Enum):
 class CuentaCredito(Document):
     tenant_id: str
     cliente_id: str  # ID referenciado a Clientes
+    cliente_nombre: Optional[str] = None
+    cliente_nit: Optional[str] = None
+    cliente_telefono: Optional[str] = None
     saldo_total: DecimalMoney = DecimalMoney("0")
     limite_credito: Optional[DecimalMoney] = None
     estado_cuenta: EstadoCuenta = EstadoCuenta.AL_DIA
@@ -77,6 +80,9 @@ class TransaccionCredito(Document):
     cajero_id: str
     cajero_nombre: str
     sesion_caja_id: Optional[str] = None
+    
+    anulada: bool = False
+    anulada_por: Optional[str] = None
     
     notas: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

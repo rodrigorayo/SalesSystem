@@ -24,39 +24,54 @@ async def get_cuentas_credito(
     if estado:
         filters.append(CuentaCredito.estado_cuenta == estado)
         
+    if q:
+        import re
+        regex = re.compile(f".*{re.escape(q)}.*", re.IGNORECASE)
+        filters.append({
+            "$or": [
+                {"cliente_nombre": regex},
+                {"cliente_nit": regex},
+                {"cliente_telefono": regex}
+            ]
+        })
+        
     query = CuentaCredito.find(*filters)
     total = await query.count()
     skip = (page - 1) * limit
     cuentas = await query.sort(-CuentaCredito.updated_at).skip(skip).limit(limit).to_list()
     
-    # Resolve client names
+    # Resolve client names fallback (for older accounts not yet migrated)
     result_items = []
     for c in cuentas:
-        cli = await Cliente.get(c.cliente_id)
-        if (q):
-           if not cli or not (
-               (cli.nombre and q.lower() in cli.nombre.lower()) or 
-               (cli.nit_ci and q in cli.nit_ci) or
-               (cli.telefono and q in cli.telefono)
-           ): continue # skip if search query provided
-            
+        # If the newly added fields exist, use them. Otherwise fallback to fetch.
+        c_nombre = getattr(c, "cliente_nombre", None)
+        c_nit = getattr(c, "cliente_nit", None)
+        c_telefono = getattr(c, "cliente_telefono", None)
+        
+        if not c_nombre:
+            cli = await Cliente.get(c.cliente_id)
+            if cli:
+                c_nombre = cli.nombre
+                c_nit = cli.nit_ci
+                c_telefono = cli.telefono
+
         result_items.append({
             "id": str(c.id),
             "cliente_id": c.cliente_id,
             "saldo_total": float(str(c.saldo_total)),
             "estado_cuenta": c.estado_cuenta.value,
             "created_at": c.created_at.isoformat(),
-            "cliente_nombre": cli.nombre if cli else "Desconocido",
-            "cliente_nit": cli.nit_ci if cli else None,
-            "cliente_telefono": cli.telefono if cli else None
+            "cliente_nombre": c_nombre or "Desconocido",
+            "cliente_nit": c_nit,
+            "cliente_telefono": c_telefono
         })
 
     import math
     return {
         "items": result_items,
-        "total": len(result_items) if q else total, 
+        "total": total, 
         "page": page,
-        "pages": math.ceil((len(result_items) if q else total) / limit) if limit > 0 else 1
+        "pages": math.ceil(total / limit) if limit > 0 else 1
     }
 
 
@@ -133,6 +148,30 @@ async def registrar_abono_endpoint(
     
     return {
         "message": "Abono registrado exitosamente.",
+        "cuenta_id": str(cuenta_actualizada.id),
+        "nuevo_saldo": float(str(cuenta_actualizada.saldo_total))
+    }
+
+@router.post("/creditos/{cuenta_id}/transacciones/{transaccion_id}/anular")
+async def anular_abono_endpoint(
+    cuenta_id: str,
+    transaccion_id: str,
+    motivo: str = "Reversión manual",
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Anula un abono, devolviendo la deuda, actualizando el saldo y registrando el egreso en caja.
+    """
+    # Verify account
+    tenant_id = current_user.tenant_id or "default"
+    cuenta = await CuentaCredito.get(cuenta_id)
+    if not cuenta or cuenta.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        
+    cuenta_actualizada = await CreditoService.anular_abono(transaccion_id, current_user, motivo)
+    
+    return {
+        "message": "Abono anulado exitosamente.",
         "cuenta_id": str(cuenta_actualizada.id),
         "nuevo_saldo": float(str(cuenta_actualizada.saldo_total))
     }

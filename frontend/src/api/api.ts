@@ -489,3 +489,9 @@ export const registrarAbonosMultiple = (cuenta_id: string, data: { pagos: any[],
     return client<any>(`/creditos/${cuenta_id}/abonos`, { method: 'POST', body: data });
 };
 
+export const anularAbono = (cuenta_id: string, transaccion_id: string, motivo: string) => {
+    const params = new URLSearchParams({ motivo });
+    return client<any>(`/creditos/${cuenta_id}/transacciones/${transaccion_id}/anular?${params.toString()}`, { method: 'POST' });
+};
+
+
