@@ -29,10 +29,11 @@ from app.utils.errors import CajaErrors
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async def _get_active_session(tenant_id: str, sucursal_id: str) -> Optional[CajaSesion]:
+async def _get_active_session(tenant_id: str, sucursal_id: str, cajero_id: str) -> Optional[CajaSesion]:
     return await CajaSesion.find_one(
         CajaSesion.tenant_id   == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
+        CajaSesion.cajero_id   == cajero_id,
         CajaSesion.estado      == EstadoSesion.ABIERTA,
     )
 
@@ -113,7 +114,7 @@ async def abrir_caja(request: Request, body: AbrirCajaIn, current_user: User = D
 async def get_sesion_activa(current_user: User = Depends(get_current_active_user)):
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         return None
     return sesion
@@ -209,7 +210,7 @@ async def registrar_gasto(body: GastoIn, current_user: User = Depends(get_curren
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         raise HTTPException(status_code=400, detail=CajaErrors.SIN_SESION_ACTIVA)
 
@@ -236,7 +237,7 @@ async def registrar_ingreso(body: IngresoIn, current_user: User = Depends(get_cu
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         raise HTTPException(status_code=400, detail="No hay una sesión de caja abierta. Abrí la caja primero.")
 
@@ -269,7 +270,7 @@ async def get_movimientos(current_user: User = Depends(get_current_active_user))
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesion = await _get_active_session(tenant_id, sucursal_id)
+    sesion = await _get_active_session(tenant_id, sucursal_id, str(current_user.id))
     if not sesion:
         return []
 

@@ -269,6 +269,7 @@ class SalesService:
                     caja_sesion = await CajaSesion.find_one(
                         CajaSesion.tenant_id   == tenant_id,
                         CajaSesion.sucursal_id == sucursal_id,
+                        CajaSesion.cajero_id   == str(current_user.id),
                         CajaSesion.estado      == EstadoSesion.ABIERTA,
                         session=session
                     )
@@ -383,6 +384,7 @@ class SalesService:
                     caja_sesion = await CajaSesion.find_one(
                         CajaSesion.tenant_id   == tenant_id,
                         CajaSesion.sucursal_id == sucursal_id,
+                        CajaSesion.cajero_id   == str(current_user.id),
                         CajaSesion.estado      == EstadoSesion.ABIERTA,
                         session=session
                     )
