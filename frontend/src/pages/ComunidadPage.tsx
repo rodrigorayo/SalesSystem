@@ -4,7 +4,7 @@ import { Users, Gift, MousePointerClick, RefreshCcw } from 'lucide-react';
 import { client } from '../api/api';
 
 export default function ComunidadPage() {
-    const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    const { data: stats, refetch: refetchStats } = useQuery({
         queryKey: ['comunidad-stats'],
         queryFn: async () => {
             const res = await client<any>('/comunidad/stats');
