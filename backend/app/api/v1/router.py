@@ -3,7 +3,7 @@ from app.api.v1.endpoints import (
     auth, tenants, users, products, sales,
     caja, categories, upload,
     sucursales, inventario, pedidos, descuentos,
-    price_requests, clientes, price_lists, reports, creditos
+    price_requests, clientes, price_lists, reports, creditos, b2b
 )
 
 api_router = APIRouter()
@@ -25,3 +25,4 @@ api_router.include_router(price_requests.router, tags=["price_requests"])
 api_router.include_router(clientes.router, tags=["clientes"])
 api_router.include_router(price_lists.router, prefix="/listas-precios", tags=["price_lists"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+api_router.include_router(b2b.router, prefix="/b2b", tags=["b2b"])

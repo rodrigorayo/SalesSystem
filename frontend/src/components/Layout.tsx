@@ -61,6 +61,7 @@ export default function Layout({ children }: LayoutProps) {
             { icon: ClipboardList,   label: 'Pedidos',      path: '/pedidos',            feature: 'PEDIDOS_INTERNOS',     roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             { icon: Users,           label: 'Personal',     path: '/usuarios',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             { icon: QrCode,          label: 'Control QR',   path: '/qr-control',         feature: 'CONTROL_QR',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR'] },
+            { icon: Warehouse,       label: 'Deuda Taboada',path: '/b2b/mermas',         feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'] },
         ];
 
         return allItems

@@ -20,6 +20,7 @@ import ControlQRPage from './pages/ControlQRPage';
 import PriceRequestsPage from './pages/PriceRequestsPage';
 import ReportsPage from './pages/ReportsPage';
 import CreditosPage from './pages/CreditosPage';
+import ReclamosFabrica from './pages/b2b/ReclamosFabrica';
 import { useAuthStore } from './store/authStore';
 import { getMyFeatures } from './api/api';
 import { Toaster } from 'sonner';
@@ -201,6 +202,13 @@ function App() {
                 <Route path="/creditos" element={
                   <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CREDITOS">
                     <CreditosPage />
+                  </ProtectedRoute>
+                } />
+
+                {/* B2B / Reclamos Fábrica */}
+                <Route path="/b2b/mermas" element={
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                    <ReclamosFabrica />
                   </ProtectedRoute>
                 } />
 

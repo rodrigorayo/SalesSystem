@@ -20,6 +20,7 @@ from app.domain.models.pedido_item import PedidoItemDocument
 from app.domain.models.cliente import Cliente
 from app.domain.models.price_list import ListaPrecio, ListaPrecioItem
 from app.domain.models.credito import CuentaCredito, Deuda, TransaccionCredito
+from app.domain.models.b2b import NotaDevolucionMerma, NotaTraspaso, InventarioMovil
 
 from app.infrastructure.core.config import settings
 
@@ -57,6 +58,9 @@ async def init_db():
             CuentaCredito,
             Deuda,
             TransaccionCredito,
+            NotaDevolucionMerma,
+            NotaTraspaso,
+            InventarioMovil
         ]
     )
 

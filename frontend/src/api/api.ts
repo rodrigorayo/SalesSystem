@@ -494,4 +494,19 @@ export const anularAbono = (cuenta_id: string, transaccion_id: string, motivo: s
     return client<any>(`/creditos/${cuenta_id}/transacciones/${transaccion_id}/anular?${params.toString()}`, { method: 'POST' });
 };
 
+// ── Logística B2B y Mermas ────────────────────────────────────────────────
+export const crearMermaReclamo = (sucursal_id: string, supermercado_id: string, data: { items: any[], notas?: string }) => {
+    const params = new URLSearchParams({ sucursal_id, supermercado_id });
+    return client<any>(`/b2b/mermas?${params.toString()}`, { method: 'POST', body: data });
+};
 
+export const getMermasReclamos = (page: number = 1, limit: number = 50, estado?: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (estado) params.set('estado', estado);
+    if (sucursal_id) params.set('sucursal_id', sucursal_id);
+    return client<any>(`/b2b/mermas?${params.toString()}`);
+};
+
+export const compensarMermaReclamo = (merma_id: string) => {
+    return client<any>(`/b2b/mermas/${merma_id}/compensar`, { method: 'POST' });
+};
