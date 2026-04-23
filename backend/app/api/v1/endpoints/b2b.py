@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from typing import List, Optional
 from app.domain.models.user import User
 from app.domain.models.b2b import NotaDevolucionMerma
-from app.api.deps import get_current_active_user
+from app.infrastructure.auth import get_current_active_user
 from app.application.services.b2b_service import B2BService, MermaInputItem
 import math
 

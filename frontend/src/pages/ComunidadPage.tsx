@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useQuery } from '@tanstack/react-query';
 import { Users, Gift, MousePointerClick, RefreshCcw } from 'lucide-react';
 import { api } from '../api/api';
