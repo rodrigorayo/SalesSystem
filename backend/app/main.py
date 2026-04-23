@@ -49,6 +49,13 @@ def health():
 # Parse allowed origins from comma-separated env var
 origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
+# Permitir siempre la landing page de FEXCO
+if "https://taboada-fexco.vercel.app" not in origins:
+    origins.append("https://taboada-fexco.vercel.app")
+# Permitir localhost para pruebas de la landing
+if "http://localhost:4321" not in origins:
+    origins.append("http://localhost:4321")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
