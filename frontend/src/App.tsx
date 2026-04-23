@@ -21,6 +21,7 @@ import PriceRequestsPage from './pages/PriceRequestsPage';
 import ReportsPage from './pages/ReportsPage';
 import CreditosPage from './pages/CreditosPage';
 import ReclamosFabrica from './pages/b2b/ReclamosFabrica';
+import ComunidadPage from './pages/ComunidadPage';
 import { useAuthStore } from './store/authStore';
 import { getMyFeatures } from './api/api';
 import { Toaster } from 'sonner';
@@ -209,6 +210,13 @@ function App() {
                 <Route path="/b2b/mermas" element={
                   <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
                     <ReclamosFabrica />
+                  </ProtectedRoute>
+                } />
+
+                {/* Comunidad FEXCO */}
+                <Route path="/comunidad" element={
+                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                    <ComunidadPage />
                   </ProtectedRoute>
                 } />
 
