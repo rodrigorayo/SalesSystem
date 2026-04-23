@@ -56,7 +56,7 @@ async def get_stats(current_user: User = Depends(get_current_active_user)):
     """
     Estadísticas del módulo de comunidad. Solo para administradores.
     """
-    if current_user.role not in [UserRole.ADMIN_MASTER, UserRole.ADMIN_SUCURSAL]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN, UserRole.SUPERADMIN]:
          raise HTTPException(status_code=403, detail="No tienes permisos para ver estadísticas de comunidad")
          
     tenant_id = current_user.tenant_id or "default"
@@ -67,7 +67,7 @@ async def get_users(limit: int = 100, skip: int = 0, current_user: User = Depend
     """
     Lista de usuarios registrados en la comunidad.
     """
-    if current_user.role not in [UserRole.ADMIN_MASTER, UserRole.ADMIN_SUCURSAL]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN, UserRole.SUPERADMIN]:
          raise HTTPException(status_code=403, detail="No tienes permisos para ver los usuarios de comunidad")
          
     tenant_id = current_user.tenant_id or "default"
