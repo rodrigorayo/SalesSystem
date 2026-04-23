@@ -1,22 +1,22 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Users, Gift, MousePointerClick, RefreshCcw } from 'lucide-react';
-import { api } from '../api/api';
+import { client } from '../api/api';
 
 export default function ComunidadPage() {
     const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
         queryKey: ['comunidad-stats'],
         queryFn: async () => {
-            const res = await api.get('/comunidad/stats');
-            return res.data;
+            const res = await client<any>('/comunidad/stats');
+            return res;
         }
     });
 
     const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
         queryKey: ['comunidad-users'],
         queryFn: async () => {
-            const res = await api.get('/comunidad/users?limit=50');
-            return res.data;
+            const res = await client<any>('/comunidad/users?limit=50');
+            return res;
         }
     });
 
