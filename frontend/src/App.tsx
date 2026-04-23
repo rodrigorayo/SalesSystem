@@ -215,7 +215,7 @@ function App() {
 
                 {/* Comunidad FEXCO */}
                 <Route path="/comunidad" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
                     <ComunidadPage />
                   </ProtectedRoute>
                 } />
