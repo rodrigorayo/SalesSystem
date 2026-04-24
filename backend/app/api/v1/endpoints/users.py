@@ -97,8 +97,9 @@ async def create_cajero(
     # Strict injection from JWT — client cannot override this
     sucursal_id = current_user.sucursal_id  # None if ADMIN_MATRIZ (matrix-level)
 
-    # BIZ RULE: If ANYONE creates a VENDEDOR or SUPERVISOR, they need their own inventory (Virtual Branch).
-    if data.role in [UserRole.SUPERVISOR, UserRole.VENDEDOR]:
+    # BIZ RULE: If creating a VENDEDOR/SUPERVISOR from Matrix level, they need their own inventory (Virtual Branch).
+    # If created from a Branch context, they stay in that branch.
+    if data.role in [UserRole.SUPERVISOR, UserRole.VENDEDOR] and not sucursal_id:
         tipo_sucursal = TipoSucursal.SUPERVISOR if data.role == UserRole.SUPERVISOR else TipoSucursal.VENDEDOR
         nombre_prefix = "Supervisor:" if data.role == UserRole.SUPERVISOR else "Vendedor:"
         
@@ -112,6 +113,7 @@ async def create_cajero(
         )
         await virtual_branch.create()
         sucursal_id = str(virtual_branch.id)
+    # else: already inherits current_user.sucursal_id or None
     else:
         # Otherwise (e.g. CAJERO) they inherit the creator's physical branch
         sucursal_id = current_user.sucursal_id
