@@ -48,6 +48,8 @@ class SaleCreate(BaseModel):
     descuento: Optional[DescuentoInfo] = None
     cliente_id: Optional[str] = None
     cliente: Optional[ClienteIn] = None
+    vendedor_id: Optional[str] = None
+    vendedor_name: Optional[str] = None
 
 
 class SalesPaginated(BaseModel):
