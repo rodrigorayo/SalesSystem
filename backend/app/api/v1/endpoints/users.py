@@ -40,26 +40,31 @@ async def get_users(current_user: User = Depends(get_current_active_user)):
     """
     Returns users scoped to the current user's context:
     - ADMIN_MATRIZ: all employees of the tenant
-    - ADMIN_SUCURSAL: only cajeros in their own sucursal
+    - ADMIN_SUCURSAL / CAJERO / etc: only staff in their own sucursal (including Vendedores)
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN, UserRole.CAJERO]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     if current_user.role == UserRole.SUPERADMIN:
         return await User.find(User.role == UserRole.CAJERO).to_list()
 
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
-        # Strict isolation: only sees cajeros of their own sucursal
+    # Define roles that are considered "Staff" for sale assignment or branch view
+    staff_roles = [UserRole.CAJERO, UserRole.VENDEDOR, UserRole.ADMIN_SUCURSAL]
+
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO]:
+        # Scoped view: staff of their own sucursal
+        from beanie.operators import In
         return await User.find(
             User.tenant_id == current_user.tenant_id,
             User.sucursal_id == current_user.sucursal_id,
-            User.role == UserRole.CAJERO,
+            In(User.role, staff_roles),
         ).to_list()
 
     # ADMIN_MATRIZ: all employees of the tenant
+    from beanie.operators import In
     return await User.find(
         User.tenant_id == current_user.tenant_id,
-        User.role == UserRole.CAJERO,
+        In(User.role, staff_roles),
     ).to_list()
 
 
