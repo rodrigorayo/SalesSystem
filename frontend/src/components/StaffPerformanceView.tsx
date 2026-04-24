@@ -94,69 +94,154 @@ export default function StaffPerformanceView() {
                     <p className="font-bold">Error al cargar datos</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Cajeros */}
-                    <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
-                        <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
-                            <Briefcase size={18} className="text-emerald-500" /> 
-                            Rendimiento por Cajero
-                        </h3>
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Cajeros */}
+                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
+                                <Briefcase size={18} className="text-emerald-500" /> 
+                                Rendimiento por Cajero
+                            </h3>
 
-                        {!data?.cajeros || data.cajeros.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                <Briefcase size={32} className="text-gray-300 mb-3" />
-                                <p className="font-bold text-gray-500">Sin datos de cajeros</p>
-                            </div>
-                        ) : (
-                            <div className="h-72 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data.cajeros} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                                        <XAxis type="number" tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                                        <YAxis dataKey="nombre" type="category" width={120} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltip />} />
-                                        <Bar dataKey="total_ventas" radius={[0, 6, 6, 0]} maxBarSize={30}>
-                                            {data.cajeros.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill="#10b981" className="transition-all duration-300 hover:opacity-80" />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
+                            {!data?.cajeros || data.cajeros.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                    <Briefcase size={32} className="text-gray-300 mb-3" />
+                                    <p className="font-bold text-gray-500">Sin datos de cajeros</p>
+                                </div>
+                            ) : (
+                                <div className="h-72 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={data.cajeros} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                                            <XAxis type="number" tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                                            <YAxis dataKey="nombre" type="category" width={120} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                                            <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltip />} />
+                                            <Bar dataKey="total_ventas" radius={[0, 6, 6, 0]} maxBarSize={30}>
+                                                {data.cajeros.map((_, index) => (
+                                                    <Cell key={`cell-${index}`} fill="#10b981" />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Vendedores */}
+                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
+                                <Users size={18} className="text-indigo-500" /> 
+                                Rendimiento por Vendedor
+                            </h3>
+
+                            {!data?.vendedores || data.vendedores.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                    <Users size={32} className="text-gray-300 mb-3" />
+                                    <p className="font-bold text-gray-500">Sin datos de vendedores</p>
+                                </div>
+                            ) : (
+                                <div className="h-72 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={data.vendedores} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                                            <XAxis type="number" tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                                            <YAxis dataKey="nombre" type="category" width={120} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                                            <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltip />} />
+                                            <Bar dataKey="total_ventas" radius={[0, 6, 6, 0]} maxBarSize={30}>
+                                                {data.vendedores.map((_, index) => (
+                                                    <Cell key={`cell-${index}`} fill="#818cf8" />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Vendedores */}
-                    <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
-                        <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
-                            <Users size={18} className="text-indigo-500" /> 
-                            Rendimiento por Vendedor
-                        </h3>
+                    {/* Detalle Desglosado */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-6">Detalle Cajeros</h4>
+                            {data?.cajeros?.map(staff => (
+                                <StaffDetailCard key={staff.nombre} staff={staff} color="emerald" />
+                            ))}
+                        </div>
+                        <div className="space-y-4">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-6">Detalle Vendedores</h4>
+                            {data?.vendedores?.map(staff => (
+                                <StaffDetailCard key={staff.nombre} staff={staff} color="indigo" />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
-                        {!data?.vendedores || data.vendedores.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                <Users size={32} className="text-gray-300 mb-3" />
-                                <p className="font-bold text-gray-500">Sin datos de vendedores</p>
+function StaffDetailCard({ staff, color }: { staff: any, color: 'emerald' | 'indigo' }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="bg-white rounded-[24px] border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md">
+            <button 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center justify-between p-4 text-left"
+            >
+                <div className="flex items-center gap-3">
+                    <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white",
+                        color === 'emerald' ? "bg-emerald-500" : "bg-indigo-500"
+                    )}>
+                        {staff.nombre[0].toUpperCase()}
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-gray-900">{staff.nombre}</p>
+                        <p className="text-xs text-gray-500 font-medium">{staff.cantidad_ventas} ventas registradas</p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-sm font-black text-gray-900">{formatBs(staff.total_ventas)}</p>
+                    <p className={cn(
+                        "text-[10px] font-bold uppercase",
+                        isExpanded ? "text-indigo-600" : "text-gray-400"
+                    )}>
+                        {isExpanded ? 'Ocultar Detalle ▲' : 'Ver Detalle ▼'}
+                    </p>
+                </div>
+            </button>
+
+            {isExpanded && (
+                <div className="px-4 pb-5 border-t border-gray-50 bg-gray-50/50">
+                    <div className="space-y-4 mt-4">
+                        {staff.categorias?.map((cat: any) => (
+                            <div key={cat.nombre} className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm">
+                                <div className="flex justify-between items-center mb-2 pb-1 border-b border-gray-50">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-tight">{cat.nombre}</span>
+                                    <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{formatBs(cat.total)}</span>
+                                </div>
+                                <div className="space-y-1">
+                                    {cat.productos?.map((p: any) => (
+                                        <div key={p.nombre} className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-600">{p.nombre} <span className="text-gray-400 ml-1">x{p.cantidad}</span></span>
+                                            <span className="font-mono font-bold text-gray-900">{formatBs(p.total)}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        ) : (
-                            <div className="h-72 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data.vendedores} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                                        <XAxis type="number" tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                                        <YAxis dataKey="nombre" type="category" width={120} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltip />} />
-                                        <Bar dataKey="total_ventas" radius={[0, 6, 6, 0]} maxBarSize={30}>
-                                            {data.vendedores.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill="#818cf8" className="transition-all duration-300 hover:opacity-80" />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                        ))}
+                        {(!staff.categorias || staff.categorias.length === 0) && (
+                            <p className="text-center text-xs text-gray-400 py-4">No hay desglose de productos disponible.</p>
                         )}
                     </div>
                 </div>
+            )}
+        </div>
+    );
+}
+
+import { cn } from '../utils/cn';
             )}
         </div>
     );

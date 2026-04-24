@@ -603,10 +603,69 @@ async def get_staff_performance(
     if target_sucursal and target_sucursal != "all":
         match_filter["sucursal_id"] = target_sucursal
 
+    # Pipeline para obtener el desglose de productos y categorías por staff
+    def get_details_pipeline(staff_field):
+        return [
+            {"$match": match_filter},
+            {"$unwind": "$items"},
+            # Lookup de productos para obtener categoría
+            {"$addFields": {"tmp_prod_id": {"$toObjectId": "$items.producto_id"}}},
+            {"$lookup": {
+                "from": "products",
+                "localField": "tmp_prod_id",
+                "foreignField": "_id",
+                "as": "product_info"
+            }},
+            {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
+            # Lookup de categorías
+            {"$addFields": {"tmp_cat_id": {"$toObjectId": "$product_info.categoria_id"}}},
+            {"$lookup": {
+                "from": "categories",
+                "localField": "tmp_cat_id",
+                "foreignField": "_id",
+                "as": "category_info"
+            }},
+            {"$unwind": {"path": "$category_info", "preserveNullAndEmptyArrays": True}},
+            # Agrupar por Staff -> Categoría -> Producto
+            {"$group": {
+                "_id": {
+                    "staff": {"$ifNull": [f"${staff_field}", "Desconocido"]},
+                    "categoria": {"$ifNull": ["$category_info.nombre", "Sin Categoría"]},
+                    "producto": "$items.descripcion"
+                },
+                "cantidad": {"$sum": "$items.cantidad"},
+                "total": {"$sum": "$items.subtotal"}
+            }},
+            # Anidar productos en categorías
+            {"$group": {
+                "_id": {
+                    "staff": "$_id.staff",
+                    "categoria": "$_id.categoria"
+                },
+                "productos": {"$push": {
+                    "nombre": "$_id.producto",
+                    "cantidad": "$cantidad",
+                    "total": "$total"
+                }},
+                "total_categoria": {"$sum": "$total"}
+            }},
+            # Anidar categorías en staff
+            {"$group": {
+                "_id": "$_id.staff",
+                "categorias": {"$push": {
+                    "nombre": "$_id.categoria",
+                    "total": "$total_categoria",
+                    "productos": "$productos"
+                }},
+                "total_items": {"$sum": "$total_categoria"}
+            }},
+            {"$sort": {"total_items": -1}}
+        ]
+
     pipeline = [
         {"$match": match_filter},
         {"$facet": {
-            "cajeros": [
+            "resumen_cajeros": [
                 {"$group": {
                     "_id": {"$ifNull": ["$cashier_name", "Cajero Desconocido"]},
                     "total_ventas": {"$sum": "$total"},
@@ -614,14 +673,16 @@ async def get_staff_performance(
                 }},
                 {"$sort": {"total_ventas": -1}}
             ],
-            "vendedores": [
+            "resumen_vendedores": [
                 {"$group": {
                     "_id": {"$ifNull": ["$vendedor_name", "Sin Vendedor Asignado"]},
                     "total_ventas": {"$sum": "$total"},
                     "cantidad_ventas": {"$sum": 1}
                 }},
                 {"$sort": {"total_ventas": -1}}
-            ]
+            ],
+            "detalles_cajeros": get_details_pipeline("cashier_name"),
+            "detalles_vendedores": get_details_pipeline("vendedor_name")
         }}
     ]
 
@@ -633,23 +694,59 @@ async def get_staff_performance(
         
     facet = raw_results[0]
     
-    # Format results
+    # Helper para formatear Decimal128
+    def fmt_val(v):
+        if v is None: return 0.0
+        return float(v.to_decimal()) if type(v).__name__ == "Decimal128" else float(v)
+
+    # Mapear detalles para acceso rápido
+    detalles_caj_map = {d["_id"]: d["categorias"] for d in facet.get("detalles_cajeros", [])}
+    detalles_ven_map = {d["_id"]: d["categorias"] for d in facet.get("detalles_vendedores", [])}
+
+    # Formatear Cajeros
     cajeros = []
-    for c in facet.get("cajeros", []):
-        t = c["total_ventas"]
+    for c in facet.get("resumen_cajeros", []):
+        nombre = c["_id"]
         cajeros.append({
-            "nombre": c["_id"],
-            "total_ventas": float(t.to_decimal()) if type(t).__name__ == "Decimal128" else float(t),
-            "cantidad_ventas": c["cantidad_ventas"]
+            "nombre": nombre,
+            "total_ventas": fmt_val(c["total_ventas"]),
+            "cantidad_ventas": c["cantidad_ventas"],
+            "categorias": [
+                {
+                    "nombre": cat["nombre"],
+                    "total": fmt_val(cat["total"]),
+                    "productos": [
+                        {
+                            "nombre": p["nombre"],
+                            "cantidad": p["cantidad"],
+                            "total": fmt_val(p["total"])
+                        } for p in cat["productos"]
+                    ]
+                } for cat in detalles_caj_map.get(nombre, [])
+            ]
         })
         
+    # Formatear Vendedores
     vendedores = []
-    for v in facet.get("vendedores", []):
-        t = v["total_ventas"]
+    for v in facet.get("resumen_vendedores", []):
+        nombre = v["_id"]
         vendedores.append({
-            "nombre": v["_id"],
-            "total_ventas": float(t.to_decimal()) if type(t).__name__ == "Decimal128" else float(t),
-            "cantidad_ventas": v["cantidad_ventas"]
+            "nombre": nombre,
+            "total_ventas": fmt_val(v["total_ventas"]),
+            "cantidad_ventas": v["cantidad_ventas"],
+            "categorias": [
+                {
+                    "nombre": cat["nombre"],
+                    "total": fmt_val(cat["total"]),
+                    "productos": [
+                        {
+                            "nombre": p["nombre"],
+                            "cantidad": p["cantidad"],
+                            "total": fmt_val(p["total"])
+                        } for p in cat["productos"]
+                    ]
+                } for cat in detalles_ven_map.get(nombre, [])
+            ]
         })
 
     return {
