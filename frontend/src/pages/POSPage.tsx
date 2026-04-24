@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProducts, getInventario, getCategories, getSaleStatsToday } from '../api/api';
+import { getProducts, getInventario, getCategories, getSaleStatsToday, getUsers } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { usePosStore, type MetodoPago } from '../store/usePosStore';
 import { useDescuentos } from '../hooks/useDescuentos';
@@ -11,7 +11,7 @@ import {
     ShoppingCart, Search, Plus, Minus, Trash2,
     CreditCard, DollarSign, QrCode, X, CheckCircle2,
     Loader2, Tag, BarChart3, Package, ChevronUp, ChevronDown,
-    Lock,
+    Lock, User as UserIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
@@ -56,6 +56,7 @@ export default function POSPage() {
     const {
         items, addItem, removeItem, updateQty,
         cliente, setCliente,
+        vendedor, setVendedor,
         pagos, pendingPago, setPendingPago, addPago, removePago,
         descuento, setDescuento,
         total, totalCubierto, restante, cambio, canFinalize,
@@ -76,6 +77,17 @@ export default function POSPage() {
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
     const { data: stats } = useQuery({ queryKey: ['pos-stats'], queryFn: () => getSaleStatsToday(), refetchInterval: 60_000 });
     const { data: descuentosDisponibles = [], isLoading: loadingD } = useDescuentos();
+    const { data: usersData = [] } = useQuery({ queryKey: ['users'], queryFn: getUsers });
+    
+    // Filtrar usuarios que pueden ser vendedores (de la misma sucursal)
+    const vendedores = useMemo(() => {
+        return usersData.filter(u => 
+            u.is_active !== false && 
+            (u.sucursal_id === sucursalId || u.sucursal_id === 'CENTRAL' || !u.sucursal_id) &&
+            ['VENDEDOR', 'ADMIN_SUCURSAL', 'CAJERO'].includes(u.role)
+        );
+    }, [usersData, sucursalId]);
+
     const stockMap = useStockMap(sucursalId);
 
     // BARCODE SCANNER DETECTOR
@@ -155,6 +167,8 @@ export default function POSPage() {
                     telefono: cliente.telefono || undefined,
                     es_factura: cliente.es_factura,
                 } : undefined,
+                vendedor_id: vendedor.vendedor_id || undefined,
+                vendedor_name: vendedor.vendedor_name || undefined,
             },
         }),
         onSuccess: (data) => {
@@ -525,6 +539,34 @@ export default function POSPage() {
                                 </AnimatePresence>
                             </div>
 
+                            {/* Vendedor */}
+                            <div className="px-3 pb-2 pt-1 border-t border-gray-100 mt-1 flex flex-col gap-1.5">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Vendedor Asignado (Opcional)</span>
+                                <div className="relative">
+                                    <UserIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <select 
+                                        value={vendedor.vendedor_id || ""}
+                                        onChange={(e) => {
+                                            const id = e.target.value;
+                                            if (!id) {
+                                                setVendedor({ vendedor_id: undefined, vendedor_name: undefined });
+                                            } else {
+                                                const v = vendedores.find(v => v._id === id);
+                                                if (v) setVendedor({ vendedor_id: v._id, vendedor_name: v.full_name || v.username });
+                                            }
+                                        }}
+                                        disabled={ticketCovered}
+                                        className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 bg-gray-50 outline-none focus:ring-1 focus:ring-indigo-400 appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Seleccione un vendedor...</option>
+                                        {vendedores.map(v => (
+                                            <option key={v._id} value={v._id}>{v.full_name || v.username}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                </div>
+                            </div>
+
                             {/* Descuentos Predefinidos */}
                             <div className="px-3 pb-2 pt-1 border-t border-gray-100 mt-1">
                                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Descuentos Activos</span>
@@ -790,6 +832,13 @@ export default function POSPage() {
                                         </div>
                                     ))}
                                 </div>
+                                
+                                {vendedor.vendedor_name && (
+                                    <div className="flex justify-between items-center border-t border-gray-100 pt-2">
+                                        <span className="text-gray-500 font-medium text-xs">Vendedor:</span>
+                                        <span className="text-xs font-bold text-gray-900">{vendedor.vendedor_name}</span>
+                                    </div>
+                                )}
 
                                 <div className="flex justify-between items-center border-t border-gray-100 pt-2">
                                     <span className="text-gray-500 font-medium text-sm">Total pagado:</span>

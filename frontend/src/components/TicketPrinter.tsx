@@ -122,6 +122,9 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
             {/* Footer */}
             <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '15px' }}>
                 <p style={{ margin: '2px 0' }}>Cajero: {sale.cashier_name || 'Caja'}</p>
+                {sale.vendedor_name && (
+                    <p style={{ margin: '2px 0' }}>Vendedor: {sale.vendedor_name}</p>
+                )}
                 <p style={{ margin: '4px 0', fontWeight: 'bold' }}>¡Gracias por su compra!</p>
                 {isFactura && (
                     <p style={{ margin: '10px 0 0 0', fontStyle: 'italic', fontSize: '9px' }}>

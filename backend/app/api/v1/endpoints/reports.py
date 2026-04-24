@@ -510,3 +510,67 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
         "ganancia_potencial": float(total_general_publico - total_general_fabrica),
         "por_sucursal": results
     }
+
+@router.get("/sales-by-hour")
+async def get_sales_by_hour(
+    date: str, # YYYY-MM-DD
+    sucursal_id: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns total sales grouped by hour for a specific day.
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    target_sucursal = sucursal_id
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
+        target_sucursal = current_user.sucursal_id
+
+    try:
+        start_dt, end_dt = get_day_range_bolivia(date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    match_filter = {
+        "tenant_id": tenant_id,
+        "anulada": False,
+        "created_at": {"$gte": start_dt, "$lte": end_dt}
+    }
+    
+    if target_sucursal and target_sucursal != "all":
+        match_filter["sucursal_id"] = target_sucursal
+
+    pipeline = [
+        {"$match": match_filter},
+        {
+            "$project": {
+                # Convertir a hora Bolivia (-04:00) para agrupar correctamente
+                "hour": {"$hour": {"date": "$created_at", "timezone": "-04:00"}},
+                "total": 1
+            }
+        },
+        {
+            "$group": {
+                "_id": "$hour",
+                "total_ventas": {"$sum": "$total"},
+                "cantidad_ventas": {"$sum": 1}
+            }
+        },
+        {"$sort": {"_id": 1}}
+    ]
+
+    cursor = Sale.get_pymongo_collection().aggregate(pipeline)
+    raw_results = await cursor.to_list(length=24)
+    
+    # Generar un arreglo con todas las horas (0-23) para que el gráfico no tenga huecos
+    hourly_data = {i: {"hour": f"{i:02d}:00", "total_ventas": 0.0, "cantidad_ventas": 0} for i in range(24)}
+    
+    for r in raw_results:
+        h = r["_id"]
+        hourly_data[h]["total_ventas"] = float(r["total_ventas"].to_decimal()) if type(r["total_ventas"]).__name__ == "Decimal128" else float(r["total_ventas"])
+        hourly_data[h]["cantidad_ventas"] = r["cantidad_ventas"]
+
+    # Filtrar solo desde la primera hora con ventas hasta la última (o 8am a 10pm por defecto si prefieres)
+    # Por ahora devolvemos todo y el frontend decide si mostrar las 24 hrs
+    return list(hourly_data.values())
+

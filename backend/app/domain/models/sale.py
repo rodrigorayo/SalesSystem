@@ -64,6 +64,8 @@ class Sale(Document):
     qr_info: Optional[QRInfo] = None
     cashier_id: str
     cashier_name: str
+    vendedor_id: Optional[str] = None
+    vendedor_name: Optional[str] = None
     anulada: bool = False
     estado_pago: EstadoPago = EstadoPago.PAGADO
     factura_emitida: bool = False

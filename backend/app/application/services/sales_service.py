@@ -205,6 +205,8 @@ class SalesService:
                         qr_info=qr_init,
                         cashier_id=str(current_user.id),
                         cashier_name=current_user.full_name or current_user.username,
+                        vendedor_id=sale_in.vendedor_id,
+                        vendedor_name=sale_in.vendedor_name,
                     )
                     await sale.create(session=session)
 

@@ -26,11 +26,17 @@ export interface ClienteData {
     es_factura: boolean;
 }
 
+export interface VendedorData {
+    vendedor_id?: string;
+    vendedor_name?: string;
+}
+
 export interface ParkedTicket {
     id: string;
     time: Date;
     items: CartItem[];
     cliente: ClienteData;
+    vendedor: VendedorData;
     descuento: { tipo: 'MONTO' | 'PORCENTAJE'; valor: string; nombre?: string };
     pagos: PagoEntry[];
 }
@@ -49,6 +55,10 @@ interface PosState {
     // Invoice / Client
     cliente: ClienteData;
     setCliente: (data: Partial<ClienteData>) => void;
+
+    // Vendedor
+    vendedor: VendedorData;
+    setVendedor: (data: Partial<VendedorData>) => void;
 
     // Split payments
     pagos: PagoEntry[];
@@ -80,6 +90,7 @@ interface PosState {
 }
 
 const DEFAULT_CLIENTE: ClienteData = { cliente_id: undefined, nit: '', razon_social: '', email: '', telefono: '', es_factura: false };
+const DEFAULT_VENDEDOR: VendedorData = { vendedor_id: undefined, vendedor_name: undefined };
 const DEFAULT_PENDING: PosState['pendingPago'] = { metodo: 'EFECTIVO', monto: '' };
 const DEFAULT_DESC: PosState['descuento'] = { tipo: 'MONTO', valor: '', nombre: '' };
 
@@ -120,6 +131,10 @@ export const usePosStore = create<PosState>()((set, get) => ({
     // ── Client / Invoice ──────────────────────────────────────────────────────
     cliente: DEFAULT_CLIENTE,
     setCliente: (data) => set(s => ({ cliente: { ...s.cliente, ...data } })),
+
+    // ── Vendedor ──────────────────────────────────────────────────────────────
+    vendedor: DEFAULT_VENDEDOR,
+    setVendedor: (data) => set(s => ({ vendedor: { ...s.vendedor, ...data } })),
 
     // ── Split Payments ────────────────────────────────────────────────────────
     pagos: [],
@@ -185,6 +200,7 @@ export const usePosStore = create<PosState>()((set, get) => ({
             time: new Date(),
             items: [...state.items],
             cliente: { ...state.cliente },
+            vendedor: { ...state.vendedor },
             descuento: { ...state.descuento },
             pagos: [...state.pagos]
         };
@@ -193,6 +209,7 @@ export const usePosStore = create<PosState>()((set, get) => ({
             parkedTickets: [...s.parkedTickets, newTicket],
             items: [],
             cliente: DEFAULT_CLIENTE,
+            vendedor: DEFAULT_VENDEDOR,
             pagos: [],
             pendingPago: DEFAULT_PENDING,
             descuento: DEFAULT_DESC
@@ -216,6 +233,7 @@ export const usePosStore = create<PosState>()((set, get) => ({
                 parkedTickets: newParked,
                 items: ticket.items,
                 cliente: ticket.cliente,
+                vendedor: ticket.vendedor || DEFAULT_VENDEDOR,
                 descuento: ticket.descuento,
                 pagos: ticket.pagos,
                 pendingPago: DEFAULT_PENDING
@@ -228,5 +246,5 @@ export const usePosStore = create<PosState>()((set, get) => ({
     })),
 
     // ── Reset ─────────────────────────────────────────────────────────────────
-    reset: () => set({ items: [], cliente: DEFAULT_CLIENTE, pagos: [], pendingPago: DEFAULT_PENDING, descuento: DEFAULT_DESC }),
+    reset: () => set({ items: [], cliente: DEFAULT_CLIENTE, vendedor: DEFAULT_VENDEDOR, pagos: [], pendingPago: DEFAULT_PENDING, descuento: DEFAULT_DESC }),
 }));

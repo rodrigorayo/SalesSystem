@@ -4,11 +4,12 @@ import { getGeneralReports } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     BarChart3, Loader2, DollarSign, Package, TrendingUp, Calendar, 
-    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText
+    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText, Clock
 } from 'lucide-react';
 import DailyReportView from '../components/DailyReportView';
 import FinancialDetailView from '../components/FinancialDetailView';
 import ValuedInventoryView from '../components/ValuedInventoryView';
+import HourlySalesView from '../components/HourlySalesView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, BarChart, Bar, Legend
@@ -22,7 +23,7 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'inventario_valorado';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'inventario_valorado';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
@@ -92,6 +93,7 @@ export default function ReportsPage() {
                     { id: 'sucursales', label: 'Rendimiento Sucursales', icon: <Store size={16} />, hidden: !esMatriz },
                     { id: 'finanzas', label: 'Finanzas y Márgenes', icon: <DollarSign size={16} />, hidden: !esMatriz },
                     { id: 'daily', label: 'Reporte de Jornada', icon: <FileText size={16} /> },
+                    { id: 'hourly', label: 'Ventas por Hora', icon: <Clock size={16} /> },
                     { id: 'inventario_valorado', label: 'Inventario Valorado', icon: <Package size={16} /> },
                 ].filter(t => !t.hidden).map((tab) => (
                     <button
@@ -115,6 +117,8 @@ export default function ReportsPage() {
                 <FinancialDetailView />
             ) : activeTab === 'inventario_valorado' ? (
                 <ValuedInventoryView />
+            ) : activeTab === 'hourly' ? (
+                <HourlySalesView />
             ) : (
                 <>
                     {isLoading ? (

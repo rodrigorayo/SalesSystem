@@ -7,6 +7,7 @@ export interface User {
     full_name?: string;
     tenant_id?: string;
     sucursal_id?: string;
+    is_active?: boolean;
 }
 
 export interface Tenant {
@@ -243,6 +244,8 @@ export interface SaleCreate {
         telefono?: string;
         es_factura: boolean;
     };
+    vendedor_id?: string;
+    vendedor_name?: string;
 }
 
 export interface PagoItem {
@@ -314,6 +317,8 @@ export interface Sale {
     qr_info?: QRInfo;
     cashier_id: string;
     cashier_name: string;
+    vendedor_id?: string;
+    vendedor_name?: string;
     anulada: boolean;
     estado_pago?: 'PAGADO' | 'PENDIENTE' | 'PARCIAL';
     factura_emitida?: boolean;
