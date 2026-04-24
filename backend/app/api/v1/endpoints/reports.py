@@ -574,3 +574,85 @@ async def get_sales_by_hour(
     # Por ahora devolvemos todo y el frontend decide si mostrar las 24 hrs
     return list(hourly_data.values())
 
+@router.get("/staff-performance")
+async def get_staff_performance(
+    date: str, # YYYY-MM-DD
+    sucursal_id: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns sales grouped by cashier and by vendor for a specific day.
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    target_sucursal = sucursal_id
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
+        target_sucursal = current_user.sucursal_id
+
+    try:
+        start_dt, end_dt = get_day_range_bolivia(date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    match_filter = {
+        "tenant_id": tenant_id,
+        "anulada": False,
+        "created_at": {"$gte": start_dt, "$lte": end_dt}
+    }
+    
+    if target_sucursal and target_sucursal != "all":
+        match_filter["sucursal_id"] = target_sucursal
+
+    pipeline = [
+        {"$match": match_filter},
+        {"$facet": {
+            "cajeros": [
+                {"$group": {
+                    "_id": {"$ifNull": ["$cashier_name", "Cajero Desconocido"]},
+                    "total_ventas": {"$sum": "$total"},
+                    "cantidad_ventas": {"$sum": 1}
+                }},
+                {"$sort": {"total_ventas": -1}}
+            ],
+            "vendedores": [
+                {"$group": {
+                    "_id": {"$ifNull": ["$vendedor_name", "Sin Vendedor Asignado"]},
+                    "total_ventas": {"$sum": "$total"},
+                    "cantidad_ventas": {"$sum": 1}
+                }},
+                {"$sort": {"total_ventas": -1}}
+            ]
+        }}
+    ]
+
+    cursor = Sale.get_pymongo_collection().aggregate(pipeline)
+    raw_results = await cursor.to_list(length=1)
+    
+    if not raw_results:
+        return {"cajeros": [], "vendedores": []}
+        
+    facet = raw_results[0]
+    
+    # Format results
+    cajeros = []
+    for c in facet.get("cajeros", []):
+        t = c["total_ventas"]
+        cajeros.append({
+            "nombre": c["_id"],
+            "total_ventas": float(t.to_decimal()) if type(t).__name__ == "Decimal128" else float(t),
+            "cantidad_ventas": c["cantidad_ventas"]
+        })
+        
+    vendedores = []
+    for v in facet.get("vendedores", []):
+        t = v["total_ventas"]
+        vendedores.append({
+            "nombre": v["_id"],
+            "total_ventas": float(t.to_decimal()) if type(t).__name__ == "Decimal128" else float(t),
+            "cantidad_ventas": v["cantidad_ventas"]
+        })
+
+    return {
+        "cajeros": cajeros,
+        "vendedores": vendedores
+    }

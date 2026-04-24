@@ -64,6 +64,15 @@ export const getSalesByHour = (date: string, sucursal_id?: string) => {
     return client<any[]>(`/reports/sales-by-hour?${params.toString()}`);
 };
 
+export const getStaffPerformanceReport = (date: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ date });
+    if (sucursal_id) params.append('sucursal_id', sucursal_id);
+    return client<{
+        cajeros: { nombre: string; total_ventas: number; cantidad_ventas: number }[];
+        vendedores: { nombre: string; total_ventas: number; cantidad_ventas: number }[];
+    }>(`/reports/staff-performance?${params.toString()}`);
+};
+
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');
 export const createSucursal = (data: SucursalCreate) => client<Sucursal>('/sucursales', { body: data });
