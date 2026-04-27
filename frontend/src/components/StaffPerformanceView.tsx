@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { cn } from '../utils/cn';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { useQuery } from '@tanstack/react-query';
 import { getStaffPerformanceReport, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
@@ -10,6 +11,10 @@ import {
 } from 'recharts';
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs));
+}
 
 export default function StaffPerformanceView() {
     const { role, sucursal_id } = useAuthStore();
