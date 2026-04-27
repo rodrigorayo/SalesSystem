@@ -618,7 +618,18 @@ async def get_staff_performance(
             {"$match": match_filter},
             {"$unwind": "$items"},
             # Lookup de productos para obtener categoría
-            {"$addFields": {"tmp_prod_id": {"$toObjectId": "$items.producto_id"}}},
+            {"$addFields": {
+                "tmp_prod_id": {
+                    "$cond": [
+                        {"$and": [
+                            {"$ne": ["$items.producto_id", None]},
+                            {"$eq": [{"$strLenCP": "$items.producto_id"}, 24]}
+                        ]},
+                        {"$toObjectId": "$items.producto_id"},
+                        None
+                    ]
+                }
+            }},
             {"$lookup": {
                 "from": "products",
                 "localField": "tmp_prod_id",
@@ -627,7 +638,18 @@ async def get_staff_performance(
             }},
             {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
             # Lookup de categorías
-            {"$addFields": {"tmp_cat_id": {"$toObjectId": "$product_info.categoria_id"}}},
+            {"$addFields": {
+                "tmp_cat_id": {
+                    "$cond": [
+                        {"$and": [
+                            {"$ne": ["$product_info.categoria_id", None]},
+                            {"$eq": [{"$strLenCP": "$product_info.categoria_id"}, 24]}
+                        ]},
+                        {"$toObjectId": "$product_info.categoria_id"},
+                        None
+                    ]
+                }
+            }},
             {"$lookup": {
                 "from": "categories",
                 "localField": "tmp_cat_id",
@@ -639,7 +661,7 @@ async def get_staff_performance(
             {"$group": {
                 "_id": {
                     "staff": {"$ifNull": [f"${staff_field}", "Desconocido"]},
-                    "categoria": {"$ifNull": ["$category_info.nombre", "Sin Categoría"]},
+                    "categoria": {"$ifNull": ["$category_info.name", "Sin Categoría"]},
                     "producto": "$items.descripcion"
                 },
                 "cantidad": {"$sum": "$items.cantidad"},

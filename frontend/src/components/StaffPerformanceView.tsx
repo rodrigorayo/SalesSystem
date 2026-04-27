@@ -180,8 +180,8 @@ export default function StaffPerformanceView() {
                                     <p className="font-bold text-gray-500">Sin datos de cajeros</p>
                                 </div>
                             ) : (
-                                <div className="h-72 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div className="h-72 w-full min-h-[288px]">
+                                    <ResponsiveContainer width="99%" height="100%" minWidth={0}>
                                         <BarChart data={data.cajeros} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
                                             <XAxis type="number" tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#6b7280'}} axisLine={false} tickLine={false} />
@@ -211,8 +211,8 @@ export default function StaffPerformanceView() {
                                     <p className="font-bold text-gray-500">Sin datos de vendedores</p>
                                 </div>
                             ) : (
-                                <div className="h-72 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div className="h-72 w-full min-h-[288px]">
+                                    <ResponsiveContainer width="99%" height="100%" minWidth={0}>
                                         <BarChart data={data.vendedores} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
                                             <XAxis type="number" tickFormatter={(val) => `Bs ${val}`} tick={{fontSize: 11, fill: '#6b7280'}} axisLine={false} tickLine={false} />
