@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '../utils/cn';
 import { useQuery } from '@tanstack/react-query';
 import { getStaffPerformanceReport, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
@@ -241,8 +242,3 @@ function StaffDetailCard({ staff, color }: { staff: any, color: 'emerald' | 'ind
     );
 }
 
-import { cn } from '../utils/cn';
-            )}
-        </div>
-    );
-}
