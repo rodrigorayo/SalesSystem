@@ -11,7 +11,7 @@ from app.domain.models.inventario import Inventario
 from app.domain.models.product import Product
 from app.utils.serializers import normalize_bson
 from datetime import datetime, timedelta, time, timezone
-from app.utils.date_utils import BOLIVIA_TZ, get_day_range_bolivia
+from app.utils.date_utils import BOLIVIA_TZ, get_day_range_bolivia, get_range_bolivia
 
 
 _ZERO = Decimal("0")  # Constante DRY para el valor cero monetario
@@ -576,12 +576,14 @@ async def get_sales_by_hour(
 
 @router.get("/staff-performance")
 async def get_staff_performance(
-    date: str, # YYYY-MM-DD
+    date: Optional[str] = None, # YYYY-MM-DD (para un solo día)
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     sucursal_id: Optional[str] = None,
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Returns sales grouped by cashier and by vendor for a specific day.
+    Returns sales grouped by cashier and by vendor for a specific day or date range.
     """
     tenant_id = current_user.tenant_id or "default"
     
@@ -590,7 +592,14 @@ async def get_staff_performance(
         target_sucursal = current_user.sucursal_id
 
     try:
-        start_dt, end_dt = get_day_range_bolivia(date)
+        if start_date and end_date:
+            start_dt, end_dt = get_range_bolivia(start_date, end_date)
+        elif date:
+            start_dt, end_dt = get_day_range_bolivia(date)
+        else:
+            # Por defecto hoy
+            today_str = datetime.now(BOLIVIA_TZ).strftime("%Y-%m-%d")
+            start_dt, end_dt = get_day_range_bolivia(today_str)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
 

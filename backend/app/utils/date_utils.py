@@ -33,6 +33,20 @@ def get_day_range_bolivia(date_str: str) -> tuple[datetime, datetime]:
     
     # Convert both to UTC for MongoDB queries
     return (start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc))
+
+def get_range_bolivia(start_str: str, end_str: str) -> tuple[datetime, datetime]:
+    """
+    Given two YYYY-MM-DD strings, returns the (start_utc, end_utc)
+    covering the entire period.
+    """
+    s_dt = datetime.strptime(start_str, "%Y-%m-%d")
+    e_dt = datetime.strptime(end_str, "%Y-%m-%d")
+    
+    start_local = s_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=BOLIVIA_TZ)
+    end_local = e_dt.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=BOLIVIA_TZ)
+    
+    return (start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc))
+
 # Aliases for better DX and backward compatibility
 get_now_bolivia = now_bolivia
 convert_to_bolivia = utc_to_bolivia

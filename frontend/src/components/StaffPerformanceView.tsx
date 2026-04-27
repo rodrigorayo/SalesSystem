@@ -20,7 +20,10 @@ export default function StaffPerformanceView() {
     const { role, sucursal_id } = useAuthStore();
     
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+    const [dateType, setDateType] = useState<'single' | 'range'>('single');
     const [date, setDate] = useState<string>(today);
+    const [startDate, setStartDate] = useState<string>(today);
+    const [endDate, setEndDate] = useState<string>(today);
     
     // Only Matriz/Superadmin can filter by all branches
     const esMatriz = ['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '');
@@ -34,8 +37,13 @@ export default function StaffPerformanceView() {
     });
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ['staff-performance', date, selectedSucursal],
-        queryFn: () => getStaffPerformanceReport(date, selectedSucursal === 'all' ? undefined : selectedSucursal),
+        queryKey: ['staff-performance', dateType, date, startDate, endDate, selectedSucursal],
+        queryFn: () => getStaffPerformanceReport(
+            dateType === 'single' ? date : undefined, 
+            selectedSucursal === 'all' ? undefined : selectedSucursal,
+            dateType === 'range' ? startDate : undefined,
+            dateType === 'range' ? endDate : undefined
+        ),
     });
 
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -59,19 +67,76 @@ export default function StaffPerformanceView() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div>
+                    <h2 className="text-xl font-black text-gray-900">Desempeño de Personal</h2>
+                    <p className="text-xs text-gray-500 font-medium">
+                        {dateType === 'single' ? `Reporte del día ${date}` : `Periodo del ${startDate} al ${endDate}`}
+                    </p>
+                </div>
+            </div>
             {/* Header Filters */}
-            <div className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="relative flex-1 md:flex-none">
-                        <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input 
-                            type="date" 
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                            max={today}
-                            className="w-full md:w-auto pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all cursor-pointer"
-                        />
+            <div className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-100 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+                <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                    {/* Selector de Tipo de Fecha */}
+                    <div className="flex bg-gray-100 p-1 rounded-xl">
+                        <button 
+                            onClick={() => setDateType('single')}
+                            className={cn(
+                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                dateType === 'single' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            Un día
+                        </button>
+                        <button 
+                            onClick={() => setDateType('range')}
+                            className={cn(
+                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                dateType === 'range' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            Rango
+                        </button>
                     </div>
+
+                    {dateType === 'single' ? (
+                        <div className="relative flex-1 md:flex-none">
+                            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input 
+                                type="date" 
+                                value={date}
+                                onChange={e => setDate(e.target.value)}
+                                max={today}
+                                className="w-full md:w-auto pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all cursor-pointer"
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 flex-1 md:flex-none">
+                            <div className="relative">
+                                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input 
+                                    type="date" 
+                                    value={startDate}
+                                    onChange={e => setStartDate(e.target.value)}
+                                    max={endDate || today}
+                                    className="pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                />
+                            </div>
+                            <span className="text-gray-400 font-bold">al</span>
+                            <div className="relative">
+                                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input 
+                                    type="date" 
+                                    value={endDate}
+                                    onChange={e => setEndDate(e.target.value)}
+                                    min={startDate}
+                                    max={today}
+                                    className="pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                />
+                            </div>
+                        </div>
+                    )}
                     
                     {esMatriz && (
                         <select
