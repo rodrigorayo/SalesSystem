@@ -31,6 +31,8 @@ class AnularRequest(BaseModel):
         "OTRO"
     ]
     notas: Optional[str] = None  # Obligatorio en frontend si motivo == "OTRO"
+    # Solo requerido cuando motivo == "ERROR_COBRO"
+    metodo_pago_correcto: Optional[Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA"]] = None
 
 
 @router.post("/ventas", response_model=Sale)
@@ -150,7 +152,8 @@ async def anular_sale(
     return await SalesService.anular_sale(
         sale_id, current_user,
         motivo=body.motivo,
-        notas=body.notas
+        notas=body.notas,
+        metodo_pago_correcto=body.metodo_pago_correcto,
     )
 
 
@@ -340,8 +343,11 @@ async def anular_sale(
     return await SalesService.anular_sale(
         sale_id, current_user,
         motivo=body.motivo,
-        notas=body.notas
+        notas=body.notas,
+        metodo_pago_correcto=body.metodo_pago_correcto,
     )
+
+
 
 
 # ─── GET /sales/{sale_id}/posible-duplicado ────────────────────────────────────────

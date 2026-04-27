@@ -382,8 +382,8 @@ export const getSaleStatsToday = (sucursal_id?: string) => {
     return client<{ today_sales: number; transaction_count: number; items_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
 };
 export type MotivoAnulacion = 'ERROR_COBRO' | 'DEVOLUCION_CLIENTE' | 'PRODUCTO_DEFECTUOSO' | 'VENTA_DUPLICADA' | 'OTRO';
-export const anularSale = ({ id, motivo, notas }: { id: string; motivo: MotivoAnulacion; notas?: string }) =>
-    client<Sale>(`/sales/${id}/anular`, { method: 'PATCH', body: { motivo, notas } });
+export const anularSale = ({ id, motivo, notas, metodo_pago_correcto }: { id: string; motivo: MotivoAnulacion; notas?: string; metodo_pago_correcto?: string }) =>
+    client<Sale>(`/sales/${id}/anular`, { method: 'PATCH', body: { motivo, notas, metodo_pago_correcto } });
 export const checkPosibleDuplicado = (id: string) =>
     client<{
         tiene_duplicado: boolean;

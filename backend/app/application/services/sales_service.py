@@ -324,15 +324,41 @@ class SalesService:
 
 
     @staticmethod
-    async def anular_sale(sale_id: str, current_user: User, motivo: str, notas: Optional[str] = None) -> Sale:
+    async def anular_sale(
+        sale_id: str,
+        current_user: User,
+        motivo: str,
+        notas: Optional[str] = None,
+        metodo_pago_correcto: Optional[str] = None,
+    ) -> Sale:
+        """
+        Anula una venta con lógica inteligente según el motivo:
+
+        - ERROR_COBRO: El método de pago fue registrado incorrectamente.
+          Se anulan los movimientos del método INCORRECTO y (opcionalmente) se
+          registra un ingreso con el método CORRECTO. Esto no genera desajuste.
+          
+        - DEVOLUCION_CLIENTE / PRODUCTO_DEFECTUOSO: El dinero sí ingresó.
+          Se invierten los movimientos reales (egreso del método real).
+          
+        - VENTA_DUPLICADA: La venta se cobró dos veces. Se invierten los
+          movimientos de caja de la venta duplicada.
+          
+        - OTRO: Comportamiento estándar (inversión de movimientos).
+        """
         tenant_id = current_user.tenant_id or "default"
         client = get_client()
+
+        # Validar que si es ERROR_COBRO, se debe especificar el método correcto
+        if motivo == "ERROR_COBRO" and not metodo_pago_correcto:
+            raise HTTPException(
+                status_code=400,
+                detail="Para anular por 'Error de cobro' debes especificar cuál fue el método de pago real."
+            )
 
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
-                    # Beanie requires ObjectId type for equality comparison.
-                    # Using Sale.get() handles the str→ObjectId conversion automatically.
                     sale = await Sale.get(sale_id, session=session)
                     if not sale or sale.tenant_id != tenant_id:
                         raise HTTPException(status_code=404, detail=VentasErrors.VENTA_NO_ENCONTRADA)
@@ -353,6 +379,7 @@ class SalesService:
 
                     sucursal_id = sale.sucursal_id
 
+                    # ── 1. Revertir stock (siempre) ──────────────────────────────
                     for item in sale.items:
                         updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
                             {
@@ -360,9 +387,7 @@ class SalesService:
                                 "sucursal_id": sucursal_id,
                                 "producto_id": item.producto_id,
                             },
-                            {
-                                "$inc": {"cantidad": item.cantidad}
-                            },
+                            {"$inc": {"cantidad": item.cantidad}},
                             return_document=ReturnDocument.AFTER,
                             session=session.client_session if hasattr(session, "client_session") else session
                         )
@@ -383,6 +408,7 @@ class SalesService:
                                 referencia_id=str(sale.id)
                             ).create(session=session)
 
+                    # ── 2. Ajuste de caja según motivo ───────────────────────────
                     caja_sesion = await CajaSesion.find_one(
                         CajaSesion.tenant_id   == tenant_id,
                         CajaSesion.sucursal_id == sucursal_id,
@@ -390,42 +416,127 @@ class SalesService:
                         CajaSesion.estado      == EstadoSesion.ABIERTA,
                         session=session
                     )
-                    if caja_sesion:
-                        movs = await CajaMovimiento.find(
+
+                    if not caja_sesion:
+                        if len(sale.pagos) > 0 and sum(p.monto for p in sale.pagos) > 0:
+                            raise HTTPException(
+                                status_code=400,
+                                detail="No puedes anular una venta con pagos registrados sin tener una sesión de caja ABIERTA. Abre la caja primero."
+                            )
+                    else:
+                        # Obtener los movimientos originales de esta venta
+                        movs_originales = await CajaMovimiento.find(
                             CajaMovimiento.tenant_id == tenant_id,
                             CajaMovimiento.sale_id == str(sale.id),
                             session=session
                         ).to_list()
-                        
-                        for mov in movs:
-                            inverse_type = "EGRESO" if mov.tipo == "INGRESO" else "INGRESO"
+
+                        ticket_ref = f"#{str(sale.id)[-6:].upper()}"
+                        cajero_info = current_user.full_name or current_user.username
+
+                        if motivo == "ERROR_COBRO":
+                            # ── FLUJO ESPECIAL: Corrección de método de pago ──
+                            # El método registrado fue incorrecto. 
+                            # Paso A: Anulamos SOLO los movimientos del método incorrecto.
+                            # Paso B: Registramos el ingreso con el método correcto.
+                            # Resultado: La caja refleja lo que REALMENTE pasó.
+                            
+                            total_venta = float(sum(p.monto for p in sale.pagos))
+                            
+                            # Paso A: Revertir movimientos del método incorrecto
+                            for mov in movs_originales:
+                                inverse_type = "EGRESO" if mov.tipo == "INGRESO" else "INGRESO"
+                                await CajaMovimiento(
+                                    tenant_id   = tenant_id,
+                                    sucursal_id = sucursal_id,
+                                    sesion_id   = str(caja_sesion.id),
+                                    cajero_id   = str(current_user.id),
+                                    cajero_name = cajero_info,
+                                    subtipo     = mov.subtipo,
+                                    tipo        = inverse_type,
+                                    monto       = mov.monto,
+                                    descripcion = f"Corrección Ticket {ticket_ref}: Reversa método incorrecto ({mov.subtipo})",
+                                    sale_id     = str(sale.id),
+                                ).create(session=session)
+
+                            # Paso B: Registrar con el método CORRECTO
+                            # Determinar el subtipo de caja para el método correcto
+                            subtipo_correcto = SubtipoMovimiento.VENTA_EFECTIVO
+                            if metodo_pago_correcto == "QR":
+                                subtipo_correcto = SubtipoMovimiento.VENTA_QR
+                            elif metodo_pago_correcto == "TARJETA":
+                                subtipo_correcto = SubtipoMovimiento.VENTA_TARJETA
+                            elif metodo_pago_correcto == "TRANSFERENCIA":
+                                subtipo_correcto = SubtipoMovimiento.VENTA_TRANSFERENCIA
+
                             await CajaMovimiento(
                                 tenant_id   = tenant_id,
                                 sucursal_id = sucursal_id,
                                 sesion_id   = str(caja_sesion.id),
                                 cajero_id   = str(current_user.id),
-                                cajero_name = current_user.full_name or current_user.username,
-                                subtipo     = mov.subtipo,
-                                tipo        = inverse_type,
-                                monto       = mov.monto,
-                                descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reversión de {mov.descripcion.split('— ')[-1] if '— ' in mov.descripcion else 'pago'}) — {motivo}",
+                                cajero_name = cajero_info,
+                                subtipo     = subtipo_correcto,
+                                tipo        = "INGRESO",
+                                monto       = total_venta,
+                                descripcion = f"Corrección Ticket {ticket_ref}: Ingreso real vía {metodo_pago_correcto} — {notas or 'Error de método de pago'}",
                                 sale_id     = str(sale.id),
                             ).create(session=session)
-                    else:
-                        # Si no hay caja abierta pero la venta tiene pagos registrados, bloqueamos la anulación pura.
-                        if len(sale.pagos) > 0 and sum(p.monto for p in sale.pagos) > 0:
-                            raise HTTPException(
-                                status_code=400, 
-                                detail="No puedes anular una venta con ingresos (efectivo/qr/tarjeta) sin tener una sesión de caja ABIERTA en tu sucursal.Abre la caja primero para procesar la devolución."
+
+                            logger.info(
+                                f"[AnularSale] ERROR_COBRO corregido en venta {sale_id}: "
+                                f"método incorrecto revertido, ingreso correcto ({metodo_pago_correcto}) registrado."
                             )
 
-                    # ── Guardar auditoría de anulación ────────────────────────
-                    sale.anulada           = True
-                    sale.motivo_anulacion  = motivo
-                    sale.notas_anulacion   = notas
-                    sale.anulada_por_id    = str(current_user.id)
-                    sale.anulada_por_nombre = current_user.full_name or current_user.username
-                    sale.anulada_at        = datetime.utcnow()
+                        elif motivo == "VENTA_DUPLICADA":
+                            # La venta se cobró dos veces — el dinero real SÍ está en caja.
+                            # Solo invertimos el movimiento de la duplicada.
+                            for mov in movs_originales:
+                                inverse_type = "EGRESO" if mov.tipo == "INGRESO" else "INGRESO"
+                                await CajaMovimiento(
+                                    tenant_id   = tenant_id,
+                                    sucursal_id = sucursal_id,
+                                    sesion_id   = str(caja_sesion.id),
+                                    cajero_id   = str(current_user.id),
+                                    cajero_name = cajero_info,
+                                    subtipo     = mov.subtipo,
+                                    tipo        = inverse_type,
+                                    monto       = mov.monto,
+                                    descripcion = f"Venta Duplicada — Reversa Ticket {ticket_ref} ({mov.subtipo})",
+                                    sale_id     = str(sale.id),
+                                ).create(session=session)
+
+                        else:
+                            # DEVOLUCION_CLIENTE, PRODUCTO_DEFECTUOSO, OTRO
+                            # El dinero real sí entró — se invierte el movimiento
+                            # (el cliente recibe su dinero de vuelta, sale de caja).
+                            for mov in movs_originales:
+                                inverse_type = "EGRESO" if mov.tipo == "INGRESO" else "INGRESO"
+                                motivo_label = {
+                                    "DEVOLUCION_CLIENTE": "Devolución de Cliente",
+                                    "PRODUCTO_DEFECTUOSO": "Prod. Defectuoso",
+                                    "OTRO": "Anulación"
+                                }.get(motivo, motivo)
+                                await CajaMovimiento(
+                                    tenant_id   = tenant_id,
+                                    sucursal_id = sucursal_id,
+                                    sesion_id   = str(caja_sesion.id),
+                                    cajero_id   = str(current_user.id),
+                                    cajero_name = cajero_info,
+                                    subtipo     = mov.subtipo,
+                                    tipo        = inverse_type,
+                                    monto       = mov.monto,
+                                    descripcion = f"{motivo_label} — Reversa Ticket {ticket_ref} ({mov.subtipo})",
+                                    sale_id     = str(sale.id),
+                                ).create(session=session)
+
+                    # ── 3. Guardar auditoría de anulación ────────────────────────
+                    sale.anulada              = True
+                    sale.motivo_anulacion     = motivo
+                    sale.notas_anulacion      = notas
+                    sale.anulada_por_id       = str(current_user.id)
+                    sale.anulada_por_nombre   = current_user.full_name or current_user.username
+                    sale.anulada_at           = datetime.utcnow()
+                    sale.metodo_pago_correcto = metodo_pago_correcto
                     await sale.save(session=session)
                     
                     await SaleItemAnalytics.find(

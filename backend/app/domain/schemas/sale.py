@@ -60,6 +60,20 @@ class SalesPaginated(BaseModel):
     pages: int
 
 
+class AnulacionCreate(BaseModel):
+    """Request body for cancelling a sale with intelligent payment correction."""
+    motivo: Literal[
+        "ERROR_COBRO",
+        "DEVOLUCION_CLIENTE",
+        "PRODUCTO_DEFECTUOSO",
+        "VENTA_DUPLICADA",
+        "OTRO"
+    ]
+    notas: Optional[str] = None
+    # Solo requerido si motivo == "ERROR_COBRO"
+    metodo_pago_correcto: Optional[Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA"]] = None
+
+
 class QRInfoUpdate(BaseModel):
     """Request body to confirm a QR payment."""
     banco: str

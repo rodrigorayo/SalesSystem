@@ -77,6 +77,8 @@ class Sale(Document):
     anulada_por_id: Optional[str] = None            # ID del usuario que anuló
     anulada_por_nombre: Optional[str] = None        # Nombre legible
     anulada_at: Optional[datetime] = None           # Timestamp de anulación
+    # ── Corrección de método de pago (para ERROR_COBRO) ───────────────────────
+    metodo_pago_correcto: Optional[str] = None      # El método que realmente se usó
 
     class Settings:
         name = "sales"

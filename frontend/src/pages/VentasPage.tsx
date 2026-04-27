@@ -13,17 +13,24 @@ import type { Sale } from '../api/types';
 
 import { formatFullDate as formatDate } from '../utils/dateUtils';
 
-// ─── Motivos de anulación ────────────────────────────────────────────────────
-
-const MOTIVOS: { value: MotivoAnulacion; label: string; icon: string; desc: string }[] = [
-    { value: 'ERROR_COBRO',          label: 'Error de cobro',            icon: '💸', desc: 'Se cobró mal el monto o el método' },
-    { value: 'DEVOLUCION_CLIENTE',   label: 'Devolución de cliente',     icon: '↩️', desc: 'El cliente devuelve el producto' },
-    { value: 'PRODUCTO_DEFECTUOSO',  label: 'Producto defectuoso',       icon: '⚠️', desc: 'El artículo presentó fallas' },
-    { value: 'VENTA_DUPLICADA',      label: 'Venta duplicada',           icon: '🔁', desc: 'Esta venta fue registrada dos veces' },
-    { value: 'OTRO',                 label: 'Otro motivo',               icon: '📝', desc: 'Especificar en el campo de notas' },
-];
-
 // ─── AnularModal ─────────────────────────────────────────────────────────────
+
+const METODOS_PAGO = [
+    { value: 'EFECTIVO', label: 'Efectivo', icon: '💵', color: 'emerald' },
+    { value: 'QR',       label: 'QR',       icon: '📱', color: 'sky' },
+    { value: 'TARJETA',  label: 'Tarjeta',  icon: '💳', color: 'indigo' },
+    { value: 'TRANSFERENCIA', label: 'Transferencia', icon: '🏦', color: 'violet' },
+] as const;
+
+type MetodoPago = typeof METODOS_PAGO[number]['value'];
+
+const MOTIVOS: { value: MotivoAnulacion; label: string; icon: string; desc: string; requiresMetodo?: boolean }[] = [
+    { value: 'ERROR_COBRO',          label: 'Error de método de cobro', icon: '💸', desc: 'Se registró el pago con el método incorrecto (ej: era QR pero se puso Efectivo)', requiresMetodo: true },
+    { value: 'DEVOLUCION_CLIENTE',   label: 'Devolución de cliente',    icon: '↩️', desc: 'El cliente devuelve el producto — el dinero real sale de caja' },
+    { value: 'PRODUCTO_DEFECTUOSO',  label: 'Producto defectuoso',      icon: '⚠️', desc: 'El artículo presentó fallas — se devuelve el dinero al cliente' },
+    { value: 'VENTA_DUPLICADA',      label: 'Venta duplicada',          icon: '🔁', desc: 'Esta venta fue registrada dos veces — se corrige sin doble egreso' },
+    { value: 'OTRO',                 label: 'Otro motivo',              icon: '📝', desc: 'Especificar en el campo de notas' },
+];
 
 function AnularModal({
     venta,
@@ -33,15 +40,15 @@ function AnularModal({
 }: {
     venta: Sale;
     onClose: () => void;
-    onConfirm: (motivo: MotivoAnulacion, notas?: string) => void;
+    onConfirm: (motivo: MotivoAnulacion, notas?: string, metodoCorrecto?: string) => void;
     isPending: boolean;
 }) {
     const [motivo, setMotivo] = useState<MotivoAnulacion | ''>('');
     const [notas, setNotas] = useState('');
+    const [metodoCorrecto, setMetodoCorrecto] = useState<MetodoPago | ''>('');
     const [dupData, setDupData] = useState<Awaited<ReturnType<typeof checkPosibleDuplicado>> | null>(null);
     const [checkingDup, setCheckingDup] = useState(false);
 
-    // Auto-check for duplicate on mount
     useState(() => {
         setCheckingDup(true);
         checkPosibleDuplicado(venta._id)
@@ -50,15 +57,39 @@ function AnularModal({
             .finally(() => setCheckingDup(false));
     });
 
-    // Financial impact analysis
-    const metodosEfectivo = (venta.pagos || []).filter(p => p.metodo === 'EFECTIVO');
-    const metodosDigital = (venta.pagos || []).filter(p => ['QR', 'TARJETA', 'TRANSFERENCIA'].includes(p.metodo));
-    const montoEfectivo = metodosEfectivo.reduce((s, p) => s + Number(p.monto), 0);
-    const montoDigital = metodosDigital.reduce((s, p) => s + Number(p.monto), 0);
-
+    const motivoInfo = MOTIVOS.find(m => m.value === motivo);
+    const requiereMetodo = motivoInfo?.requiresMetodo === true;
     const requiereNotas = motivo === 'OTRO';
     const notasOk = !requiereNotas || notas.trim().length >= 10;
-    const canConfirm = motivo !== '' && notasOk && !isPending;
+    const metodoOk = !requiereMetodo || metodoCorrecto !== '';
+    const canConfirm = motivo !== '' && notasOk && metodoOk && !isPending;
+
+    // Calcular método actual de la venta
+    const metodosActuales = (venta.pagos || []).map(p => p.metodo);
+    const metodosUnicos = [...new Set(metodosActuales)];
+    const totalVenta = (venta.pagos || []).reduce((s, p) => s + Number(p.monto), 0);
+
+    // Impacto financiero según motivo seleccionado
+    const getImpactoText = () => {
+        if (!motivo) return null;
+        if (motivo === 'ERROR_COBRO') {
+            if (!metodoCorrecto) return { color: 'amber', msg: 'Selecciona el método real para ver el impacto en caja.' };
+            const metodosLabel = metodosUnicos.join('/');
+            return {
+                color: 'sky',
+                msg: `Se revertirá el ingreso de ${metodosLabel} y se registrará el ingreso correcto como ${metodoCorrecto}. La caja quedará cuadrada.`
+            };
+        }
+        if (motivo === 'VENTA_DUPLICADA') {
+            return { color: 'amber', msg: `Se quitarán Bs. ${totalVenta.toFixed(2)} de ${metodosUnicos.join('/')} de caja. El dinero real cobrado permanece.` };
+        }
+        if (motivo === 'DEVOLUCION_CLIENTE' || motivo === 'PRODUCTO_DEFECTUOSO') {
+            return { color: 'red', msg: `Saldrán Bs. ${totalVenta.toFixed(2)} de caja en ${metodosUnicos.join('/')} (devolución real al cliente).` };
+        }
+        return { color: 'red', msg: `Se invertirán los movimientos de caja de esta venta.` };
+    };
+
+    const impacto = getImpactoText();
 
     return (
         <motion.div
@@ -81,17 +112,18 @@ function AnularModal({
                         </div>
                         <div>
                             <h2 className="text-white font-bold text-base">Anular Venta</h2>
-                            <p className="text-red-200 text-[11px]">Ticket #{venta._id.slice(-6).toUpperCase()} — Bs. {Number(venta.total).toFixed(2)}</p>
+                            <p className="text-red-200 text-[11px]">
+                                Ticket #{venta._id.slice(-6).toUpperCase()} — Bs. {Number(venta.total).toFixed(2)}
+                                {' · '}Pagado con: {metodosUnicos.join(' + ')}
+                            </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-all">
-                        ✕
-                    </button>
+                    <button onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-all">✕</button>
                 </div>
 
-                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
 
-                    {/* Alerta de duplicado detectado */}
+                    {/* Duplicado detectado */}
                     {checkingDup && (
                         <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
                             <Loader2 size={12} className="animate-spin" /> Verificando posibles duplicados...
@@ -104,43 +136,22 @@ function AnularModal({
                             <div>
                                 <p className="text-xs font-bold text-amber-900 mb-0.5">⚠️ Posible venta duplicada detectada</p>
                                 <p className="text-[11px] text-amber-800">
-                                    Hay otra venta similar (Ticket <strong>#{dupData.candidato_id_corto}</strong> — Bs. {dupData.candidato_monto?.toFixed(2)}) del mismo cajero hace menos de 2 minutos. ¿Es esta la que querías anular?
+                                    Hay otra venta similar (Ticket <strong>#{dupData.candidato_id_corto}</strong> — Bs. {dupData.candidato_monto?.toFixed(2)}) hace menos de 2 min.
                                 </p>
                             </div>
                         </motion.div>
                     )}
 
-                    {/* Impacto financiero */}
-                    <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Impacto Financiero de la Anulación</p>
-                        {montoEfectivo > 0 && (
-                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-2">
-                                <Ban size={14} className="text-red-600 shrink-0" />
-                                <p className="text-[11px] text-red-800 font-medium">
-                                    <strong>Bs. {montoEfectivo.toFixed(2)} en EFECTIVO</strong> saldrá del cajón de la caja activa.
-                                </p>
-                            </div>
-                        )}
-                        {montoDigital > 0 && (
-                            <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-lg p-2">
-                                <ShieldCheck size={14} className="text-sky-600 shrink-0" />
-                                <p className="text-[11px] text-sky-800 font-medium">
-                                    <strong>Bs. {montoDigital.toFixed(2)} digital (QR/Tarjeta)</strong> no afecta el cajón.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
                     {/* Selector de motivo */}
                     <div>
                         <p className="text-[10px] font-black text-gray-600 uppercase tracking-wider mb-2">
-                            Motivo de Anulación <span className="text-red-500">*</span>
+                            ¿Por qué se anula? <span className="text-red-500">*</span>
                         </p>
                         <div className="space-y-2">
                             {MOTIVOS.map(m => (
                                 <button
                                     key={m.value}
-                                    onClick={() => setMotivo(m.value)}
+                                    onClick={() => { setMotivo(m.value); setMetodoCorrecto(''); }}
                                     className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-sm ${
                                         motivo === m.value
                                             ? 'border-red-400 bg-red-50 text-red-900 ring-2 ring-red-200'
@@ -148,21 +159,68 @@ function AnularModal({
                                     }`}
                                 >
                                     <span className="text-base">{m.icon}</span>
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="font-bold text-[12px]">{m.label}</p>
                                         <p className="text-[10px] opacity-60">{m.desc}</p>
                                     </div>
-                                    {motivo === m.value && (
-                                        <div className="ml-auto text-red-500">
-                                            <ShieldCheck size={16} />
-                                        </div>
-                                    )}
+                                    {motivo === m.value && <ShieldCheck size={16} className="text-red-500 shrink-0" />}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Notas adicionales */}
+                    {/* Selector método correcto — solo para ERROR_COBRO */}
+                    {requiereMetodo && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
+                            <p className="text-[10px] font-black text-sky-700 uppercase tracking-wider mb-2">
+                                ¿Con qué método se pagó realmente? <span className="text-red-500">*</span>
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {METODOS_PAGO.map(mp => {
+                                    const esActual = metodosUnicos.includes(mp.value);
+                                    return (
+                                        <button
+                                            key={mp.value}
+                                            disabled={esActual}
+                                            onClick={() => setMetodoCorrecto(mp.value)}
+                                            title={esActual ? `Ya está registrado como ${mp.value}` : undefined}
+                                            className={`flex items-center gap-2 p-3 rounded-xl border text-sm transition-all ${
+                                                esActual
+                                                    ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                                    : metodoCorrecto === mp.value
+                                                        ? 'border-sky-400 bg-sky-50 text-sky-900 ring-2 ring-sky-200'
+                                                        : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50'
+                                            }`}
+                                        >
+                                            <span>{mp.icon}</span>
+                                            <div>
+                                                <p className="font-bold text-[12px]">{mp.label}</p>
+                                                {esActual && <p className="text-[9px] text-gray-400">Método actual</p>}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Impacto financiero dinámico */}
+                    {impacto && (
+                        <motion.div
+                            key={motivo + metodoCorrecto}
+                            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                            className={`flex items-start gap-2 p-3 rounded-xl border text-[11px] font-medium ${
+                                impacto.color === 'red' ? 'bg-red-50 border-red-200 text-red-800' :
+                                impacto.color === 'sky' ? 'bg-sky-50 border-sky-200 text-sky-800' :
+                                'bg-amber-50 border-amber-200 text-amber-800'
+                            }`}
+                        >
+                            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                            <p>{impacto.msg}</p>
+                        </motion.div>
+                    )}
+
+                    {/* Notas */}
                     <div>
                         <label className={`block text-[10px] font-black uppercase tracking-wider mb-1.5 ${requiereNotas ? 'text-red-600' : 'text-gray-500'}`}>
                             {requiereNotas ? 'Detalle del motivo *' : 'Notas adicionales (opcional)'}
@@ -182,14 +240,11 @@ function AnularModal({
 
                 {/* Footer */}
                 <div className="px-5 pb-5 pt-2 flex gap-3 border-t border-gray-100">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-colors"
-                    >
+                    <button onClick={onClose} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-colors">
                         Cancelar
                     </button>
                     <button
-                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined)}
+                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined, metodoCorrecto || undefined)}
                         disabled={!canConfirm}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                             canConfirm
@@ -198,13 +253,15 @@ function AnularModal({
                         }`}
                     >
                         {isPending ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
-                        {isPending ? 'Procesando...' : motivo ? 'Confirmar Anulación' : 'Selecciona un motivo'}
+                        {isPending ? 'Procesando...' : canConfirm ? 'Confirmar Anulación' : 'Completa los campos'}
                     </button>
                 </div>
             </motion.div>
         </motion.div>
     );
 }
+
+
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -507,7 +564,7 @@ export default function VentasPage() {
                     <AnularModal
                         venta={anularVenta}
                         onClose={() => setAnularVenta(null)}
-                        onConfirm={(motivo, notas) => anularMut.mutate({ id: anularVenta._id, motivo, notas })}
+                        onConfirm={(motivo, notas, metodoCorrecto) => anularMut.mutate({ id: anularVenta._id, motivo, notas, metodo_pago_correcto: metodoCorrecto })}
                         isPending={anularMut.isPending}
                     />
                 )}
