@@ -10,6 +10,10 @@ class PremioComunidad(str, Enum):
     DESCUENTO_2_MES = "DESCUENTO_2_MES"
     DESCUENTO_3_2SEMANAS = "DESCUENTO_3_2SEMANAS"
     DESCUENTO_4_1SEMANA = "DESCUENTO_4_1SEMANA"
+    # Nuevos Descuentos Mayo FEXCO
+    DESCUENTO_7_MAYO = "DESCUENTO_7_MAYO"
+    DESCUENTO_5_MAYO = "DESCUENTO_5_MAYO"
+    DESCUENTO_3_MAYO = "DESCUENTO_3_MAYO"
 
 class ComunidadUser(Document):
     """
