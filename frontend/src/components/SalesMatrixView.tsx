@@ -1,14 +1,8 @@
 import { useState, useMemo } from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { useQuery } from '@tanstack/react-query';
 import { getSalesMatrix, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { Loader2, AlertTriangle, Calendar, Download } from 'lucide-react';
-
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
 
 export default function SalesMatrixView() {
     const { role, sucursal_id } = useAuthStore();
@@ -185,7 +179,7 @@ export default function SalesMatrixView() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
-                                    {data?.products.map((p, i) => {
+                                    {data?.products.map((p) => {
                                         let rowTotal = 0;
                                         return (
                                             <tr key={p.producto_id} className="hover:bg-gray-50 transition-colors">
