@@ -401,13 +401,17 @@ async def get_financial_report(
 
     return results
 
+from app.domain.models.inventario import Inventario, InventoryLog
+
 @router.get("/valued-inventory")
-async def get_valued_inventory(current_user: User = Depends(get_current_active_user)):
+async def get_valued_inventory(
+    date: Optional[str] = None, # YYYY-MM-DD
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Returns the total value of inventory (cantidad * costo_producto)
     grouped by branch, plus a detailed breakdown.
-    Admin Sucursal can see their own branch.
-    Admin Matriz/SuperAdmin can see all branches.
+    If 'date' is provided, it reconstructs the stock using historical logs.
     """
     tenant_id = current_user.tenant_id or ""
     
@@ -415,53 +419,117 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
         match_filter["sucursal_id"] = current_user.sucursal_id
 
-    # Pipeline to join with Products and calculate value
-    pipeline = [
-        {"$match": match_filter},
-        {
-            "$lookup": {
-                "from": Product.get_collection_name(),
-                "let": {"pid": "$producto_id"},
-                "pipeline": [
-                    {"$match": {
-                        "$expr": {"$eq": [{"$toString": "$_id"}, "$$pid"]}
-                    }}
-                ],
-                "as": "product_info"
-            }
-        },
-        {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": True }},
-        {
-            "$project": {
-                "sucursal_id": 1,
-                "producto_id": 1,
-                "cantidad": 1,
-                "producto_nombre": {"$ifNull": ["$product_info.descripcion", "Producto Desconocido"]},
-                "costo_producto": {"$ifNull": ["$product_info.costo_producto", 0]},
-                "precio_venta": {
-                    "$ifNull": [
-                        "$precio_sucursal", 
-                        {"$ifNull": ["$product_info.precio_venta", 0]}
-                    ]
-                },
-                "valor_fabrica": {
-                    "$multiply": ["$cantidad", {"$ifNull": ["$product_info.costo_producto", 0]}]
-                },
-                "valor_publico": {
-                    "$multiply": [
-                        "$cantidad", 
-                        {
-                            "$ifNull": [
-                                "$precio_sucursal", 
-                                {"$ifNull": ["$product_info.precio_venta", 0]}
-                            ]
-                        }
-                    ]
+    if date:
+        # ─── HISTORICAL MODE (Using InventoryLogs) ──────────────────────────
+        try:
+            _, end_dt = get_day_range_bolivia(date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+        # Historical match filter
+        hist_match = {"tenant_id": tenant_id, "created_at": {"$lte": end_dt}}
+        if "sucursal_id" in match_filter:
+            hist_match["sucursal_id"] = match_filter["sucursal_id"]
+
+        pipeline = [
+            {"$match": hist_match},
+            {"$sort": {"created_at": -1}},
+            {
+                "$group": {
+                    "_id": {
+                        "sucursal_id": "$sucursal_id",
+                        "producto_id": "$producto_id"
+                    },
+                    "last_log": {"$first": "$$ROOT"}
                 }
-            }
-        },
-        {
-            "$group": {
+            },
+            {
+                "$project": {
+                    "sucursal_id": "$_id.sucursal_id",
+                    "producto_id": "$_id.producto_id",
+                    "cantidad": "$last_log.stock_resultante",
+                    "producto_nombre": "$last_log.descripcion",
+                    "costo_producto": {"$ifNull": ["$last_log.costo_unitario_momento", 0]},
+                    "precio_venta": {"$ifNull": ["$last_log.precio_venta_momento", 0]},
+                    "valor_fabrica": {
+                        "$multiply": ["$last_log.stock_resultante", {"$ifNull": ["$last_log.costo_unitario_momento", 0]}]
+                    },
+                    "valor_publico": {
+                        "$multiply": ["$last_log.stock_resultante", {"$ifNull": ["$last_log.precio_venta_momento", 0]}]
+                    }
+                }
+            },
+            # Skip items with 0 stock to keep report clean
+            {"$match": {"cantidad": {"$gt": 0}}},
+            {
+                "$group": {
+                    "_id": "$sucursal_id",
+                    "total_items": {"$sum": "$cantidad"},
+                    "valor_total_fabrica_sucursal": {"$sum": "$valor_fabrica"},
+                    "valor_total_publico_sucursal": {"$sum": "$valor_publico"},
+                    "desglose": {
+                        "$push": {
+                            "producto_id": "$producto_id",
+                            "producto_nombre": "$producto_nombre",
+                            "cantidad": "$cantidad",
+                            "costo_unitario": "$costo_producto",
+                            "precio_publico_unitario": "$precio_venta",
+                            "valor_fabrica": "$valor_fabrica",
+                            "valor_publico": "$valor_publico"
+                        }
+                    }
+                }
+            },
+            {"$sort": {"valor_total_fabrica_sucursal": -1}}
+        ]
+        cursor = InventoryLog.get_pymongo_collection().aggregate(pipeline)
+    else:
+        # ─── REAL-TIME MODE (Current Stock) ──────────────────────────────────
+        pipeline = [
+            {"$match": match_filter},
+            {
+                "$lookup": {
+                    "from": Product.get_collection_name(),
+                    "let": {"pid": "$producto_id"},
+                    "pipeline": [
+                        {"$match": {
+                            "$expr": {"$eq": [{"$toString": "$_id"}, "$$pid"]}
+                        }}
+                    ],
+                    "as": "product_info"
+                }
+            },
+            {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": True }},
+            {
+                "$project": {
+                    "sucursal_id": 1,
+                    "producto_id": 1,
+                    "cantidad": 1,
+                    "producto_nombre": {"$ifNull": ["$product_info.descripcion", "Producto Desconocido"]},
+                    "costo_producto": {"$ifNull": ["$product_info.costo_producto", 0]},
+                    "precio_venta": {
+                        "$ifNull": [
+                            "$precio_sucursal", 
+                            {"$ifNull": ["$product_info.precio_venta", 0]}
+                        ]
+                    },
+                    "valor_fabrica": {
+                        "$multiply": ["$cantidad", {"$ifNull": ["$product_info.costo_producto", 0]}]
+                    },
+                    "valor_publico": {
+                        "$multiply": [
+                            "$cantidad", 
+                            {
+                                "$ifNull": [
+                                    "$precio_sucursal", 
+                                    {"$ifNull": ["$product_info.precio_venta", 0]}
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            {"$group": {
                 "_id": "$sucursal_id",
                 "total_items": {"$sum": "$cantidad"},
                 "valor_total_fabrica_sucursal": {"$sum": "$valor_fabrica"},
@@ -477,12 +545,11 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
                         "valor_publico": "$valor_publico"
                     }
                 }
-            }
-        },
-        {"$sort": {"valor_total_fabrica_sucursal": -1}}
-    ]
+            }},
+            {"$sort": {"valor_total_fabrica_sucursal": -1}}
+        ]
+        cursor = Inventario.get_pymongo_collection().aggregate(pipeline)
 
-    cursor = Inventario.get_pymongo_collection().aggregate(pipeline)
     raw_results = await cursor.to_list(length=100)
     
     # Resolve sucursal names
@@ -508,7 +575,9 @@ async def get_valued_inventory(current_user: User = Depends(get_current_active_u
         "total_general_fabrica": float(total_general_fabrica),
         "total_general_publico": float(total_general_publico),
         "ganancia_potencial": float(total_general_publico - total_general_fabrica),
-        "por_sucursal": results
+        "por_sucursal": results,
+        "historical": bool(date),
+        "date": date
     }
 
 @router.get("/sales-by-hour")

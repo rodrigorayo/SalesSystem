@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getValuedInventory } from '../api/api';
-import { Loader2, Package, Store, AlertTriangle, ChevronDown, ChevronUp, DollarSign, Gem, ShieldCheck, Tag } from 'lucide-react';
+import { Loader2, Package, Store, AlertTriangle, ChevronDown, ChevronUp, DollarSign, Gem, ShieldCheck, Tag, Calendar, History } from 'lucide-react';
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function ValuedInventoryView() {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+    const [selectedDate, setSelectedDate] = useState<string>('');
+
     const { data: valuatedData, isLoading, isError } = useQuery({
-        queryKey: ['valued-inventory'],
-        queryFn: getValuedInventory,
+        queryKey: ['valued-inventory', selectedDate],
+        queryFn: () => getValuedInventory(selectedDate),
         staleTime: 5 * 60 * 1000 // 5 minutes cache
     });
 
@@ -22,7 +25,7 @@ export default function ValuedInventoryView() {
         return (
             <div className="py-32 flex flex-col items-center justify-center bg-white rounded-[32px] border border-gray-100 shadow-sm mt-6">
                 <Loader2 size={48} className="animate-spin text-indigo-500 mb-4" />
-                <p className="text-gray-400 font-bold animate-pulse uppercase tracking-widest text-sm">Escaneando inventario y precios reales...</p>
+                <p className="text-gray-400 font-bold animate-pulse uppercase tracking-widest text-sm">Escaneando inventario y precios {selectedDate ? `al ${selectedDate}` : 'reales'}...</p>
             </div>
         );
     }
@@ -36,11 +39,55 @@ export default function ValuedInventoryView() {
         );
     }
 
-    const { total_general_fabrica, total_general_publico, ganancia_potencial, por_sucursal } = valuatedData;
+    const { total_general_fabrica, total_general_publico, ganancia_potencial, por_sucursal, historical } = valuatedData;
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 mt-6">
             
+            {/* ── Filtros y Control ────────────────────────────────── */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+                <div>
+                    <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                        {historical ? <History className="text-amber-500" size={20} /> : <ShieldCheck className="text-indigo-500" size={20} />}
+                        {historical ? `Corte Histórico al ${selectedDate}` : 'Estado de Inventario Actual'}
+                    </h3>
+                    <p className="text-xs text-gray-500 font-medium">
+                        {historical 
+                            ? 'Los valores mostrados corresponden a la reconstrucción del stock al cierre de ese día.' 
+                            : 'Valorización en tiempo real basada en el stock físico actual en todas las sucursales.'}
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input 
+                            type="date" 
+                            value={selectedDate}
+                            max={today}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
+                        />
+                    </div>
+                    {selectedDate && (
+                        <button 
+                            onClick={() => setSelectedDate('')}
+                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                        >
+                            Ver Hoy
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {historical && (
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3">
+                    <AlertTriangle className="text-amber-500 shrink-0" size={18} />
+                    <p className="text-[11px] text-amber-700 font-medium">
+                        <span className="font-bold uppercase">Nota:</span> El reporte histórico reconstruye el inventario usando los movimientos registrados. Si faltan registros de ingresos o salidas manuales del pasado, los totales podrían variar respecto a la realidad física de ese momento.
+                    </p>
+                </div>
+            )}
+
             {/* ── KPIs Principales ────────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
@@ -50,7 +97,7 @@ export default function ValuedInventoryView() {
                         <ShieldCheck size={24} /> <span className="font-bold uppercase tracking-wider text-xs">Costo Inmovilizado</span>
                     </div>
                     <h2 className="text-4xl font-black mb-2">{formatBs(total_general_fabrica)}</h2>
-                    <p className="opacity-90 text-[11px] font-medium leading-tight">Valor real (precio costo) del stock actual que se encuentra guardado o en vitrina.</p>
+                    <p className="opacity-90 text-[11px] font-medium leading-tight">Valor real (precio costo) del stock {historical ? 'en la fecha seleccionada' : 'actual'} que se encuentra guardado o en vitrina.</p>
                 </div>
 
                 {/* Cliente / Público */}
@@ -61,7 +108,7 @@ export default function ValuedInventoryView() {
                             <DollarSign size={20} className="p-1 bg-indigo-50 text-indigo-600 rounded-full" /> <span className="font-bold uppercase tracking-wider text-[10px] text-gray-500">Valor Esperado Cliente</span>
                         </div>
                         <h2 className="text-3xl font-black mb-1">{formatBs(total_general_publico)}</h2>
-                        <p className="text-[11px] text-gray-400 font-bold leading-tight">Si se vende todo el inventario hoy al precio de venta asignado a público.</p>
+                        <p className="text-[11px] text-gray-400 font-bold leading-tight">Si se vendiera todo el inventario {historical ? 'en ese momento' : 'hoy'} al precio de venta asignado.</p>
                     </div>
                 </div>
 
@@ -173,7 +220,7 @@ export default function ValuedInventoryView() {
                     <div className="text-center py-20 bg-white rounded-[40px] border border-gray-100 shadow-sm">
                         <Package size={48} className="mx-auto text-gray-200 mb-4" />
                         <h3 className="font-black text-gray-900 text-xl">Sin inventario</h3>
-                        <p className="text-sm font-medium text-gray-400">No hay datos de stock para calcular.</p>
+                        <p className="text-sm font-medium text-gray-400">No hay datos de stock para calcular {historical ? `al ${selectedDate}` : ''}.</p>
                     </div>
                 )}
             </div>

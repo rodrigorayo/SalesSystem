@@ -45,8 +45,11 @@ export const getDailyReport = (date: string, sucursal_id?: string) => {
     return client<any>(`/reports/daily-report?${params.toString()}`);
 };
 
-export const getValuedInventory = () => 
-    client<{total_general_fabrica: number; total_general_publico: number; ganancia_potencial: number; por_sucursal: any[]}>('/reports/valued-inventory');
+export const getValuedInventory = (date?: string) => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    return client<{total_general_fabrica: number; total_general_publico: number; ganancia_potencial: number; por_sucursal: any[], historical?: boolean, date?: string}>(`/reports/valued-inventory${date ? '?' + params.toString() : ''}`);
+};
 
 
 export const getFinancialReport = (startDate: string, endDate: string, sucursal_id: string = 'all') => {
