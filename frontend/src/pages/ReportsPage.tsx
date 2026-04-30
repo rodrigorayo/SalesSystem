@@ -11,6 +11,7 @@ import FinancialDetailView from '../components/FinancialDetailView';
 import ValuedInventoryView from '../components/ValuedInventoryView';
 import HourlySalesView from '../components/HourlySalesView';
 import StaffPerformanceView from '../components/StaffPerformanceView';
+import SalesMatrixView from '../components/SalesMatrixView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, BarChart, Bar, Legend
@@ -24,7 +25,7 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado' | 'matrix';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
@@ -96,6 +97,7 @@ export default function ReportsPage() {
                     { id: 'daily', label: 'Reporte de Jornada', icon: <FileText size={16} /> },
                     { id: 'hourly', label: 'Ventas por Hora', icon: <Clock size={16} /> },
                     { id: 'staff', label: 'Desempeño Staff', icon: <Users size={16} /> },
+                    { id: 'matrix', label: 'Matriz de Ventas', icon: <BarChart3 size={16} /> },
                     { id: 'inventario_valorado', label: 'Inventario Valorado', icon: <Package size={16} /> },
                 ].filter(t => !t.hidden).map((tab) => (
                     <button
@@ -123,6 +125,8 @@ export default function ReportsPage() {
                 <HourlySalesView />
             ) : activeTab === 'staff' ? (
                 <StaffPerformanceView />
+            ) : activeTab === 'matrix' ? (
+                <SalesMatrixView />
             ) : (
                 <>
                     {isLoading ? (

@@ -86,6 +86,18 @@ export const getStaffPerformanceReport = (date?: string, sucursal_id?: string, s
     }>(`/reports/staff-performance?${params.toString()}`);
 };
 
+export const getSalesMatrix = (start_date: string, end_date: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ start_date, end_date });
+    if (sucursal_id && sucursal_id !== 'all') params.append('sucursal_id', sucursal_id);
+    return client<{
+        products: {
+            producto_id: string;
+            descripcion: string;
+            days: Record<string, number>;
+        }[];
+    }>(`/reports/sales-matrix?${params.toString()}`);
+};
+
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');
 export const createSucursal = (data: SucursalCreate) => client<Sucursal>('/sucursales', { body: data });

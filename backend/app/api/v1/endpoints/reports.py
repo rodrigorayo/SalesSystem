@@ -784,3 +784,88 @@ async def get_staff_performance(
         "cajeros": cajeros,
         "vendedores": vendedores
     }
+
+
+@router.get("/sales-matrix")
+async def get_sales_matrix(
+    start_date: str, # YYYY-MM-DD
+    end_date: str, # YYYY-MM-DD
+    sucursal_id: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns sales matrix grouped by product and day.
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    target_sucursal = sucursal_id
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
+        target_sucursal = current_user.sucursal_id
+
+    try:
+        start_dt, end_dt = get_range_bolivia(start_date, end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    match_filter = {
+        "tenant_id": tenant_id,
+        "sale_date": {"$gte": start_dt, "$lte": end_dt}
+    }
+    
+    if target_sucursal and target_sucursal != "all":
+        match_filter["sucursal_id"] = target_sucursal
+
+    pipeline = [
+        {"$match": match_filter},
+        {
+            "$project": {
+                "producto_id": 1,
+                "descripcion": 1,
+                "cantidad": 1,
+                "date_str": {
+                    "$dateToString": {
+                        "format": "%Y-%m-%d", 
+                        "date": "$sale_date", 
+                        "timezone": "-04:00"
+                    }
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "producto_id": "$producto_id",
+                    "descripcion": "$descripcion",
+                    "date": "$date_str"
+                },
+                "cantidad": {"$sum": "$cantidad"}
+            }
+        }
+    ]
+
+    cursor = SaleItem.get_pymongo_collection().aggregate(pipeline)
+    raw_results = await cursor.to_list(length=None)
+    
+    # We need to construct the matrix payload
+    # { "products": { "prod_id": { "descripcion": "xxx", "days": { "YYYY-MM-DD": cant } } } }
+    
+    products = {}
+    for r in raw_results:
+        _id = r["_id"]
+        p_id = _id["producto_id"]
+        desc = _id["descripcion"]
+        date_str = _id["date"]
+        cant = r["cantidad"]
+        
+        if p_id not in products:
+            products[p_id] = {
+                "producto_id": p_id,
+                "descripcion": desc,
+                "days": {}
+            }
+        
+        products[p_id]["days"][date_str] = products[p_id]["days"].get(date_str, 0) + cant
+
+    return {
+        "products": list(products.values())
+    }
