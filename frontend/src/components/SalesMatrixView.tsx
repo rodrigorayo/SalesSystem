@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSalesMatrix, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
-import { Loader2, AlertTriangle, Calendar, Download } from 'lucide-react';
+import { Loader2, AlertTriangle, Calendar, Download, Search } from 'lucide-react';
 
 export default function SalesMatrixView() {
     const { role, sucursal_id } = useAuthStore();
@@ -17,6 +17,7 @@ export default function SalesMatrixView() {
     
     const [startDate, setStartDate] = useState<string>(lastWeekStr);
     const [endDate, setEndDate] = useState<string>(todayStr);
+    const [searchTerm, setSearchTerm] = useState('');
     
     const esMatriz = ['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '');
     const defaultSucursal = esMatriz ? 'all' : (sucursal_id || 'CENTRAL');
@@ -32,6 +33,13 @@ export default function SalesMatrixView() {
         queryKey: ['sales-matrix', startDate, endDate, selectedSucursal],
         queryFn: () => getSalesMatrix(startDate, endDate, selectedSucursal),
     });
+
+    const filteredProducts = useMemo(() => {
+        if (!data?.products) return [];
+        return data.products.filter(p => 
+            p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [data?.products, searchTerm]);
 
     const dateList = useMemo(() => {
         const dates = [];
@@ -100,6 +108,17 @@ export default function SalesMatrixView() {
             {/* Header Filters */}
             <div className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-100 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
                 <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                    <div className="relative flex-1 md:flex-none">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input 
+                            type="text"
+                            placeholder="Buscar producto..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full md:w-64 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                        />
+                    </div>
+
                     <div className="flex items-center gap-2 flex-1 md:flex-none">
                         <div className="relative">
                             <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -153,55 +172,55 @@ export default function SalesMatrixView() {
                 </div>
             ) : (
                 <div className="bg-white rounded-[24px] border border-gray-100 overflow-hidden shadow-sm">
-                    {data?.products.length === 0 ? (
+                    {filteredProducts.length === 0 ? (
                         <div className="p-12 text-center text-gray-400 font-medium">
-                            No se encontraron ventas en este periodo.
+                            {searchTerm ? 'No hay productos que coincidan con la búsqueda.' : 'No se encontraron ventas en este periodo.'}
                         </div>
                     ) : (
                         <div className="overflow-x-auto max-h-[600px]">
-                            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                                <thead className="bg-gray-50 sticky top-0 z-10 text-gray-500 text-[11px] uppercase tracking-wider font-black shadow-sm">
+                            <table className="w-full text-left border-collapse text-[11px] whitespace-nowrap">
+                                <thead className="bg-gray-50 sticky top-0 z-30 text-gray-500 uppercase tracking-wider font-black shadow-sm">
                                     <tr>
-                                        <th className="p-4 border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-20 min-w-[200px]">
+                                        <th className="p-2 border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-40 min-w-[150px]">
                                             Producto
                                         </th>
                                         {dateList.map(d => {
                                             const parts = d.split('-');
                                             return (
-                                                <th key={d} className="p-3 border-b border-gray-200 text-center min-w-[60px]">
+                                                <th key={d} className="p-2 border-b border-gray-200 text-center min-w-[45px]">
                                                     {parts[2]}/{parts[1]}
                                                 </th>
                                             );
                                         })}
-                                        <th className="p-3 border-b border-l border-gray-200 bg-indigo-50 text-indigo-700 text-center sticky right-0 z-20">
+                                        <th className="p-2 border-b border-l border-gray-200 bg-indigo-50 text-indigo-700 text-center sticky right-0 z-40 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                                             Total
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
-                                    {data?.products.map((p) => {
+                                    {filteredProducts.map((p) => {
                                         let rowTotal = 0;
                                         return (
                                             <tr key={p.producto_id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="p-4 border-r border-gray-100 sticky left-0 bg-white z-10 max-w-[300px] truncate" title={p.descripcion}>
+                                                <td className="p-2 border-r border-gray-100 sticky left-0 bg-white z-20 max-w-[200px] truncate font-bold text-gray-900 shadow-[2px_0_4px_rgba(0,0,0,0.02)]" title={p.descripcion}>
                                                     {p.descripcion}
                                                 </td>
                                                 {dateList.map(d => {
                                                     const qty = p.days[d] || 0;
                                                     rowTotal += qty;
                                                     return (
-                                                        <td key={d} className="p-3 text-center">
+                                                        <td key={d} className="p-1 text-center">
                                                             {qty > 0 ? (
-                                                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
+                                                                <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-lg font-black inline-block min-w-[20px]">
                                                                     {qty}
                                                                 </span>
                                                             ) : (
-                                                                <span className="text-gray-300">-</span>
+                                                                <span className="text-gray-200">-</span>
                                                             )}
                                                         </td>
                                                     );
                                                 })}
-                                                <td className="p-3 border-l border-gray-100 text-center font-black text-indigo-700 bg-indigo-50/30 sticky right-0 z-10">
+                                                <td className="p-2 border-l border-gray-100 text-center font-black text-indigo-700 bg-indigo-50 sticky right-0 z-20 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                                                     {rowTotal}
                                                 </td>
                                             </tr>
