@@ -24,8 +24,10 @@ export default function InventarioPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [categorySearch, setCategorySearch] = useState('');
     const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
-    const [startDate, setStartDate] = useState(getBoliviaTodayISO());
-    const [endDate, setEndDate] = useState(getBoliviaTodayISO());
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [kardexProductoId, setKardexProductoId] = useState<string | undefined>(undefined);
+    const [kardexProductoNombre, setKardexProductoNombre] = useState<string | null>(null);
 
 
     const { data: sucursales = [] } = useQuery({
@@ -68,8 +70,8 @@ export default function InventarioPage() {
     const totalItemsStock = invData?.total || 0;
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
-        queryKey: ['movimientos', selectedSucursal, startDate, endDate],
-        queryFn: () => getMovimientosInventario(selectedSucursal, undefined, startDate || undefined, endDate || undefined),
+        queryKey: ['movimientos', selectedSucursal, startDate, endDate, debouncedSearch, kardexProductoId],
+        queryFn: () => getMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined)),
         enabled: tab === 'kardex',
     });
 
@@ -84,9 +86,9 @@ export default function InventarioPage() {
     }, [searchTerm, selectedSucursal, tab, selectedCategory, stockBajoOnly]);
 
     const filteredMovs = useMemo(() => {
-        if (!debouncedSearch) return movimientos;
-        return movimientos.filter(m => m.producto_nombre?.toLowerCase().includes(debouncedSearch.toLowerCase()));
-    }, [movimientos, debouncedSearch]);
+        // El filtrado ya se hace principalmente en el backend ahora, pero mantenemos esto por si acaso o para refinamiento extra
+        return movimientos;
+    }, [movimientos]);
 
     const paginatedMovs = useMemo(() => {
         const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
@@ -159,23 +161,49 @@ export default function InventarioPage() {
                             </button>
                         )}
                         {tab === 'kardex' && (
-                            <div className="flex bg-gray-50 rounded-xl border border-gray-100 p-1 shadow-inner gap-1">
+                            <div className="flex flex-wrap items-center bg-gray-50 rounded-xl border border-gray-100 p-1 shadow-inner gap-1">
                                 <input
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                     className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
+                                    title="Fecha Inicio"
                                 />
-                                <span className="text-gray-400 text-[10px] my-auto">a</span>
+                                <span className="text-gray-400 text-[10px] my-auto px-1">a</span>
                                 <input
                                     type="date"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                     className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
+                                    title="Fecha Fin"
                                 />
+                                {(startDate || endDate || kardexProductoId) && (
+                                    <button 
+                                        onClick={() => { setStartDate(''); setEndDate(''); setKardexProductoId(undefined); setKardexProductoNombre(null); setSearchTerm(''); }}
+                                        className="ml-1 p-1 text-red-500 hover:bg-red-50 rounded-md"
+                                        title="Limpiar Filtros"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
+
+                    {tab === 'kardex' && kardexProductoNombre && (
+                        <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <History size={16} className="text-indigo-600" />
+                                <span className="text-xs font-bold text-indigo-900">Mostrando historial de: <span className="uppercase">{kardexProductoNombre}</span></span>
+                            </div>
+                            <button 
+                                onClick={() => { setKardexProductoId(undefined); setKardexProductoNombre(null); }}
+                                className="text-xs font-bold text-indigo-600 hover:underline"
+                            >
+                                Ver todos los productos
+                            </button>
+                        </div>
+                    )}
 
 
                     {/* Tabs e Importar */}
@@ -340,6 +368,19 @@ export default function InventarioPage() {
                                                                     <Tag size={12} />
                                                                 </button>
                                                             )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setKardexProductoId(item.producto_id);
+                                                                    setKardexProductoNombre(item.producto_nombre);
+                                                                    setTab('kardex');
+                                                                    setStartDate('');
+                                                                    setEndDate('');
+                                                                }}
+                                                                className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-gray-200"
+                                                                title="Ver Historial (Kárdex)"
+                                                            >
+                                                                <History size={12} />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 )}

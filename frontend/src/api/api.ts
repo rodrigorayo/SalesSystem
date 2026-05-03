@@ -255,11 +255,12 @@ export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: 
 };
 export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>
     client(`/inventario/ajuste?sucursal_id=${sucursal_id}`, { method: 'POST', body: data });
-export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string) => {
+export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string) => {
     const params = new URLSearchParams({ sucursal_id });
     if (producto_id) params.set('producto_id', producto_id);
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);
+    if (search) params.set('search', search);
     return client<InventoryLog[]>(`/inventario/movimientos?${params.toString()}`);
 };
 

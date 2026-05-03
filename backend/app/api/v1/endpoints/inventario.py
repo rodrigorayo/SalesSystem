@@ -213,14 +213,26 @@ async def get_movimientos(
     query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id}
     if producto_id:
         query["producto_id"] = producto_id
+
+    # Soporte para búsqueda por texto en la descripción del log
+    search: Optional[str] = Query(None)
+    if search:
+        query["descripcion"] = {"$regex": search, "$options": "i"}
         
-    if start_date and end_date:
-        try:
+    # Rangos de fecha flexibles (pueden venir solo uno o ambos)
+    date_filter = {}
+    try:
+        if start_date:
             start_dt, _ = get_day_range_bolivia(start_date)
+            date_filter["$gte"] = start_dt
+        if end_date:
             _, end_dt = get_day_range_bolivia(end_date)
-            query["created_at"] = {"$gte": start_dt, "$lte": end_dt}
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+            date_filter["$lte"] = end_dt
+            
+        if date_filter:
+            query["created_at"] = date_filter
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
             
     from app.domain.models.inventario import InventoryLog
     
