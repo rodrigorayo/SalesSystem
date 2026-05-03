@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
@@ -217,7 +218,9 @@ async def get_movimientos(
     # Soporte para búsqueda por texto en la descripción del log
     search: Optional[str] = Query(None)
     if search:
-        query["descripcion"] = {"$regex": search, "$options": "i"}
+        # Escapar caracteres especiales como ( ) + * para que se busquen literalmente y no rompan el motor de regex
+        safe_search = re.escape(search)
+        query["descripcion"] = {"$regex": safe_search, "$options": "i"}
         
     # Rangos de fecha flexibles (pueden venir solo uno o ambos)
     date_filter = {}
