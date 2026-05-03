@@ -48,6 +48,17 @@ async def get_general_reports(
             }
         },
         {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$sid"]}, "anulada": False}}
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
+        {
             "$group": {
                 "_id": None,
                 "total_ventas": {"$sum": "$subtotal"},
@@ -83,6 +94,17 @@ async def get_general_reports(
                 "sale_date": {"$gte": start_date}
             }
         },
+        {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$sid"]}, "anulada": False}}
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
         {
             "$group": {
                 "_id": "$sucursal_id",
@@ -130,6 +152,17 @@ async def get_general_reports(
             }
         },
         {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$sid"]}, "anulada": False}}
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
+        {
             "$group": {
                 "_id": "$descripcion",
                 "cantidad_vendida": {"$sum": "$cantidad"},
@@ -162,6 +195,17 @@ async def get_general_reports(
                 "sale_date": {"$gte": start_date}
             }
         },
+        {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$sid"]}, "anulada": False}}
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
         {
             "$group": {
                 "_id": { "$dateToString": { "format": "%Y-%m-%d", "date": "$sale_date", "timezone": "-04:00" } },
@@ -279,6 +323,17 @@ async def get_daily_report(
             }
         },
         {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$sid"]}, "anulada": False}}
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
+        {
             "$group": {
                 "_id": "$descripcion",
                 "cantidad": {"$sum": "$cantidad"},
@@ -351,6 +406,17 @@ async def get_financial_report(
 
     pipeline = [
         {"$match": match_filter},
+        {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$sid"]}, "anulada": False}}
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
         {
             "$group": {
                 "_id": {
