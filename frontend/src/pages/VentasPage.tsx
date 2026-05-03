@@ -40,12 +40,13 @@ function AnularModal({
 }: {
     venta: Sale;
     onClose: () => void;
-    onConfirm: (motivo: MotivoAnulacion, notas?: string, metodoCorrecto?: string) => void;
+    onConfirm: (motivo: MotivoAnulacion, notas?: string, metodoCorrecto?: string, afectar_caja?: boolean) => void;
     isPending: boolean;
 }) {
     const [motivo, setMotivo] = useState<MotivoAnulacion | ''>('');
     const [notas, setNotas] = useState('');
     const [metodoCorrecto, setMetodoCorrecto] = useState<MetodoPago | ''>('');
+    const [afectarCaja, setAfectarCaja] = useState(true);
     const [dupData, setDupData] = useState<Awaited<ReturnType<typeof checkPosibleDuplicado>> | null>(null);
     const [checkingDup, setCheckingDup] = useState(false);
 
@@ -81,12 +82,12 @@ function AnularModal({
             };
         }
         if (motivo === 'VENTA_DUPLICADA') {
-            return { color: 'amber', msg: `Se quitarán Bs. ${totalVenta.toFixed(2)} de ${metodosUnicos.join('/')} de caja. El dinero real cobrado permanece.` };
+            return { color: 'amber', msg: afectarCaja ? `Se quitarán Bs. ${totalVenta.toFixed(2)} de ${metodosUnicos.join('/')} de caja actual para cuadrar el sistema.` : `Se anulará el ticket, pero NO se registrará egreso en la caja actual.` };
         }
         if (motivo === 'DEVOLUCION_CLIENTE' || motivo === 'PRODUCTO_DEFECTUOSO') {
-            return { color: 'red', msg: `Saldrán Bs. ${totalVenta.toFixed(2)} de caja en ${metodosUnicos.join('/')} (devolución real al cliente).` };
+            return { color: 'red', msg: afectarCaja ? `Saldrán Bs. ${totalVenta.toFixed(2)} de caja en ${metodosUnicos.join('/')} (devolución real al cliente).` : `Se anulará el ticket, pero NO se registrará egreso en la caja actual.` };
         }
-        return { color: 'red', msg: `Se invertirán los movimientos de caja de esta venta.` };
+        return { color: 'red', msg: afectarCaja ? `Se invertirán los movimientos de caja de esta venta.` : `Se anulará la venta sin modificar la caja actual.` };
     };
 
     const impacto = getImpactoText();
@@ -236,6 +237,26 @@ function AnularModal({
                             }`}
                         />
                     </div>
+
+                    {/* Afectar Caja Checkbox */}
+                    {motivo && (
+                        <div className="pt-2">
+                            <label className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={afectarCaja}
+                                    onChange={(e) => setAfectarCaja(e.target.checked)}
+                                    className="mt-1 shrink-0 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                />
+                                <div>
+                                    <p className="text-sm font-bold text-gray-800">Afectar Caja Actual</p>
+                                    <p className="text-[11px] text-gray-500 mt-0.5">
+                                        Desmarca esto si estás corrigiendo un error de un turno pasado y NO quieres que el dinero salga de la caja chica de hoy.
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -244,7 +265,7 @@ function AnularModal({
                         Cancelar
                     </button>
                     <button
-                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined, metodoCorrecto || undefined)}
+                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined, metodoCorrecto || undefined, afectarCaja)}
                         disabled={!canConfirm}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                             canConfirm
@@ -564,7 +585,7 @@ export default function VentasPage() {
                     <AnularModal
                         venta={anularVenta}
                         onClose={() => setAnularVenta(null)}
-                        onConfirm={(motivo, notas, metodoCorrecto) => anularMut.mutate({ id: anularVenta._id, motivo, notas, metodo_pago_correcto: metodoCorrecto })}
+                        onConfirm={(motivo, notas, metodoCorrecto, afectar_caja) => anularMut.mutate({ id: anularVenta._id, motivo, notas, metodo_pago_correcto: metodoCorrecto, afectar_caja })}
                         isPending={anularMut.isPending}
                     />
                 )}

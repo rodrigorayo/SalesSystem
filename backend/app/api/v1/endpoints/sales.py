@@ -33,6 +33,7 @@ class AnularRequest(BaseModel):
     notas: Optional[str] = None  # Obligatorio en frontend si motivo == "OTRO"
     # Solo requerido cuando motivo == "ERROR_COBRO"
     metodo_pago_correcto: Optional[Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA"]] = None
+    afectar_caja: bool = True
 
 
 @router.post("/ventas", response_model=Sale)
@@ -154,6 +155,7 @@ async def anular_sale(
         motivo=body.motivo,
         notas=body.notas,
         metodo_pago_correcto=body.metodo_pago_correcto,
+        afectar_caja=body.afectar_caja
     )
 
 
