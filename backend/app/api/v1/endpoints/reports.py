@@ -887,6 +887,24 @@ async def get_sales_matrix(
     pipeline = [
         {"$match": match_filter},
         {
+            "$lookup": {
+                "from": "sales",
+                "let": {"sid": "$sale_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": [{"$toString": "$_id"}, "$$sid"]
+                            },
+                            "anulada": False
+                        }
+                    }
+                ],
+                "as": "sale_parent"
+            }
+        },
+        {"$match": {"sale_parent": {"$ne": []}}},
+        {
             "$project": {
                 "producto_id": 1,
                 "descripcion": 1,
