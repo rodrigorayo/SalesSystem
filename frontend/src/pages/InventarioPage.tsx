@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
-import { formatFullDate as formatDate } from '../utils/dateUtils';
+import { formatFullDate as formatDate, getBoliviaTodayISO } from '../utils/dateUtils';
 
 
 export default function InventarioPage() {
@@ -24,8 +24,8 @@ export default function InventarioPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [categorySearch, setCategorySearch] = useState('');
     const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const [startDate, setStartDate] = useState(getBoliviaTodayISO());
+    const [endDate, setEndDate] = useState(getBoliviaTodayISO());
     const [kardexProductoId, setKardexProductoId] = useState<string | undefined>(undefined);
     const [kardexProductoNombre, setKardexProductoNombre] = useState<string | null>(null);
 

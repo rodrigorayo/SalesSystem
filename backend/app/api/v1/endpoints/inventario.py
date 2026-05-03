@@ -203,6 +203,7 @@ async def get_movimientos(
     sucursal_id: str = "CENTRAL",
     start_date: Optional[str] = None, # YYYY-MM-DD
     end_date: Optional[str] = None,   # YYYY-MM-DD
+    search: Optional[str] = None,
     limit: int = 500,
     current_user: User = Depends(get_current_active_user)
 ):
@@ -216,7 +217,6 @@ async def get_movimientos(
         query["producto_id"] = producto_id
 
     # Soporte para búsqueda por texto en la descripción del log
-    search: Optional[str] = Query(None)
     if search:
         # Escapar caracteres especiales como ( ) + * para que se busquen literalmente y no rompan el motor de regex
         safe_search = re.escape(search)
