@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
-import { formatFullDate as formatDate, getBoliviaTodayISO } from '../utils/dateUtils';
+import { formatFullDate as formatDate } from '../utils/dateUtils';
 
 
 export default function InventarioPage() {
