@@ -368,8 +368,13 @@ export default function POSPage() {
                                                         document.getElementById('pos-search-input')?.focus();
                                                     } else {
                                                         const nextEl = document.querySelector(`[data-product-idx="${nextIdx}"]`) as HTMLElement;
-                                                        if (nextEl) nextEl.focus();
-                                                        else (document.querySelector(`[data-product-idx="${idx + 1}"]`) as HTMLElement)?.focus() || (document.querySelector(`[data-product-idx="${idx - 1}"]`) as HTMLElement)?.focus();
+                                                        if (nextEl) {
+                                                            nextEl.focus();
+                                                        } else {
+                                                            const altNext = document.querySelector(`[data-product-idx="${idx + 1}"]`) as HTMLElement;
+                                                            if (altNext) altNext.focus();
+                                                            else (document.querySelector(`[data-product-idx="${idx - 1}"]`) as HTMLElement)?.focus();
+                                                        }
                                                     }
                                                 }
                                             }}
