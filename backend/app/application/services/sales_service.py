@@ -331,6 +331,7 @@ class SalesService:
         notas: Optional[str] = None,
         metodo_pago_correcto: Optional[str] = None,
         afectar_caja: bool = True,
+        caja_sesion_id: Optional[str] = None,
     ) -> Sale:
         """
         Anula una venta con lógica inteligente según el motivo:
@@ -411,13 +412,20 @@ class SalesService:
 
                     # ── 2. Ajuste de caja según motivo ───────────────────────────
                     if afectar_caja:
-                        caja_sesion = await CajaSesion.find_one(
-                            CajaSesion.tenant_id   == tenant_id,
-                            CajaSesion.sucursal_id == sucursal_id,
-                            CajaSesion.cajero_id   == str(current_user.id),
-                            CajaSesion.estado      == EstadoSesion.ABIERTA,
-                            session=session
-                        )
+                        if caja_sesion_id:
+                            # Buscar la sesión de caja específica indicada por el administrador
+                            caja_sesion = await CajaSesion.get(caja_sesion_id, session=session)
+                            if caja_sesion and caja_sesion.estado != EstadoSesion.ABIERTA:
+                                caja_sesion = None # No usar si está cerrada
+                        else:
+                            # Comportamiento normal: buscar la caja del usuario actual
+                            caja_sesion = await CajaSesion.find_one(
+                                CajaSesion.tenant_id   == tenant_id,
+                                CajaSesion.sucursal_id == sucursal_id,
+                                CajaSesion.cajero_id   == str(current_user.id),
+                                CajaSesion.estado      == EstadoSesion.ABIERTA,
+                                session=session
+                            )
 
                         if not caja_sesion:
                             if len(sale.pagos) > 0 and sum(p.monto for p in sale.pagos) > 0:

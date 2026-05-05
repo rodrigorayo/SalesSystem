@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSales, anularSale, getSucursales, toggleFacturaEmitida, checkPosibleDuplicado, type MotivoAnulacion } from '../api/api';
+import { getSales, anularSale, getSucursales, toggleFacturaEmitida, checkPosibleDuplicado, getSesionesAbiertas, type MotivoAnulacion } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import {
     Receipt, Loader2, ChevronRight, ChevronDown,
@@ -40,15 +40,23 @@ function AnularModal({
 }: {
     venta: Sale;
     onClose: () => void;
-    onConfirm: (motivo: MotivoAnulacion, notas?: string, metodoCorrecto?: string, afectar_caja?: boolean) => void;
+    onConfirm: (motivo: MotivoAnulacion, notas?: string, metodoCorrecto?: string, afectar_caja?: boolean, caja_sesion_id?: string) => void;
     isPending: boolean;
 }) {
     const [motivo, setMotivo] = useState<MotivoAnulacion | ''>('');
     const [notas, setNotas] = useState('');
     const [metodoCorrecto, setMetodoCorrecto] = useState<MetodoPago | ''>('');
     const [afectarCaja, setAfectarCaja] = useState(true);
+    const [cajaSeleccionada, setCajaSeleccionada] = useState<string>('');
     const [dupData, setDupData] = useState<Awaited<ReturnType<typeof checkPosibleDuplicado>> | null>(null);
     const [checkingDup, setCheckingDup] = useState(false);
+    
+    const user = useAuthStore(s => s.user);
+
+    const { data: sesionesAbiertas = [], isLoading: loadingSesiones } = useQuery({
+        queryKey: ['sesionesAbiertas'],
+        queryFn: getSesionesAbiertas,
+    });
 
     useState(() => {
         setCheckingDup(true);
@@ -63,7 +71,8 @@ function AnularModal({
     const requiereNotas = motivo === 'OTRO';
     const notasOk = !requiereNotas || notas.trim().length >= 10;
     const metodoOk = !requiereMetodo || metodoCorrecto !== '';
-    const canConfirm = motivo !== '' && notasOk && metodoOk && !isPending;
+    const cajaOk = !afectarCaja || sesionesAbiertas.length === 0 || cajaSeleccionada !== '';
+    const canConfirm = motivo !== '' && notasOk && metodoOk && cajaOk && !isPending;
 
     // Calcular método actual de la venta
     const metodosActuales = (venta.pagos || []).map(p => p.metodo);
@@ -261,6 +270,41 @@ function AnularModal({
                             </label>
                         </div>
                     )}
+
+                    {/* Selector de Caja Abierta */}
+                    {motivo && afectarCaja && sesionesAbiertas.length > 0 && (
+                        <div className="pt-1">
+                            <label className="block text-[10px] font-black uppercase tracking-wider mb-1.5 text-indigo-700">
+                                ¿De qué caja se hará el ajuste? <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={cajaSeleccionada}
+                                onChange={(e) => setCajaSeleccionada(e.target.value)}
+                                className={`w-full text-sm rounded-xl border p-3 outline-none focus:ring-2 transition-all ${
+                                    cajaSeleccionada === '' ? 'border-amber-300 bg-amber-50 focus:ring-amber-200' : 'border-indigo-200 bg-indigo-50 focus:ring-indigo-200'
+                                }`}
+                            >
+                                <option value="" disabled>-- Selecciona la caja abierta --</option>
+                                {sesionesAbiertas.map((sesion: any) => (
+                                    <option key={sesion._id} value={sesion._id}>
+                                        {sesion.cajero_name} (Abierta {formatDate(sesion.abierta_at)})
+                                    </option>
+                                ))}
+                            </select>
+                            {cajaSeleccionada === '' && <p className="text-[10px] text-amber-600 mt-1">Selecciona la caja para poder continuar.</p>}
+                        </div>
+                    )}
+                    
+                    {motivo && afectarCaja && !loadingSesiones && sesionesAbiertas.length === 0 && (
+                        <div className="pt-1">
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                                <p className="text-xs font-bold text-red-800">⚠️ No hay cajas abiertas</p>
+                                <p className="text-[11px] text-red-600 mt-0.5">
+                                    No puedes afectar caja porque nadie tiene una sesión abierta en esta sucursal. Desmarca "Afectar Caja" o abre una caja primero.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -269,8 +313,8 @@ function AnularModal({
                         Cancelar
                     </button>
                     <button
-                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined, metodoCorrecto || undefined, afectarCaja)}
-                        disabled={!canConfirm}
+                        onClick={() => canConfirm && onConfirm(motivo as MotivoAnulacion, notas || undefined, metodoCorrecto || undefined, afectarCaja, cajaSeleccionada || undefined)}
+                        disabled={!canConfirm || (afectarCaja && sesionesAbiertas.length === 0)}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                             canConfirm
                                 ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 active:scale-95'
@@ -589,7 +633,7 @@ export default function VentasPage() {
                     <AnularModal
                         venta={anularVenta}
                         onClose={() => setAnularVenta(null)}
-                        onConfirm={(motivo, notas, metodoCorrecto, afectar_caja) => anularMut.mutate({ id: anularVenta._id, motivo, notas, metodo_pago_correcto: metodoCorrecto, afectar_caja })}
+                        onConfirm={(motivo, notas, metodoCorrecto, afectar_caja, caja_sesion_id) => anularMut.mutate({ id: anularVenta._id, motivo, notas, metodo_pago_correcto: metodoCorrecto, afectar_caja, caja_sesion_id })}
                         isPending={anularMut.isPending}
                     />
                 )}

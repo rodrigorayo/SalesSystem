@@ -110,6 +110,20 @@ async def abrir_caja(request: Request, body: AbrirCajaIn, current_user: User = D
     return await CajaService.abrir_caja(body, current_user, ip, ua)
 
 
+@router.get("/sesiones/abiertas")
+async def get_sesiones_abiertas(current_user: User = Depends(get_current_active_user)):
+    """Retorna todas las sesiones de caja actualmente ABIERTAS en la sucursal."""
+    tenant_id   = current_user.tenant_id or "default"
+    sucursal_id = current_user.sucursal_id or "CENTRAL"
+    
+    sesiones = await CajaSesion.find(
+        CajaSesion.tenant_id   == tenant_id,
+        CajaSesion.sucursal_id == sucursal_id,
+        CajaSesion.estado      == EstadoSesion.ABIERTA,
+    ).to_list()
+    
+    return sesiones
+
 @router.get("/sesion/activa")
 async def get_sesion_activa(current_user: User = Depends(get_current_active_user)):
     tenant_id   = current_user.tenant_id or "default"
