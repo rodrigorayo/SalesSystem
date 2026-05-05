@@ -369,7 +369,7 @@ export default function POSPage() {
                                                     } else {
                                                         const nextEl = document.querySelector(`[data-product-idx="${nextIdx}"]`) as HTMLElement;
                                                         if (nextEl) nextEl.focus();
-                                                        else document.querySelector(`[data-product-idx="${idx + 1}"]`)?.focus() || document.querySelector(`[data-product-idx="${idx - 1}"]`)?.focus();
+                                                        else (document.querySelector(`[data-product-idx="${idx + 1}"]`) as HTMLElement)?.focus() || (document.querySelector(`[data-product-idx="${idx - 1}"]`) as HTMLElement)?.focus();
                                                     }
                                                 }
                                             }}
