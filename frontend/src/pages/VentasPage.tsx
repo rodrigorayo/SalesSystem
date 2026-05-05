@@ -277,7 +277,7 @@ function AnularModal({
                             <select
                                 value={cajaSeleccionada}
                                 onChange={(e) => setCajaSeleccionada(e.target.value)}
-                                className={`w-full text-sm rounded-xl border p-3 outline-none focus:ring-2 transition-all ${
+                                className={`w-full text-sm rounded-xl border p-3 outline-none focus:ring-2 transition-all text-gray-900 ${
                                     cajaSeleccionada === '' ? 'border-amber-300 bg-amber-50 focus:ring-amber-200' : 'border-indigo-200 bg-indigo-50 focus:ring-indigo-200'
                                 }`}
                             >
