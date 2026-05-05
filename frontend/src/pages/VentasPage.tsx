@@ -51,7 +51,7 @@ function AnularModal({
     const [dupData, setDupData] = useState<Awaited<ReturnType<typeof checkPosibleDuplicado>> | null>(null);
     const [checkingDup, setCheckingDup] = useState(false);
     
-    const user = useAuthStore(s => s.user);
+
 
     const { data: sesionesAbiertas = [], isLoading: loadingSesiones } = useQuery({
         queryKey: ['sesionesAbiertas'],
