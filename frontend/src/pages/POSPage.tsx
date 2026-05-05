@@ -97,7 +97,37 @@ export default function POSPage() {
         let lastTimestamp = 0;
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignorar si el usuario está tipeando en un input o textarea (ej. buscador)
+            // Hotkeys Globales
+            if (e.key === 'F1') {
+                e.preventDefault();
+                document.getElementById('pos-search-input')?.focus();
+                return;
+            }
+            if (e.key === 'F2') {
+                e.preventDefault();
+                document.getElementById('pos-payment-input')?.focus();
+                return;
+            }
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (canFinalize()) {
+                    // Validaciones de Cliente
+                    if (cliente.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliente.email)) {
+                        toast.error('El formato del correo electrónico es inválido');
+                        return;
+                    }
+                    if (cliente.razon_social && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(cliente.razon_social)) {
+                        toast.error('El nombre/razón social solo puede contener letras y espacios');
+                        return;
+                    }
+                    setConfirmSale(true);
+                } else {
+                    toast.error('No se puede finalizar. Verifica los pagos o agrega productos.');
+                }
+                return;
+            }
+
+            // Ignorar escáner si el usuario está tipeando en un input o textarea (ej. buscador)
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                 return;
             }
@@ -271,10 +301,18 @@ export default function POSPage() {
                     <div className="flex-1 relative">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
+                            id="pos-search-input"
                             type="text" value={search} onChange={e => setSearch(e.target.value)}
-                            placeholder="Buscar nombre, código corto o código de barras…"
+                            placeholder="Buscar nombre (F1)…"
                             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
                             autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    const first = document.querySelector('[data-product-idx="0"]') as HTMLElement;
+                                    if (first) first.focus();
+                                }
+                            }}
                         />
                     </div>
                     <div className="flex items-center gap-1.5 text-sm bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-xl shrink-0">
@@ -310,14 +348,33 @@ export default function POSPage() {
                     ) : (
                         <div className="flex flex-col h-full">
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-4">
-                                {paginatedFiltered.map(p => {
+                                {paginatedFiltered.map((p, idx) => {
                                     const stock = stockMap[p._id] ?? 0;
-                                const inCart = items.find(i => i.product._id === p._id)?.quantity ?? 0;
-                                const noStock = stock <= 0;
-                                return (
-                                    <button key={p._id} onClick={() => !noStock && addItem(p)} disabled={noStock}
-                                        className={`group relative bg-white rounded-2xl border p-3 text-left shadow-sm flex flex-col transition-all duration-200
-                                            ${noStock ? 'opacity-40 cursor-not-allowed border-gray-100' : 'hover:shadow-md hover:-translate-y-0.5 hover:border-indigo-300 border-gray-200 cursor-pointer active:scale-[0.97]'}`}>
+                                    const inCart = items.find(i => i.product._id === p._id)?.quantity ?? 0;
+                                    const noStock = stock <= 0;
+                                    return (
+                                        <button key={p._id} onClick={() => !noStock && addItem(p)} disabled={noStock}
+                                            data-product-idx={idx}
+                                            onKeyDown={(e) => {
+                                                if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
+                                                    e.preventDefault();
+                                                    let nextIdx = idx;
+                                                    if (e.key === 'ArrowRight') nextIdx = idx + 1;
+                                                    else if (e.key === 'ArrowLeft') nextIdx = idx - 1;
+                                                    else if (e.key === 'ArrowDown') nextIdx = idx + 2; // Assuming ~2-3 cols min
+                                                    else if (e.key === 'ArrowUp') nextIdx = idx - 2;
+                                                    
+                                                    if (nextIdx < 0) {
+                                                        document.getElementById('pos-search-input')?.focus();
+                                                    } else {
+                                                        const nextEl = document.querySelector(`[data-product-idx="${nextIdx}"]`) as HTMLElement;
+                                                        if (nextEl) nextEl.focus();
+                                                        else document.querySelector(`[data-product-idx="${idx + 1}"]`)?.focus() || document.querySelector(`[data-product-idx="${idx - 1}"]`)?.focus();
+                                                    }
+                                                }
+                                            }}
+                                            className={`group relative bg-white rounded-2xl border p-3 text-left shadow-sm flex flex-col transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                                                ${noStock ? 'opacity-40 cursor-not-allowed border-gray-100' : 'hover:shadow-md hover:-translate-y-0.5 hover:border-indigo-300 border-gray-200 cursor-pointer active:scale-[0.97]'}`}>
                                         <div className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full self-start mb-1.5 truncate max-w-full">
                                             {p.categoria_nombre ?? '–'}
                                         </div>
@@ -634,13 +691,13 @@ export default function POSPage() {
                                 <div className="flex gap-1.5 mb-1.5">
                                     <div className="relative flex-1">
                                         <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <input type="number" step="0.10" min="0.10"
+                                        <input id="pos-payment-input" type="number" step="0.10" min="0.10"
                                             value={pendingPago.monto}
                                             onChange={e => setPendingPago({ monto: e.target.value })}
                                             onKeyDown={e => e.key === 'Enter' && addPago()}
                                             disabled={ticketCovered}
                                             className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 font-mono focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none disabled:opacity-40 disabled:bg-gray-50 transition-colors"
-                                            placeholder="0.00" />
+                                            placeholder="0.00 (F2)" />
                                     </div>
                                     <button onClick={addPago}
                                         disabled={!pendingPago.monto || parseFloat(pendingPago.monto) <= 0 || ticketCovered || !items.length || (pendingPago.metodo === 'CREDITO' && (!cliente.razon_social || !cliente.telefono))}
@@ -787,13 +844,10 @@ export default function POSPage() {
                         {/* Finalize */}
                         <button onClick={handleTryFinalize}
                             disabled={!canFinalize() || saleMut.isPending || !!lastSale}
-                            className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all
-                            ${canFinalize() && !lastSale
-                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 active:scale-[0.97]'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                            className={`w-full py-3.5 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all group ${canFinalize() && !lastSale ? 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95 cursor-pointer' : 'bg-gray-300 shadow-none cursor-not-allowed'}`}>
                             {saleMut.isPending
                                 ? <Loader2 size={18} className="animate-spin" />
-                                : <><CheckCircle2 size={18} /> Finalizar Venta</>}
+                                : canFinalize() ? <><CheckCircle2 className="group-hover:scale-110 transition-transform" /> Cobrar e Imprimir (F4)</> : <><Lock size={18} /> Faltan pagos</>}
                         </button>
                     </div>
                 </div>

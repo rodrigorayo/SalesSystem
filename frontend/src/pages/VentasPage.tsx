@@ -83,22 +83,21 @@ function AnularModal({
     const getImpactoText = () => {
         if (!motivo) return null;
         if (motivo === 'ERROR_COBRO') {
-            if (!metodoCorrecto) return { color: 'amber', msg: 'Selecciona el método real para ver el impacto en caja.' };
-            const metodosLabel = metodosUnicos.join('/');
+            if (!metodoCorrecto) return { color: 'amber', msg: 'Selecciona el método correcto.' };
             return {
                 color: 'sky',
                 msg: afectarCaja 
-                    ? `(REQUIERE CAJA ABIERTA) Se revertirá el ingreso de ${metodosLabel} y se registrará como ${metodoCorrecto}. La caja física quedará cuadrada. El administrador verá este cambio en el reporte de caja.`
-                    : `Se corregirá el método de pago en los reportes de ventas, pero NO se registrará el cambio en la caja chica de hoy.`
+                    ? `Se cambiará el registro de ${metodosUnicos.join('/')} a ${metodoCorrecto} en la caja actual.`
+                    : `Se corregirá el método en el sistema sin afectar la caja actual.`
             };
         }
         if (motivo === 'VENTA_DUPLICADA') {
-            return { color: 'amber', msg: afectarCaja ? `(REQUIERE CAJA ABIERTA) Se quitarán Bs. ${totalVenta.toFixed(2)} de la caja actual del sistema para contrarrestar el doble ingreso falso. Tu caja física no sufrirá cambios.` : `Se anulará el ticket, pero NO se restará dinero de la caja actual (ideal si la venta es de un turno pasado cerrado).` };
+            return { color: 'amber', msg: afectarCaja ? `Se restarán Bs. ${totalVenta.toFixed(2)} de la caja actual para cuadrar el sistema.` : `No se restará dinero de la caja actual.` };
         }
         if (motivo === 'DEVOLUCION_CLIENTE' || motivo === 'PRODUCTO_DEFECTUOSO') {
-            return { color: 'red', msg: afectarCaja ? `(REQUIERE CAJA ABIERTA) El sistema registrará que sacaste Bs. ${totalVenta.toFixed(2)} físicos de tu caja para devolvérselos al cliente.` : `Se anulará la venta y se devolverá el stock, pero NO registrará que salió dinero de la caja chica de hoy.` };
+            return { color: 'red', msg: afectarCaja ? `Se registrará una salida física de Bs. ${totalVenta.toFixed(2)} de la caja.` : `No se registrará salida de dinero de la caja actual.` };
         }
-        return { color: 'red', msg: afectarCaja ? `(REQUIERE CAJA ABIERTA) Se invertirán los movimientos de caja de esta venta, afectando tu total esperado hoy.` : `Se anulará la venta sin modificar los totales de tu caja actual.` };
+        return { color: 'red', msg: afectarCaja ? `Se revertirán los movimientos en la caja actual.` : `No se modificará la caja actual.` };
     };
 
     const impacto = getImpactoText();
@@ -260,11 +259,9 @@ function AnularModal({
                                     className="mt-1 shrink-0 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                                 />
                                 <div>
-                                    <p className="text-sm font-bold text-gray-800">Registrar ajuste en mi Caja Chica actual</p>
+                                    <p className="text-sm font-bold text-gray-800">Afectar Caja</p>
                                     <p className="text-[11px] text-gray-500 mt-0.5">
-                                        {afectarCaja 
-                                            ? "✔️ El sistema registrará este movimiento en tu caja ABIERTA de hoy, afectando el monto que debes entregar al cerrar turno."
-                                            : "❌ Desmarcado. Solo se devolverá el producto al stock. La caja actual no sufrirá cambios en sus totales."}
+                                        {afectarCaja ? "Se registrará el movimiento en caja." : "Solo se devolverá el producto al stock."}
                                     </p>
                                 </div>
                             </label>
@@ -300,7 +297,7 @@ function AnularModal({
                             <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
                                 <p className="text-xs font-bold text-red-800">⚠️ No hay cajas abiertas</p>
                                 <p className="text-[11px] text-red-600 mt-0.5">
-                                    No puedes afectar caja porque nadie tiene una sesión abierta en esta sucursal. Desmarca "Afectar Caja" o abre una caja primero.
+                                    Abre una caja primero o desmarca "Afectar Caja".
                                 </p>
                             </div>
                         </div>
