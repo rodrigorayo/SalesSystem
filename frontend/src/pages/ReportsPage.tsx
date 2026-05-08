@@ -4,7 +4,7 @@ import { getGeneralReports } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     BarChart3, Loader2, DollarSign, Package, TrendingUp, Calendar, 
-    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText, Clock, Users
+    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText, Clock, Users, Scale
 } from 'lucide-react';
 import DailyReportView from '../components/DailyReportView';
 import FinancialDetailView from '../components/FinancialDetailView';
@@ -12,6 +12,7 @@ import ValuedInventoryView from '../components/ValuedInventoryView';
 import HourlySalesView from '../components/HourlySalesView';
 import StaffPerformanceView from '../components/StaffPerformanceView';
 import SalesMatrixView from '../components/SalesMatrixView';
+import InventoryReconciliationView from '../components/InventoryReconciliationView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, BarChart, Bar, Legend
@@ -25,7 +26,7 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado' | 'matrix';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado' | 'matrix' | 'conciliacion';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
@@ -94,6 +95,7 @@ export default function ReportsPage() {
                     { id: 'general', label: 'Visión General', icon: <TrendingUp size={16} />, hidden: !esMatriz },
                     { id: 'sucursales', label: 'Rendimiento Sucursales', icon: <Store size={16} />, hidden: !esMatriz },
                     { id: 'finanzas', label: 'Finanzas y Márgenes', icon: <DollarSign size={16} />, hidden: !esMatriz },
+                    { id: 'conciliacion', label: 'Auditoría', icon: <Scale size={16} />, hidden: !esMatriz },
                     { id: 'daily', label: 'Reporte de Jornada', icon: <FileText size={16} /> },
                     { id: 'hourly', label: 'Ventas por Hora', icon: <Clock size={16} /> },
                     { id: 'staff', label: 'Desempeño Staff', icon: <Users size={16} /> },
@@ -127,6 +129,8 @@ export default function ReportsPage() {
                 <StaffPerformanceView />
             ) : activeTab === 'matrix' ? (
                 <SalesMatrixView />
+            ) : activeTab === 'conciliacion' ? (
+                <InventoryReconciliationView />
             ) : (
                 <>
                     {isLoading ? (

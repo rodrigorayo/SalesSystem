@@ -1090,3 +1090,110 @@ async def get_sales_matrix(
     return {
         "products": list(products.values())
     }
+
+@router.get("/conciliacion-inventario")
+async def get_inventory_reconciliation(
+    start_date: str,
+    end_date: str,
+    sucursal_id: str = "all",
+    current_user: User = Depends(get_current_active_user)
+) -> Dict[str, Any]:
+    from app.domain.models.inventario import InventoryLog
+    from app.domain.models.sale import Sale
+    
+    tenant_id = current_user.tenant_id or ""
+    start_dt, end_dt = get_range_bolivia(start_date, end_date)
+    
+    inv_query = {
+        "tenant_id": tenant_id,
+        "created_at": {"$gte": start_dt, "$lte": end_dt}
+    }
+    if sucursal_id != "all":
+        inv_query["sucursal_id"] = sucursal_id
+        
+    logs_pipeline = [
+        {"$match": inv_query},
+        {
+            "$group": {
+                "_id": "$tipo_movimiento",
+                "cantidad": {"$sum": "$cantidad_movida"},
+                "valor_costo": {"$sum": {"$multiply": ["$cantidad_movida", {"$toDouble": "$costo_unitario_momento"}]}}
+            }
+        }
+    ]
+    cursor_logs = InventoryLog.get_pymongo_collection().aggregate(logs_pipeline)
+    raw_logs = await cursor_logs.to_list(length=None)
+    
+    ingresos_costo = Decimal("0.0")
+    salidas_mermas_costo = Decimal("0.0")
+    costo_ventas_kardex = Decimal("0.0")
+    
+    for r in raw_logs:
+        tipo = r["_id"]
+        valor = Decimal(str(r["valor_costo"]))
+        if valor > 0: 
+            ingresos_costo += valor
+        else: 
+            if tipo == "VENTA":
+                costo_ventas_kardex += abs(valor)
+            else:
+                salidas_mermas_costo += abs(valor)
+                
+    sale_query = {
+        "tenant_id": tenant_id,
+        "anulada": False,
+        "created_at": {"$gte": start_dt, "$lte": end_dt}
+    }
+    if sucursal_id != "all":
+        sale_query["sucursal_id"] = sucursal_id
+        
+    sales_pipeline = [
+        {"$match": sale_query},
+        {
+            "$group": {
+                "_id": None,
+                "total_ventas": {"$sum": {"$toDouble": "$total"}}
+            }
+        }
+    ]
+    cursor_sales = Sale.get_pymongo_collection().aggregate(sales_pipeline)
+    raw_sales = await cursor_sales.to_list(length=1)
+    
+    ventas_netas = Decimal(str(raw_sales[0]["total_ventas"])) if raw_sales else Decimal("0.0")
+    ganancia_bruta = ventas_netas - costo_ventas_kardex
+    
+    inv_final_query = {"tenant_id": tenant_id}
+    if sucursal_id != "all":
+        inv_final_query["sucursal_id"] = sucursal_id
+    
+    inv_final_pipeline = [
+        {"$match": inv_final_query},
+        {
+            "$lookup": {
+                "from": "products",
+                "localField": "producto_id",
+                "foreignField": "_id",
+                "as": "product"
+            }
+        },
+        {"$unwind": {"path": "$product", "preserveNullAndEmptyArrays": True}},
+        {
+            "$group": {
+                "_id": None,
+                "inventario_final_costo": {"$sum": {"$multiply": ["$cantidad", {"$toDouble": {"$ifNull": ["$product.costo_unitario", "0"]}}]}}
+            }
+        }
+    ]
+    cursor_inv = Inventario.get_pymongo_collection().aggregate(inv_final_pipeline)
+    raw_inv = await cursor_inv.to_list(length=1)
+    inventario_final_costo = Decimal(str(raw_inv[0]["inventario_final_costo"])) if raw_inv else Decimal("0.0")
+    
+    return {
+        "ingresos_inventario_costo": float(ingresos_costo),
+        "salidas_mermas_costo": float(salidas_mermas_costo),
+        "costo_ventas": float(costo_ventas_kardex),
+        "ventas_netas": float(ventas_netas),
+        "ganancia_bruta": float(ganancia_bruta),
+        "inventario_final_costo": float(inventario_final_costo)
+    }
+
