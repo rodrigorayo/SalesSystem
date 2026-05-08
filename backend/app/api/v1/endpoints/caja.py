@@ -56,8 +56,8 @@ async def get_sesiones(current_user: User = Depends(get_current_active_user)):
         movs = await CajaMovimiento.find(CajaMovimiento.sesion_id == str(s.id)).to_list()
         ef   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
         ef_ing = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
-        cc   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.CAMBIO)
-        gs   = sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.GASTO)
+        cc   = sum((float(m.monto) if m.tipo == "EGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.CAMBIO)
+        gs   = sum((float(m.monto) if m.tipo == "EGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.GASTO)
         aj   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movs if m.subtipo == SubtipoMovimiento.AJUSTE)
         saldo = float(s.monto_inicial) + ef + ef_ing - cc - gs + aj
 
@@ -156,8 +156,8 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
 
     total_ventas_ef = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.VENTA_EFECTIVO)
     total_ingresos_ef = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_EFECTIVO)
-    total_cambio    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.CAMBIO)
-    total_gastos    = sum(float(m.monto) for m in movimientos if m.subtipo == SubtipoMovimiento.GASTO)
+    total_cambio    = sum((float(m.monto) if m.tipo == "EGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.CAMBIO)
+    total_gastos    = sum((float(m.monto) if m.tipo == "EGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.GASTO)
     total_ajustes   = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.AJUSTE)
     
     total_ingresos_qr = sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
