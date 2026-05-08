@@ -204,7 +204,8 @@ async def get_movimientos(
     start_date: Optional[str] = None, # YYYY-MM-DD
     end_date: Optional[str] = None,   # YYYY-MM-DD
     search: Optional[str] = None,
-    limit: int = 500,
+    tipo_movimiento: Optional[str] = None,
+    limit: int = 1000,
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -215,6 +216,9 @@ async def get_movimientos(
     query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id}
     if producto_id:
         query["producto_id"] = producto_id
+        
+    if tipo_movimiento:
+        query["tipo_movimiento"] = tipo_movimiento
 
     # Soporte para búsqueda por texto en la descripción del log
     if search:
@@ -250,6 +254,77 @@ async def get_movimientos(
         result.append(data)
         
     return result
+
+
+@router.get("/inventario/movimientos/exportar")
+async def exportar_movimientos(
+    producto_id: str = None,
+    sucursal_id: str = "CENTRAL",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
+    tipo_movimiento: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Exports the movement history (Kárdex) to Excel.
+    """
+    tenant_id = current_user.tenant_id or ""
+    
+    query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id}
+    if producto_id: query["producto_id"] = producto_id
+    if tipo_movimiento: query["tipo_movimiento"] = tipo_movimiento
+    if search:
+        safe_search = re.escape(search)
+        query["descripcion"] = {"$regex": safe_search, "$options": "i"}
+        
+    try:
+        date_filter = {}
+        if start_date:
+            start_dt, _ = get_day_range_bolivia(start_date)
+            date_filter["$gte"] = start_dt
+        if end_date:
+            _, end_dt = get_day_range_bolivia(end_date)
+            date_filter["$lte"] = end_dt
+        if date_filter: query["created_at"] = date_filter
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido")
+            
+    from app.domain.models.inventario import InventoryLog
+    from app.utils.date_utils import BOLIVIA_TZ
+    from datetime import datetime
+    
+    movimientos = await InventoryLog.find(query).sort("-created_at").limit(5000).to_list()
+    
+    rows = []
+    for mov in movimientos:
+        rows.append({
+            "FECHA": mov.created_at.astimezone(BOLIVIA_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+            "PRODUCTO": mov.descripcion or "Producto Sin Nombre",
+            "TIPO MOVIMIENTO": mov.tipo_movimiento.replace('_', ' '),
+            "CANTIDAD": float(mov.cantidad_movida),
+            "STOCK RESULTANTE": float(mov.stock_resultante),
+            "COSTO UNIT.": float(mov.costo_unitario_momento or 0),
+            "PRECIO VENTA UNIT.": float(mov.precio_venta_momento or 0),
+            "USUARIO": mov.usuario_nombre,
+            "NOTAS": mov.notas or ""
+        })
+        
+    df = pd.DataFrame(rows)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Kardex', index=False)
+        
+    output.seek(0)
+    
+    fecha_str = datetime.now(BOLIVIA_TZ).strftime("%Y-%m-%d")
+    filename = f"Kardex_{sucursal_id}_{fecha_str}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @router.get("/inventario/exportar-plantilla")

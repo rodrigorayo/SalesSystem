@@ -283,13 +283,41 @@ export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: 
 };
 export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>
     client(`/inventario/ajuste?sucursal_id=${sucursal_id}`, { method: 'POST', body: data });
-export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string) => {
+export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
     const params = new URLSearchParams({ sucursal_id });
     if (producto_id) params.set('producto_id', producto_id);
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);
     if (search) params.set('search', search);
+    if (tipo_movimiento) params.set('tipo_movimiento', tipo_movimiento);
     return client<InventoryLog[]>(`/inventario/movimientos?${params.toString()}`);
+};
+
+export const exportMovimientosInventario = async (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+        
+    const params = new URLSearchParams({ sucursal_id });
+    if (producto_id) params.set('producto_id', producto_id);
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    if (search) params.set('search', search);
+    if (tipo_movimiento) params.set('tipo_movimiento', tipo_movimiento);
+    
+    const response = await fetch(`${CACHE_URL}/inventario/movimientos/exportar?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Error al exportar Kardex');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Kardex_${sucursal_id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 };
 
 export const exportInventoryTemplate = async (sucursal_id: string) => {

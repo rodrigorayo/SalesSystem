@@ -2,13 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories } from '../api/api';
+import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
-import { formatFullDate as formatDate, getBoliviaTodayISO } from '../utils/dateUtils';
+import { formatFullDate as formatDate } from '../utils/dateUtils';
 
 
 export default function InventarioPage() {
@@ -24,8 +24,9 @@ export default function InventarioPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [categorySearch, setCategorySearch] = useState('');
     const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
-    const [startDate, setStartDate] = useState(getBoliviaTodayISO());
-    const [endDate, setEndDate] = useState(getBoliviaTodayISO());
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [tipoMovimiento, setTipoMovimiento] = useState('');
     const [kardexProductoId, setKardexProductoId] = useState<string | undefined>(undefined);
     const [kardexProductoNombre, setKardexProductoNombre] = useState<string | null>(null);
 
@@ -70,8 +71,8 @@ export default function InventarioPage() {
     const totalItemsStock = invData?.total || 0;
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
-        queryKey: ['movimientos', selectedSucursal, startDate, endDate, debouncedSearch, kardexProductoId],
-        queryFn: () => getMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined)),
+        queryKey: ['movimientos', selectedSucursal, startDate, endDate, debouncedSearch, kardexProductoId, tipoMovimiento],
+        queryFn: () => getMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined),
         enabled: tab === 'kardex',
     });
 
@@ -177,15 +178,30 @@ export default function InventarioPage() {
                                     className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
                                     title="Fecha Fin"
                                 />
-                                {(startDate || endDate || kardexProductoId) && (
+                                {(startDate || endDate || kardexProductoId || tipoMovimiento) && (
                                     <button 
-                                        onClick={() => { setStartDate(''); setEndDate(''); setKardexProductoId(undefined); setKardexProductoNombre(null); setSearchTerm(''); }}
+                                        onClick={() => { setStartDate(''); setEndDate(''); setKardexProductoId(undefined); setKardexProductoNombre(null); setSearchTerm(''); setTipoMovimiento(''); }}
                                         className="ml-1 p-1 text-red-500 hover:bg-red-50 rounded-md"
                                         title="Limpiar Filtros"
                                     >
                                         <X size={14} />
                                     </button>
                                 )}
+                            </div>
+                        )}
+                        {tab === 'kardex' && (
+                            <div className="w-36">
+                                <select
+                                    value={tipoMovimiento}
+                                    onChange={e => setTipoMovimiento(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-xl px-2 py-2.5 outline-none transition-all text-[11px] font-bold text-gray-700 shadow-inner"
+                                >
+                                    <option value="">Todos los Movimientos</option>
+                                    <option value="VENTA">Solo Ventas</option>
+                                    <option value="ENTRADA_MANUAL">Entradas</option>
+                                    <option value="SALIDA_MANUAL">Salidas / Mermas</option>
+                                    <option value="TRASLADO">Traslados</option>
+                                </select>
                             </div>
                         )}
                     </div>
@@ -231,6 +247,15 @@ export default function InventarioPage() {
                             >
                                 <FileSpreadsheet size={16} />
                                 Importar Excel
+                            </button>
+                        )}
+                        {tab === 'kardex' && (
+                            <button 
+                                onClick={() => exportMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined)}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap"
+                            >
+                                <Download size={16} />
+                                Exportar
                             </button>
                         )}
                     </div>
