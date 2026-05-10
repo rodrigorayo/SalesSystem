@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { client, getSucursales } from '../api/api';
 import { 
@@ -26,9 +26,15 @@ export default function InventoryReconciliationView() {
         return d.toISOString().split('T')[0];
     })();
     
-    const [startDate, setStartDate] = useState(sevenDaysAgo);
-    const [endDate, setEndDate] = useState(today);
-    const [selectedSucursal, setSelectedSucursal] = useState('all');
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    const startDate = searchParams.get('rec_start') || sevenDaysAgo;
+    const endDate = searchParams.get('rec_end') || today;
+    const selectedSucursal = searchParams.get('rec_sucursal') || 'all';
+
+    const setStartDate = (val: string) => { const p = new URLSearchParams(searchParams); p.set('rec_start', val); setSearchParams(p); };
+    const setEndDate = (val: string) => { const p = new URLSearchParams(searchParams); p.set('rec_end', val); setSearchParams(p); };
+    const setSelectedSucursal = (val: string) => { const p = new URLSearchParams(searchParams); p.set('rec_sucursal', val); setSearchParams(p); };
 
     const { data: sucursales } = useQuery({
         queryKey: ['sucursales'],

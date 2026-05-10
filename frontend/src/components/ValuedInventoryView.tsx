@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getValuedInventory, exportValuedInventory } from '../api/api';
@@ -8,7 +9,15 @@ const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { m
 
 export default function ValuedInventoryView() {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
-    const [selectedDate, setSelectedDate] = useState<string>('');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const selectedDate = searchParams.get('valued_date') || '';
+    
+    const setSelectedDate = (date: string) => {
+        const newParams = new URLSearchParams(searchParams);
+        if (date) newParams.set('valued_date', date);
+        else newParams.delete('valued_date');
+        setSearchParams(newParams);
+    };
 
     const { data: valuatedData, isLoading, isError } = useQuery({
         queryKey: ['valued-inventory', selectedDate],

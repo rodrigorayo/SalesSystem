@@ -75,6 +75,7 @@ class InventoryLog(Document):
             "tipo_movimiento",
             "usuario_id",
             "created_at",
+            [("tenant_id", 1), ("created_at", -1)],
             [("tenant_id", 1), ("sucursal_id", 1), ("created_at", -1)],
             [("tenant_id", 1), ("producto_id", 1), ("created_at", -1)],
         ]

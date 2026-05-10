@@ -31,6 +31,7 @@ class SaleItem(Document):
             "sucursal_id",
             "producto_id",
             "sale_date",
+            [("tenant_id", 1), ("sale_date", -1)],
             [("tenant_id", 1), ("producto_id", 1), ("sale_date", -1)],
             [("tenant_id", 1), ("sucursal_id", 1), ("sale_date", -1)],
         ]

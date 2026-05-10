@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getGeneralReports } from '../api/api';
 import { useAuthStore } from '../store/authStore';
@@ -30,11 +30,15 @@ type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_venta
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
-    const [days, setDays] = useState(30);
-    const [activeTab, setActiveTab] = useState<TabType>(
-        role === 'ADMIN_SUCURSAL' ? 'daily' : 'general'
-    );
-    const [selectedSucursal, setSelectedSucursal] = useState<string>('all');
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    const days = parseInt(searchParams.get('days') || '30', 10);
+    const activeTab = (searchParams.get('tab') as TabType) || (role === 'ADMIN_SUCURSAL' ? 'daily' : 'general');
+    const selectedSucursal = searchParams.get('sucursal') || 'all';
+
+    const setDays = (val: number) => { const p = new URLSearchParams(searchParams); p.set('days', val.toString()); setSearchParams(p); };
+    const setActiveTab = (val: TabType) => { const p = new URLSearchParams(searchParams); p.set('tab', val); setSearchParams(p); };
+    const setSelectedSucursal = (val: string) => { const p = new URLSearchParams(searchParams); p.set('sucursal', val); setSearchParams(p); };
 
     const { data: reporte, isLoading, isError } = useQuery({
         queryKey: ['reports', days],

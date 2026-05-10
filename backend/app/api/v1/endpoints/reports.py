@@ -1171,8 +1171,12 @@ async def get_inventory_reconciliation(
         {
             "$lookup": {
                 "from": "products",
-                "localField": "producto_id",
-                "foreignField": "_id",
+                "let": {"pid": "$producto_id"},
+                "pipeline": [
+                    {"$match": {
+                        "$expr": {"$eq": [{"$toString": "$_id"}, "$$pid"]}
+                    }}
+                ],
                 "as": "product"
             }
         },
@@ -1180,7 +1184,7 @@ async def get_inventory_reconciliation(
         {
             "$group": {
                 "_id": None,
-                "inventario_final_costo": {"$sum": {"$multiply": ["$cantidad", {"$toDouble": {"$ifNull": ["$product.costo_unitario", "0"]}}]}}
+                "inventario_final_costo": {"$sum": {"$multiply": ["$cantidad", {"$toDouble": {"$ifNull": ["$product.costo_producto", 0]}}]}}
             }
         }
     ]
