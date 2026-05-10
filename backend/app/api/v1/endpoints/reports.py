@@ -1190,11 +1190,41 @@ async def get_inventory_reconciliation(
     raw_inv = await cursor_inv.to_list(length=1)
     inventario_final_costo = Decimal(str(raw_inv[0]["inventario_final_costo"])) if raw_inv else Decimal("0.0")
     
-    # Calculate initial inventory mathematically so the report balances perfectly
-    inventario_inicial_costo = inventario_final_costo - ingresos_costo + salidas_mermas_costo + costo_ventas_kardex
+    # Calculate TRUE inventario_inicial_costo strictly BEFORE start_dt
+    hist_start_match = {"tenant_id": tenant_id, "created_at": {"$lt": start_dt}}
+    if sucursal_id != "all":
+        hist_start_match["sucursal_id"] = sucursal_id
+        
+    inv_inicial_pipeline = [
+        {"$match": hist_start_match},
+        {"$sort": {"created_at": -1}},
+        {
+            "$group": {
+                "_id": {"sucursal_id": "$sucursal_id", "producto_id": "$producto_id"},
+                "last_log": {"$first": "$$ROOT"}
+            }
+        },
+        {"$match": {"last_log.stock_resultante": {"$gt": 0}}},
+        {
+            "$group": {
+                "_id": None,
+                "inventario_inicial_costo": {
+                    "$sum": {"$multiply": ["$last_log.stock_resultante", {"$toDouble": {"$ifNull": ["$last_log.costo_unitario_momento", 0]}}]}
+                }
+            }
+        }
+    ]
+    cursor_inv_ini = InventoryLog.get_pymongo_collection().aggregate(inv_inicial_pipeline)
+    raw_inv_ini = await cursor_inv_ini.to_list(length=1)
+    true_inventario_inicial_costo = Decimal(str(raw_inv_ini[0]["inventario_inicial_costo"])) if raw_inv_ini else Decimal("0.0")
+    
+    # Calculate revaluation (difference between expected final and actual final)
+    expected_final = true_inventario_inicial_costo + ingresos_costo - salidas_mermas_costo - costo_ventas_kardex
+    revalorizacion_costos = inventario_final_costo - expected_final
     
     return {
-        "inventario_inicial_costo": float(inventario_inicial_costo),
+        "inventario_inicial_costo": float(true_inventario_inicial_costo),
+        "revalorizacion_costos": float(revalorizacion_costos),
         "ingresos_inventario_costo": float(ingresos_costo),
         "salidas_mermas_costo": float(salidas_mermas_costo),
         "costo_ventas": float(costo_ventas_kardex),

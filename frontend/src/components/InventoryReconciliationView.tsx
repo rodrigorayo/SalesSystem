@@ -11,6 +11,7 @@ const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { m
 
 interface ReconciliationData {
     inventario_inicial_costo: number;
+    revalorizacion_costos: number;
     ingresos_inventario_costo: number;
     salidas_mermas_costo: number;
     costo_ventas: number;
@@ -167,6 +168,15 @@ export default function InventoryReconciliationView() {
                                     <span className="font-medium">(-) Costo de Ventas (Salió por Caja)</span>
                                     <span className="font-bold">-{formatBs(report.costo_ventas)}</span>
                                 </div>
+                                {report.revalorizacion_costos !== 0 && (
+                                    <>
+                                        <div className="h-px bg-gray-200/50 my-1"></div>
+                                        <div className="flex justify-between items-center text-sm text-orange-600">
+                                            <span className="font-medium flex items-center gap-1">(±) Ajuste por Revalorización <div title="Diferencia generada por cambios en el Costo Unitario del catálogo"><Info size={14} className="opacity-50" /></div></span>
+                                            <span className="font-bold">{report.revalorizacion_costos > 0 ? '+' : ''}{formatBs(report.revalorizacion_costos)}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex justify-between items-center">
