@@ -1192,7 +1192,11 @@ async def get_inventory_reconciliation(
     raw_inv = await cursor_inv.to_list(length=1)
     inventario_final_costo = Decimal(str(raw_inv[0]["inventario_final_costo"])) if raw_inv else Decimal("0.0")
     
+    # Calculate initial inventory mathematically so the report balances perfectly
+    inventario_inicial_costo = inventario_final_costo - ingresos_costo + salidas_mermas_costo + costo_ventas_kardex
+    
     return {
+        "inventario_inicial_costo": float(inventario_inicial_costo),
         "ingresos_inventario_costo": float(ingresos_costo),
         "salidas_mermas_costo": float(salidas_mermas_costo),
         "costo_ventas": float(costo_ventas_kardex),

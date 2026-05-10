@@ -10,6 +10,7 @@ import html2canvas from 'html2canvas';
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 interface ReconciliationData {
+    inventario_inicial_costo: number;
     ingresos_inventario_costo: number;
     salidas_mermas_costo: number;
     costo_ventas: number;
@@ -150,24 +151,28 @@ export default function InventoryReconciliationView() {
                             
                             <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 space-y-3">
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600 font-medium">Ingresos a Inventario (Pedidos, Compras)</span>
-                                    <span className="font-bold text-gray-900">{formatBs(report.ingresos_inventario_costo)}</span>
+                                    <span className="text-gray-600 font-bold text-[11px] uppercase tracking-wider">Inventario Inicial <span className="opacity-50">(antes del {startDate})</span></span>
+                                    <span className="font-bold text-gray-900">{formatBs(report.inventario_inicial_costo)}</span>
+                                </div>
+                                <div className="h-px bg-gray-200/50 my-1"></div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600 font-medium">(+) Ingresos a Inventario (Pedidos, Compras)</span>
+                                    <span className="font-bold text-indigo-600">+{formatBs(report.ingresos_inventario_costo)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm text-red-600">
                                     <span className="font-medium flex items-center gap-1">(-) Mermas y Salidas Manuales <div title="Mercadería retirada sin cobrar"><Info size={14} className="opacity-50" /></div></span>
                                     <span className="font-bold">-{formatBs(report.salidas_mermas_costo)}</span>
                                 </div>
-                                <div className="h-px bg-gray-200 my-2"></div>
-                                <div className="flex justify-between items-center text-sm text-indigo-700">
-                                    <span className="font-bold">Costo de Ventas (Salió por Caja)</span>
-                                    <span className="font-black">-{formatBs(report.costo_ventas)}</span>
+                                <div className="flex justify-between items-center text-sm text-red-600">
+                                    <span className="font-medium">(-) Costo de Ventas (Salió por Caja)</span>
+                                    <span className="font-bold">-{formatBs(report.costo_ventas)}</span>
                                 </div>
                             </div>
 
                             <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex justify-between items-center">
                                 <div>
-                                    <span className="text-blue-800 font-bold block">Inventario Final Actual</span>
-                                    <span className="text-[11px] text-blue-600">Costo total del stock físico hoy</span>
+                                    <span className="text-blue-800 font-bold block">Inventario Final Calculado</span>
+                                    <span className="text-[11px] text-blue-600">Stock físico actual valorado al costo</span>
                                 </div>
                                 <span className="font-black text-blue-900 text-xl">{formatBs(report.inventario_final_costo)}</span>
                             </div>
