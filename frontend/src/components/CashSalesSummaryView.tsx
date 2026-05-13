@@ -3,12 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getHistorialCaja, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
-    Calendar, Loader2, Wallet, FileDown, 
-    Filter, LayoutGrid, Search, Store
+    Calendar, Loader2, FileDown, 
+    LayoutGrid, Store
 } from 'lucide-react';
 import { getBoliviaTodayISO } from '../utils/dateUtils';
 import { descargarPDFVentasCaja } from '../utils/reportPDF';
-import { motion } from 'framer-motion';
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.domain.models.caja import CajaSesion, CajaMovimiento, CajaGastoCategoria, EstadoSesion, SubtipoMovimiento
 from app.domain.models.sale import Sale
-from app.domain.models.user import User
+from app.domain.models.user import User, UserRole
 from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()

@@ -14,6 +14,7 @@ const C = {
     amber:   [245,158,  11]  as [number,number,number],
     red:     [239, 68,  68]  as [number,number,number],
     gray:    [107,114, 128]  as [number,number,number],
+    sky:     [14, 165, 233]  as [number,number,number],
     light:   [248,250, 252]  as [number,number,number],
     white:   [255,255, 255]  as [number,number,number],
 };
