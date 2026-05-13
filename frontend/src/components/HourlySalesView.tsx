@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSalesByHour, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
-import { Loader2, AlertTriangle, Calendar, Clock, BarChart3, TrendingUp } from 'lucide-react';
+import { Loader2, AlertTriangle, Calendar, Clock, BarChart3, TrendingUp, FileDown } from 'lucide-react';
+import { descargarPDFHoras } from '../utils/reportPDF';
 import {
     ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, Cell, LabelList
@@ -114,6 +115,19 @@ export default function HourlySalesView() {
                         </div>
                     )}
                 </div>
+
+                <button
+                    onClick={() => {
+                        if (data && data.length > 0) {
+                            const sucNombre = selectedSucursal === 'all' ? 'Todas las Sucursales' : (sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal);
+                            descargarPDFHoras(data, date, sucNombre, totalVentas, picoHora);
+                        }
+                    }}
+                    disabled={!data || totalVentas === 0}
+                    className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200 disabled:opacity-40 whitespace-nowrap"
+                >
+                    <FileDown size={16} /> Descargar PDF
+                </button>
             </div>
 
             {/* Chart Area */}

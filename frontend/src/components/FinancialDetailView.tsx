@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getFinancialReport, getSucursales } from '../api/api';
 import { 
     Loader2, Calendar, Store, TrendingUp, DollarSign, 
-    Printer
+    Printer, FileDown
 } from 'lucide-react';
 import { getBoliviaTodayISO } from '../utils/dateUtils';
+import { descargarPDFFinanzas } from '../utils/reportPDF';
 
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -95,10 +96,16 @@ export default function FinancialDetailView() {
                 </div>
 
                 <button 
-                    onClick={() => window.print()}
-                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                    onClick={() => {
+                        if (report && totals) {
+                            const sucNombre = selectedSucursal === 'all' ? 'Todas las Sucursales' : (sucursales?.find((s: any) => s._id === selectedSucursal)?.nombre || selectedSucursal);
+                            descargarPDFFinanzas(report, totals, startDate, endDate, sucNombre);
+                        }
+                    }}
+                    disabled={!report}
+                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50"
                 >
-                    <Printer size={18} /> PDF
+                    <FileDown size={18} /> Descargar PDF
                 </button>
             </div>
 

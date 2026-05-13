@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSalesMatrix, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
-import { Loader2, AlertTriangle, Calendar, Download, Search } from 'lucide-react';
+import { Loader2, AlertTriangle, Calendar, Download, Search, FileDown } from 'lucide-react';
+import { descargarPDFMatriz } from '../utils/reportPDF';
 
 export default function SalesMatrixView() {
     const { role, sucursal_id } = useAuthStore();
@@ -95,14 +96,29 @@ export default function SalesMatrixView() {
                         Periodo del {startDate} al {endDate}
                     </p>
                 </div>
-                <button 
-                    onClick={handleDownloadCSV}
-                    disabled={!data || data.products.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-200 hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Download size={16} />
-                    Exportar a CSV
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handleDownloadCSV}
+                        disabled={!data || data.products.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-200 hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Download size={16} />
+                        CSV
+                    </button>
+                    <button 
+                        onClick={() => {
+                            if (data && data.products.length > 0) {
+                                const sucNombre = selectedSucursal === 'all' ? 'Todas las Sucursales' : (sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal);
+                                descargarPDFMatriz(data, dateList, startDate, endDate, sucNombre);
+                            }
+                        }}
+                        disabled={!data || data.products.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <FileDown size={16} />
+                        PDF
+                    </button>
+                </div>
             </div>
             
             {/* Header Filters */}

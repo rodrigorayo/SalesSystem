@@ -4,7 +4,8 @@ import { twMerge } from 'tailwind-merge';
 import { useQuery } from '@tanstack/react-query';
 import { getStaffPerformanceReport, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
-import { Loader2, AlertTriangle, Calendar, Users, Briefcase } from 'lucide-react';
+import { Loader2, AlertTriangle, Calendar, Users, Briefcase, FileDown } from 'lucide-react';
+import { descargarPDFStaff } from '../utils/reportPDF';
 import {
     ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, Cell
@@ -67,14 +68,27 @@ export default function StaffPerformanceView() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <div>
-                    <h2 className="text-xl font-black text-gray-900">Desempeño de Personal</h2>
-                    <p className="text-xs text-gray-500 font-medium">
-                        {dateType === 'single' ? `Reporte del día ${date}` : `Periodo del ${startDate} al ${endDate}`}
-                    </p>
+            <div className="flex items-center gap-3">
+                    <div>
+                        <h2 className="text-xl font-black text-gray-900">Desempeño de Personal</h2>
+                        <p className="text-xs text-gray-500 font-medium">
+                            {dateType === 'single' ? `Reporte del día ${date}` : `Periodo del ${startDate} al ${endDate}`}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            if (data) {
+                                const periodo = dateType === 'single' ? date : `${startDate}_${endDate}`;
+                                const sucNombre = selectedSucursal === 'all' ? 'Todas las Sucursales' : (sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal);
+                                descargarPDFStaff(data, periodo, sucNombre);
+                            }
+                        }}
+                        disabled={!data}
+                        className="ml-auto flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200 disabled:opacity-40 whitespace-nowrap"
+                    >
+                        <FileDown size={16} /> Descargar PDF
+                    </button>
                 </div>
-            </div>
             {/* Header Filters */}
             <div className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-100 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
                 <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">

@@ -2,7 +2,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getValuedInventory, exportValuedInventory } from '../api/api';
-import { Loader2, Package, Store, AlertTriangle, ChevronDown, ChevronUp, DollarSign, Gem, ShieldCheck, Tag, Calendar, History, Download } from 'lucide-react';
+import { Loader2, Package, Store, AlertTriangle, ChevronDown, ChevronUp, DollarSign, Gem, ShieldCheck, Tag, Calendar, History, Download, FileDown } from 'lucide-react';
+import { descargarPDFInventario } from '../utils/reportPDF';
 
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -91,7 +92,14 @@ export default function ValuedInventoryView() {
                         className="ml-2 flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-2xl text-sm font-bold transition-all"
                     >
                         <Download size={16} />
-                        Exportar Excel
+                        Excel
+                    </button>
+                    <button 
+                        onClick={() => descargarPDFInventario(valuatedData, selectedDate || 'actual')}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
+                    >
+                        <FileDown size={16} />
+                        PDF
                     </button>
                 </div>
             </div>

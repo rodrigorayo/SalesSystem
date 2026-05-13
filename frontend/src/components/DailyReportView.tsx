@@ -4,9 +4,10 @@ import { getDailyReport, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     Calendar, Loader2, TrendingUp, Wallet, 
-    ShoppingBag, Ban, ArrowDownCircle, Printer, Package
+    ShoppingBag, Ban, ArrowDownCircle, Printer, Package, FileDown
 } from 'lucide-react';
 import { getBoliviaTodayISO, formatFullDate } from '../utils/dateUtils';
+import { descargarPDFJornada } from '../utils/reportPDF';
 
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -31,6 +32,11 @@ export default function DailyReportView() {
     });
 
     const handlePrint = () => window.print();
+    const handleDownloadPDF = () => {
+        if (!report) return;
+        const sucNombre = sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal;
+        descargarPDFJornada(report, selectedDate, sucNombre);
+    };
 
     if (isLoading) return (
         <div className="flex flex-col items-center justify-center py-20">
@@ -73,12 +79,21 @@ export default function DailyReportView() {
                         </select>
                     )}
                 </div>
-                <button 
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200"
-                >
-                    <Printer size={18} /> Imprimir Reporte
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                    >
+                        <Printer size={16} /> Imprimir
+                    </button>
+                    <button 
+                        onClick={handleDownloadPDF}
+                        disabled={!report}
+                        className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200 disabled:opacity-50"
+                    >
+                        <FileDown size={16} /> Descargar PDF
+                    </button>
+                </div>
             </div>
 
             {/* Print Header (Only visible when printing) */}

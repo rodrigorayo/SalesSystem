@@ -2,10 +2,11 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { client, getSucursales } from '../api/api';
 import { 
-    Loader2, Calendar, Store, Scale, AlertTriangle, Info, TrendingUp, Download, Printer
+    Loader2, Calendar, Store, Scale, AlertTriangle, Info, TrendingUp, Download, Printer, FileDown
 } from 'lucide-react';
 import { getBoliviaTodayISO } from '../utils/dateUtils';
 import html2canvas from 'html2canvas';
+import { descargarPDFAuditoria } from '../utils/reportPDF';
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -115,10 +116,16 @@ export default function InventoryReconciliationView() {
                         <Download size={18} /> Imagen
                     </button>
                     <button 
-                        onClick={() => window.print()}
-                        className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                        onClick={() => {
+                            if (report) {
+                                const sucNombre = selectedSucursal === 'all' ? 'Global' : (sucursales?.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal);
+                                descargarPDFAuditoria(report, startDate, endDate, sucNombre);
+                            }
+                        }}
+                        disabled={!report}
+                        className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50"
                     >
-                        <Printer size={18} /> PDF
+                        <FileDown size={18} /> Descargar PDF
                     </button>
                 </div>
             </div>
