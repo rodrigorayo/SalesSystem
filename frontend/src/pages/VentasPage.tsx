@@ -340,6 +340,9 @@ export default function VentasPage() {
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? '' : (user?.sucursal_id || ''));
     const [searchTerm, setSearchTerm] = useState('');
     const [soloFacturas, setSoloFacturas] = useState(false);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [metodoPago, setMetodoPago] = useState('');
     const [expanded, setExpanded] = useState<string | null>(null);
     const [printSale, setPrintSale] = useState<Sale | null>(null);
     const [page, setPage] = useState(1);
@@ -355,8 +358,8 @@ export default function VentasPage() {
     });
 
     const { data: ventasRes, isLoading } = useQuery({
-        queryKey: ['sales-history', selectedSucursal, page, soloFacturas],
-        queryFn: () => getSales(selectedSucursal || undefined, page, limit, undefined, soloFacturas)
+        queryKey: ['sales-history', selectedSucursal, page, soloFacturas, startDate, endDate, metodoPago],
+        queryFn: () => getSales(selectedSucursal || undefined, page, limit, metodoPago || undefined, soloFacturas, undefined, undefined, startDate || undefined, endDate || undefined)
     });
 
     const ventas = ventasRes?.items || [];
@@ -428,9 +431,55 @@ export default function VentasPage() {
                             }}
                             className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-xs font-semibold text-gray-700">Solo Facturas / NIT</span>
+                        <span className="text-xs font-semibold text-gray-700">Solo Facturas</span>
                     </label>
                 </div>
+            </div>
+
+            {/* ── Filtros Avanzados ── */}
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <CalendarDays size={14} className="text-gray-400" />
+                    <input 
+                        type="date" 
+                        value={startDate}
+                        onChange={e => { setStartDate(e.target.value); setPage(1); }}
+                        className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                    <span className="text-gray-400 text-[10px] font-bold uppercase">al</span>
+                    <input 
+                        type="date" 
+                        value={endDate}
+                        onChange={e => { setEndDate(e.target.value); setPage(1); }}
+                        className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                </div>
+
+                <div className="h-4 w-[1px] bg-gray-200 hidden sm:block" />
+
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Método:</span>
+                    <select
+                        value={metodoPago}
+                        onChange={e => { setMetodoPago(e.target.value); setPage(1); }}
+                        className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-200"
+                    >
+                        <option value="">Todos</option>
+                        <option value="EFECTIVO">Efectivo 💵</option>
+                        <option value="QR">QR 📱</option>
+                        <option value="TARJETA">Tarjeta 💳</option>
+                        <option value="TRANSFERENCIA">Transferencia 🏦</option>
+                    </select>
+                </div>
+
+                {(startDate || endDate || metodoPago) && (
+                    <button 
+                        onClick={() => { setStartDate(''); setEndDate(''); setMetodoPago(''); setPage(1); }}
+                        className="ml-auto text-[10px] font-black text-red-500 uppercase hover:text-red-600 transition-colors"
+                    >
+                        Limpiar Filtros
+                    </button>
+                )}
             </div>
 
             {/* Lista de Ventas */}
