@@ -362,37 +362,37 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estado</th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                    Txs <Info size={10} className="text-gray-300 cursor-help" title="Número total de transacciones registradas" />
+                                    Txs <span title="Número total de transacciones registradas"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                    QR <Info size={10} className="text-gray-300 cursor-help" title="Ventas cobradas mediante QR (Dinero digital)" />
+                                    QR <span title="Ventas cobradas mediante QR (Dinero digital)"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                    Tarjeta <Info size={10} className="text-gray-300 cursor-help" title="Ventas cobradas mediante Tarjeta/POS (Dinero digital)" />
+                                    Tarjeta <span title="Ventas cobradas mediante Tarjeta/POS (Dinero digital)"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                    Ef. neto <Info size={10} className="text-gray-300 cursor-help" title="Ingresos en Efectivo - Cambios/Vueltos entregados" />
+                                    Ef. neto <span title="Ingresos en Efectivo - Cambios/Vueltos entregados"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                    Gastos <Info size={10} className="text-gray-300 cursor-help" title="Total de egresos registrados por gastos operativos" />
+                                    Gastos <span title="Total de egresos registrados por gastos operativos"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                    Total <Info size={10} className="text-gray-300 cursor-help" title="Suma de todas las ventas (Efectivo + QR + Tarjeta)" />
+                                    Total <span title="Suma de todas las ventas (Efectivo + QR + Tarjeta)"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1 font-black text-gray-600">
-                                    Saldo caja <Info size={10} className="text-indigo-300 cursor-help" title="Monto Inicial + Ef. neto - Gastos (Dinero esperado físicamente)" />
+                                    Saldo caja <span title="Monto Inicial + Ef. neto - Gastos (Dinero esperado físicamente)"><Info size={10} className="text-indigo-300 cursor-help" /></span>
                                 </div>
                             </th>
                             <th className="px-2 py-2" />
