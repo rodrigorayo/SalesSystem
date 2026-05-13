@@ -41,15 +41,32 @@ async def _get_active_session(tenant_id: str, sucursal_id: str, cajero_id: str) 
 # ─── Historial de sesiones ────────────────────────────────────────────────────
 
 @router.get("/sesiones")
-async def get_sesiones(current_user: User = Depends(get_current_active_user)):
-    """Return all sessions for the current tenant/branch, newest first. Read-only."""
+async def get_sesiones(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Return sessions. By default returns last 5, or filters by date range if provided."""
     tenant_id   = current_user.tenant_id or "default"
     sucursal_id = current_user.sucursal_id or "CENTRAL"
 
-    sesiones = await CajaSesion.find(
-        CajaSesion.tenant_id   == tenant_id,
+    query_args = [
+        CajaSesion.tenant_id == tenant_id,
         CajaSesion.sucursal_id == sucursal_id,
-    ).sort("-abierta_at").to_list()
+    ]
+    
+    if start_date and end_date:
+        from app.utils.date_utils import get_range_bolivia
+        start_dt, end_dt = get_range_bolivia(start_date, end_date)
+        query_args.append(CajaSesion.abierta_at >= start_dt)
+        query_args.append(CajaSesion.abierta_at <= end_dt)
+        
+    find_query = CajaSesion.find(*query_args).sort("-abierta_at")
+    
+    if not start_date and not end_date:
+        find_query = find_query.limit(5)
+        
+    sesiones = await find_query.to_list()
 
     result = []
     for s in sesiones:

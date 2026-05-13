@@ -215,12 +215,31 @@ function SessionTable({ resumen, categoriasGlobal, filterCashOnly }: { resumen: 
 // ─── Historial Tab ───────────────────────────────────────────────────────────
 
 function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategoria[] }) {
-    const { data: sesiones = [], isLoading } = useHistorialCaja();
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
+    const [filterActive, setFilterActive] = useState<boolean>(false);
+
+    const { data: sesiones = [], isLoading } = useHistorialCaja(
+        filterActive ? startDate : undefined,
+        filterActive ? endDate : undefined
+    );
     const [expanded, setExpanded] = useState<string | null>(null);
     const [pdfLoading, setPdfLoading] = useState<string | null>(null);
 
+    function handleBuscar() {
+        if (startDate && endDate) {
+            setFilterActive(true);
+        }
+    }
+
+    function handleLimpiar() {
+        setStartDate('');
+        setEndDate('');
+        setFilterActive(false);
+    }
+
     async function handleExportPDF(e: React.MouseEvent, s: CajaSesionResumen) {
-        e.stopPropagation(); // don't toggle expand
+        e.stopPropagation();
         setPdfLoading(s.id);
         try {
             const resumen = await getResumenCaja(s.id);
@@ -238,29 +257,64 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
         );
     }
 
-    if (sesiones.length === 0) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400">
-                <History size={36} className="opacity-20" />
-                <p className="text-sm">No hay sesiones de caja registradas aún.</p>
-            </div>
-        );
-    }
-
     return (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-            {/* read-only notice + export */}
-            <div className="flex items-center justify-between px-1 mb-2">
-                <div className="flex items-center gap-2 text-[11px] text-gray-400">
+            {/* ── Filter bar ── */}
+            <div className="flex flex-wrap items-center gap-2 px-1 mb-3">
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
                     <ShieldCheck size={13} className="text-indigo-400" />
-                    Historial de solo lectura — los registros no pueden modificarse
+                    {filterActive
+                        ? <span className="text-indigo-600 font-bold">Rango aplicado</span>
+                        : <span>Últimas 5 sesiones</span>
+                    }
                 </div>
-                <button
-                    onClick={() => exportarHistorialCSV(sesiones)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
-                    <Download size={12} /> Exportar CSV
-                </button>
+
+                <div className="flex items-center gap-2 ml-auto flex-wrap">
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-[11px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-indigo-300 outline-none"
+                        placeholder="Desde"
+                    />
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-[11px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-indigo-300 outline-none"
+                        placeholder="Hasta"
+                    />
+                    <button
+                        onClick={handleBuscar}
+                        disabled={!startDate || !endDate}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
+                    >
+                        Buscar
+                    </button>
+                    {filterActive && (
+                        <button
+                            onClick={handleLimpiar}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold transition-all active:scale-95"
+                        >
+                            Ver últimas 5
+                        </button>
+                    )}
+                    <button
+                        onClick={() => exportarHistorialCSV(sesiones)}
+                        disabled={sesiones.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
+                    >
+                        <Download size={12} /> CSV
+                    </button>
+                </div>
             </div>
+
+            {sesiones.length === 0 && !isLoading ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400">
+                    <History size={36} className="opacity-20" />
+                    <p className="text-sm">No se encontraron sesiones en ese rango.</p>
+                </div>
+            ) : (
 
             <div className="flex-1 bg-white rounded-2xl border border-gray-200 overflow-hidden">
                 <table className="w-full text-left text-xs">
@@ -331,6 +385,7 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                     </tbody>
                 </table>
             </div>
+            )}
         </div>
     );
 }

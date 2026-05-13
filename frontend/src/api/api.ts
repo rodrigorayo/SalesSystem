@@ -490,8 +490,13 @@ export const registrarAbono = (sale_id: string, abono: { metodo: 'EFECTIVO' | 'T
 
 export const getCajaSesionActiva = () =>
     client<CajaSesion | null>('/caja/sesion/activa');
-export const getHistorialCaja = () =>
-    client<CajaSesionResumen[]>('/caja/sesiones');
+export const getHistorialCaja = (startDate?: string, endDate?: string) => {
+    let url = '/caja/sesiones';
+    if (startDate && endDate) {
+        url += `?start_date=${startDate}&end_date=${endDate}`;
+    }
+    return client<CajaSesionResumen[]>(url);
+};
 export const abrirCaja = (data: AbrirCajaIn) =>
     client<CajaSesion>('/caja/sesion/abrir', { method: 'POST', body: data });
 export const cerrarCaja = (sesionId: string, data: CerrarCajaIn) =>

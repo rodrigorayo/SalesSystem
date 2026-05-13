@@ -207,9 +207,9 @@ export function useCrearCategoriaGasto() {
     });
 }
 
-export function useHistorialCaja() {
+export function useHistorialCaja(startDate?: string, endDate?: string) {
     return useQuery({
-        queryKey: ['caja-historial'],
-        queryFn: getHistorialCaja,
+        queryKey: ['caja-historial', startDate, endDate],
+        queryFn: () => getHistorialCaja(startDate, endDate),
     });
 }
