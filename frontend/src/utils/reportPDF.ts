@@ -511,3 +511,71 @@ export function descargarPDFFinanzas(report: any[], totals: any, startDate: stri
     addFooters(doc);
     doc.save(`Finanzas_Margenes_${startDate}_${endDate}.pdf`);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 8. REPORTE DE GASTOS DETALLADO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function descargarPDFGastos(report: any, startDate: string, endDate: string, sucursalNombre: string, categoriaNombre: string) {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+
+    let subtitle = `${sucursalNombre}  •  ${startDate} al ${endDate}`;
+    if (categoriaNombre !== 'Todas') subtitle += `  •  Cat: ${categoriaNombre}`;
+
+    let y = drawHeader(doc, 'Reporte Detallado de Gastos', subtitle);
+
+    // KPIs
+    const kpiW = (pw - 28) / 2;
+    drawKPI(doc, 10, y, kpiW - 2, 'Total Gastado', bs(report.total), C.red);
+    drawKPI(doc, 10 + kpiW, y, kpiW - 2, 'Nro. de Gastos', report.count.toString(), C.dark);
+    y += 26;
+
+    // Tabla por categoría (Resumen)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...C.dark);
+    doc.text('Resumen por Categoría', 10, y);
+    y += 4;
+
+    const catRows = Object.entries(report.por_categoria || {}).map(([cat, monto]) => [cat, bs(monto as number)]);
+    autoTable(doc, {
+        startY: y,
+        head: [['Categoría', 'Monto Total (Bs.)']],
+        body: catRows,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: C.dark, textColor: C.white, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: C.light },
+        columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+        margin: { left: 10, right: 10 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+
+    // Detalle de movimientos
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...C.dark);
+    doc.text('Detalle de Movimientos', 10, y);
+    y += 4;
+
+    autoTable(doc, {
+        startY: y,
+        head: [['Fecha', 'Hora', 'Categoría', 'Descripción', 'Cajero', 'Monto (Bs.)']],
+        body: report.detalle?.map((d: any) => [
+            d.fecha.split('T')[0],
+            d.hora,
+            d.categoria,
+            d.descripcion,
+            d.cajero,
+            bs(d.monto)
+        ]),
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: C.primary, textColor: C.white, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: C.light },
+        columnStyles: { 5: { halign: 'right', fontStyle: 'bold' } },
+        margin: { left: 10, right: 10 },
+    });
+
+    addFooters(doc);
+    doc.save(`Reporte_Gastos_${startDate}_${endDate}.pdf`);
+}

@@ -117,6 +117,19 @@ export const getStaffPerformanceReport = (date?: string, sucursal_id?: string, s
     }>(`/reports/staff-performance?${params.toString()}`);
 };
 
+export const getVentasMatrix = (startDate: string, endDate: string, sucursalId?: string) => {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (sucursalId && sucursalId !== 'all') params.set('sucursal_id', sucursalId);
+    return client<any>(`/reports/sales-matrix?${params.toString()}`);
+};
+
+export const getExpensesReport = (startDate: string, endDate: string, sucursalId?: string, categoriaId?: string) => {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (sucursalId && sucursalId !== 'all') params.set('sucursal_id', sucursalId);
+    if (categoriaId && categoriaId !== 'all') params.set('categoria_id', categoriaId);
+    return client<any>(`/reports/expenses-report?${params.toString()}`);
+};
+
 export const getSalesMatrix = (start_date: string, end_date: string, sucursal_id?: string) => {
     const params = new URLSearchParams({ start_date, end_date });
     if (sucursal_id && sucursal_id !== 'all') params.append('sucursal_id', sucursal_id);
@@ -519,7 +532,11 @@ export const registrarIngreso = (data: { monto: number; descripcion: string; met
 export const getCategoriasGasto = () =>
     client<CajaGastoCategoria[]>('/caja/categorias-gasto');
 export const createCategoriaGasto = (data: CategoriaGastoIn) =>
-    client<CajaGastoCategoria>('/caja/categorias-gasto', { body: data });
+    client<CajaGastoCategoria>('/caja/categorias-gasto', { method: 'POST', body: data });
+export const updateCategoriaGasto = (id: string, data: CategoriaGastoIn) =>
+    client<CajaGastoCategoria>(`/caja/categorias-gasto/${id}`, { method: 'PUT', body: data });
+export const deleteCategoriaGasto = (id: string) =>
+    client(`/caja/categorias-gasto/${id}`, { method: 'DELETE' });
 
 // ── Descuentos ─────────────────────────────────────────────────────────────
 export const getDescuentos = () =>

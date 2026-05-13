@@ -6,7 +6,7 @@ from app.domain.models.user import User, UserRole
 from app.domain.models.sale_item import SaleItem
 from app.domain.models.sucursal import Sucursal
 from app.domain.models.sale import Sale
-from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento
+from app.domain.models.caja import CajaMovimiento, SubtipoMovimiento, CajaGastoCategoria
 from app.domain.models.inventario import Inventario
 from app.domain.models.product import Product
 from app.utils.serializers import normalize_bson
@@ -1233,3 +1233,77 @@ async def get_inventory_reconciliation(
         "inventario_final_costo": float(inventario_final_costo)
     }
 
+@router.get("/expenses-report")
+async def get_expenses_report(
+    start_date: str, # YYYY-MM-DD
+    end_date: str,   # YYYY-MM-DD
+    sucursal_id: Optional[str] = None,
+    categoria_id: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns a detailed expenses report filtered by date range, branch and category.
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    # Permission check: Branch admins only see their branch
+    if current_user.role not in [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ]:
+        target_sucursal = current_user.sucursal_id
+    else:
+        target_sucursal = sucursal_id if sucursal_id and sucursal_id != "all" else None
+
+    # Parse dates
+    try:
+        s_dt, _ = get_day_range_bolivia(start_date)
+        _, e_dt = get_day_range_bolivia(end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    # Build query
+    query: Dict[str, Any] = {
+        "tenant_id": tenant_id,
+        "tipo": "EGRESO",
+        "subtipo": SubtipoMovimiento.GASTO,
+        "fecha": {"$gte": s_dt, "$lte": e_dt}
+    }
+    if target_sucursal:
+        query["sucursal_id"] = target_sucursal
+    if categoria_id and categoria_id != "all":
+        query["categoria_id"] = categoria_id
+
+    # Get movements
+    movimientos = await CajaMovimiento.find(query).sort("-fecha").to_list()
+    
+    # Get categories to map IDs to names
+    categories = await CajaGastoCategoria.find(CajaGastoCategoria.tenant_id == tenant_id).to_list()
+    cat_map = {str(c.id): c.nombre for c in categories}
+    
+    # Format response
+    total_monto = _ZERO
+    detalle = []
+    
+    for m in movimientos:
+        total_monto += m.monto
+        detalle.append({
+            "id": str(m.id),
+            "fecha": m.fecha.isoformat(),
+            "hora": m.fecha.strftime("%H:%M"),
+            "monto": float(m.monto),
+            "descripcion": m.descripcion,
+            "categoria": cat_map.get(m.categoria_id, "Sin Categoría"),
+            "cajero": m.cajero_name,
+            "sucursal_id": m.sucursal_id
+        })
+
+    # Summary by category
+    por_categoria = {}
+    for d in detalle:
+        cat = d["categoria"]
+        por_categoria[cat] = por_categoria.get(cat, 0.0) + d["monto"]
+
+    return {
+        "total": float(total_monto),
+        "count": len(detalle),
+        "detalle": detalle,
+        "por_categoria": por_categoria
+    }

@@ -339,3 +339,28 @@ async def create_categoria(body: CategoriaGastoIn, current_user: User = Depends(
     )
     await cat.create()
     return cat
+
+
+@router.put("/categorias-gasto/{cat_id}")
+async def update_categoria(cat_id: str, body: CategoriaGastoIn, current_user: User = Depends(get_current_active_user)):
+    tenant_id = current_user.tenant_id or "default"
+    cat = await CajaGastoCategoria.find_one(CajaGastoCategoria.id == cat_id, CajaGastoCategoria.tenant_id == tenant_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    cat.nombre = body.nombre
+    cat.descripcion = body.descripcion
+    cat.icono = body.icono or cat.icono
+    await cat.save()
+    return cat
+
+
+@router.delete("/categorias-gasto/{cat_id}")
+async def delete_categoria(cat_id: str, current_user: User = Depends(get_current_active_user)):
+    tenant_id = current_user.tenant_id or "default"
+    cat = await CajaGastoCategoria.find_one(CajaGastoCategoria.id == cat_id, CajaGastoCategoria.tenant_id == tenant_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    await cat.soft_delete()
+    return {"status": "deleted"}
