@@ -309,12 +309,22 @@ export default function PedidosPage() {
 
             {/* Create Pedido Modal */}
             {showCreate && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-base font-bold text-gray-900">Nuevo Pedido Interno</h2>
-                            <button onClick={() => { setShowCreate(false); resetForm(); }} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl border border-gray-100 max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                    <Plus className="text-indigo-600" size={24} />
+                                    Nuevo Pedido Interno
+                                </h2>
+                                <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Configuración de traslado de mercadería</p>
+                            </div>
+                            <button onClick={() => { setShowCreate(false); resetForm(); }} className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
+                                <X size={24} />
+                            </button>
                         </div>
+
                         <form onSubmit={e => {
                             e.preventDefault();
                             const validItems = orderItems.filter(i => i.producto_id.trim() !== '');
@@ -372,113 +382,124 @@ export default function PedidosPage() {
                             }
                             
                             createMut.mutate(payload);
-                        }} className="space-y-4">
+                        }} className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50">
+                            
+                            {/* Selector de Movimiento */}
                             {(user?.role === 'SUPERVISOR' || isSucursal()) && (
-                                <div className="mb-4">
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Movimiento</label>
-                                    <select value={supervisorAction} onChange={e => setSupervisorAction(e.target.value as any)}
-                                        className="w-full border border-indigo-200 bg-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                        <option value="PEDIR">
-                                            {isSucursal() ? 'Solicitar Mercadería (A Matriz)' : 'Extraer Mercadería (Desde Sucursal Física)'}
-                                        </option>
-                                        <option value="TRANSFERIR">
-                                            {isSucursal() ? 'Entregar Mercadería (A un Supervisor)' : 'Entregar Mercadería (A un Vendedor)'}
-                                        </option>
-                                        <option value="DEVOLVER">
-                                            {isSucursal() ? 'Recuperar Inventario (De un Supervisor)' : 'Recuperar Inventario (De un Vendedor)'}
-                                        </option>
-                                    </select>
+                                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Tipo de Operación</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        {(['PEDIR', 'TRANSFERIR', 'DEVOLVER'] as const).map((act) => (
+                                            <button
+                                                key={act}
+                                                type="button"
+                                                onClick={() => setSupervisorAction(act)}
+                                                className={`py-3 px-4 rounded-xl text-[11px] font-bold transition-all border ${
+                                                    supervisorAction === act 
+                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' 
+                                                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {act === 'PEDIR' && (isSucursal() ? 'ABASTECIMIENTO' : 'EXTRAER')}
+                                                {act === 'TRANSFERIR' && 'ENTREGAR'}
+                                                {act === 'DEVOLVER' && 'RECUPERAR'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="flex bg-gray-50 p-3 rounded-xl border border-gray-100 gap-3">
+                            {/* Ruta de Mercadería */}
+                            <div className="grid grid-cols-1 md:grid-cols-11 gap-4 items-center">
                                 {/* ORIGEN */}
-                                <div className="flex-1">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                        <Truck size={12} /> Origen
+                                <div className="md:col-span-5 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <Truck size={14} className="text-indigo-400" /> Punto de Salida
                                     </label>
                                     {isMatriz() || user?.role === 'SUPERADMIN' ? (
-                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
-                                            Matriz Principal
+                                        <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold">
+                                            Matriz Principal (Fábrica)
                                         </div>
                                     ) : user?.role === 'SUPERVISOR' ? (
                                         supervisorAction === 'PEDIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Seleccionar Sucursal Física...</option>
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Origen...</option>
                                                 {sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : supervisorAction === 'DEVOLVER' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
                                                 <option value="">Seleccionar Vendedor...</option>
                                                 {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
                                                 {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         )
                                     ) : (
                                         supervisorAction === 'PEDIR' ? (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold">
                                                 Matriz Principal
                                             </div>
                                         ) : supervisorAction === 'DEVOLVER' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Seleccionar Supervisor Móvil...</option>
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Supervisor...</option>
                                                 {sucursales.filter(s => s.tipo === 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Sucursal'}
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
                                             </div>
                                         )
                                     )}
                                 </div>
 
                                 {/* ICON */}
-                                <div className="flex items-center justify-center pt-5">
-                                    <ChevronRight size={18} className="text-gray-400" />
+                                <div className="md:col-span-1 flex items-center justify-center">
+                                    <div className="bg-indigo-50 p-2 rounded-full border border-indigo-100">
+                                        <ChevronRight size={24} className="text-indigo-400" />
+                                    </div>
                                 </div>
 
                                 {/* DESTINO */}
-                                <div className="flex-1">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                        <Package size={12} /> Destino
+                                <div className="md:col-span-5 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <Package size={14} className="text-emerald-400" /> Punto de Destino
                                     </label>
                                     {isMatriz() || user?.role === 'SUPERADMIN' ? (
                                         <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                            className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                            <option value="">Sucursal Física...</option>
+                                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                            <option value="">Seleccionar Sucursal...</option>
                                             {sucursales.filter(s => s.tipo !== 'VENDEDOR' && s.tipo !== 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                         </select>
                                     ) : user?.role === 'SUPERVISOR' ? (
                                         supervisorAction === 'PEDIR' ? (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
                                                 {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         ) : supervisorAction === 'TRANSFERIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
                                                 <option value="">Seleccionar Vendedor...</option>
                                                 {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
                                                 {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         )
                                     ) : (
                                         supervisorAction === 'TRANSFERIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Seleccionar Supervisor Móvil...</option>
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Supervisor...</option>
                                                 {sucursales.filter(s => s.tipo === 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
                                         ) : (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
                                                 {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
                                             </div>
                                         )
@@ -486,57 +507,98 @@ export default function PedidosPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5 gap-2">
-                                    <label className="text-xs font-semibold text-gray-700">Explorar Catálogo *</label>
-                                    <div className="flex-1 px-4">
-                                        <input type="text" placeholder="🔍 Buscar por nombre o código..." value={searchProd} onChange={e => setSearchProd(e.target.value)}
-                                            className="w-full border border-gray-300 rounded px-2 py-1 text-[11px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder-gray-400" />
+                            {/* Lista de Productos */}
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-[300px]">
+                                <div className="p-4 border-b border-gray-50 flex items-center justify-between gap-4">
+                                    <div>
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Selección de Productos</label>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Agrega los ítems que deseas trasladar.</p>
                                     </div>
-                                    <button type="button" onClick={addItem} className="text-[11px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-bold">
-                                        <Plus size={12} /> Agregar Ítem Fila
+                                    <div className="flex-1 max-w-xs relative">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Filtrar catálogo..." 
+                                            value={searchProd} 
+                                            onChange={e => setSearchProd(e.target.value)}
+                                            className="w-full border border-gray-200 rounded-xl px-4 py-2 text-xs font-medium text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none placeholder-gray-400 bg-gray-50" 
+                                        />
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={addItem} 
+                                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-2 rounded-xl text-[11px] font-black transition-all flex items-center gap-2 border border-indigo-100"
+                                    >
+                                        <Plus size={14} /> AGREGAR LÍNEA
                                     </button>
                                 </div>
-                                <div className="space-y-2">
+
+                                <div className="p-4 space-y-3">
                                     {orderItems.map((item, i) => (
-                                        <div key={i} className="flex gap-1.5 items-center">
-                                            <select required value={item.producto_id} onChange={e => updateItem(i, 'producto_id', e.target.value)}
-                                                className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] bg-white">
-                                                <option value="">-- Seleccionar Producto --</option>
-                                                {filteredCatalog.map((p: any) => (
-                                                    <option key={p.producto_id} value={p.producto_id}>
-                                                        {p.producto_nombre} (Stock: {p.cantidad}) — Valor Unitario: Bs.{(Number(p.precio)||0).toFixed(2)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <input required type="number" min="1" value={item.cantidad} onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
-                                                className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] text-center"
-                                                title="Cantidad solicitada/despachada"
-                                            />
-                                            <button type="button" onClick={() => removeItem(i)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
+                                        <div key={i} className="flex gap-3 items-end animate-in slide-in-from-left-2 duration-200">
+                                            <div className="flex-1">
+                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-wider">Producto</label>
+                                                <select required value={item.producto_id} onChange={e => updateItem(i, 'producto_id', e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs font-bold bg-white transition-all">
+                                                    <option value="">-- Seleccionar --</option>
+                                                    {filteredCatalog.map((p: any) => (
+                                                        <option key={p.producto_id} value={p.producto_id}>
+                                                            {p.producto_nombre} (Stock: {p.cantidad}) — Bs.{(Number(p.precio)||0).toFixed(2)}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="w-24">
+                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-wider">Cant.</label>
+                                                <input required type="number" min="1" value={item.cantidad} onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-black font-mono focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm text-center bg-white transition-all"
+                                                />
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => removeItem(i)} 
+                                                className="mb-1 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <X size={20} />
+                                            </button>
                                         </div>
                                     ))}
+                                    
                                     {orderItems.length === 0 && (
-                                        <div className="text-center py-4 text-gray-400 border border-dashed border-gray-200 rounded-xl">
-                                            <Package size={20} className="mx-auto mb-1 opacity-40" />
-                                            <p className="text-[11px] text-gray-500">Sin productos aún</p>
+                                        <div className="text-center py-12 text-gray-400">
+                                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                                                <Package size={24} className="opacity-20" />
+                                            </div>
+                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No hay productos seleccionados</p>
+                                            <button type="button" onClick={addItem} className="mt-4 text-[10px] font-black text-indigo-600 hover:underline">PRESIONA AQUÍ PARA EMPEZAR</button>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Notas (opcional)</label>
+                            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Comentarios Adicionales</label>
                                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
-                                    className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none text-[11px]"
-                                    placeholder="Instrucciones especiales..."
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none resize-none text-xs font-medium transition-all"
+                                    placeholder="Instrucciones para el despacho, motivos especiales, etc."
                                 />
                             </div>
 
-                            <button type="submit" disabled={createMut.isPending || orderItems.length === 0}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
-                                {createMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Crear Pedido</>}
-                            </button>
+                            <div className="flex gap-3 pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setShowCreate(false); resetForm(); }}
+                                    className="flex-1 py-4 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                                >
+                                    Descartar
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={createMut.isPending || orderItems.length === 0}
+                                    className="flex-[2] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-4 rounded-2xl text-sm font-black flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 transition-all active:scale-95"
+                                >
+                                    {createMut.isPending ? <Loader2 size={20} className="animate-spin" /> : <><Check size={20} /> CREAR PEDIDO</>}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
