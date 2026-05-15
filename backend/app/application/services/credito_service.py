@@ -107,10 +107,18 @@ class CreditoService:
             raise HTTPException(status_code=400, detail="El monto de abono no puede exceder la deuda total de la cuenta.")
             
         # 3. Find Debts to apply
+        from app.domain.models.user import UserRole
+        is_global_admin = user.role in [UserRole.SUPERADMIN, UserRole.ADMIN_MATRIZ]
+        
         if request.deuda_id:
             deuda_especifica = await Deuda.get(request.deuda_id)
             if not deuda_especifica or str(deuda_especifica.cuenta_id) != cuenta_id:
                 raise HTTPException(status_code=404, detail="Deuda específica no encontrada en esta cuenta.")
+            
+            # Security: If not admin, cannot pay debts from other branches
+            if not is_global_admin and user.sucursal_id and deuda_especifica.sucursal_id != user.sucursal_id:
+                 raise HTTPException(status_code=403, detail="No tienes permiso para registrar pagos de deudas de otra sucursal.")
+                 
             if deuda_especifica.estado == EstadoDeuda.PAGADA:
                 raise HTTPException(status_code=400, detail="Esta deuda ya está pagada.")
             if monto_total_abono > Decimal(str(deuda_especifica.saldo_pendiente)) + Decimal("0.01"):
@@ -119,14 +127,20 @@ class CreditoService:
             deudas_a_cobrar = [deuda_especifica]
         else:
             # Pagar las más antiguas primero (FIFO)
-            deudas_a_cobrar = await Deuda.find(
+            filters = [
                 Deuda.cuenta_id == cuenta_id,
                 Deuda.estado != EstadoDeuda.PAGADA,
                 Deuda.estado != EstadoDeuda.ANULADA
-            ).sort(Deuda.fecha_emision).to_list()
+            ]
+            
+            # Restricción por sucursal
+            if not is_global_admin and user.sucursal_id:
+                filters.append(Deuda.sucursal_id == user.sucursal_id)
+                
+            deudas_a_cobrar = await Deuda.find(*filters).sort(Deuda.fecha_emision).to_list()
             
         if not deudas_a_cobrar:
-            raise HTTPException(status_code=400, detail="No hay deudas pendientes en esta cuenta.")
+            raise HTTPException(status_code=400, detail="No hay deudas pendientes en esta cuenta (filtrado por sucursal)." if not is_global_admin else "No hay deudas pendientes en esta cuenta.")
 
         saldo_restante_abono = monto_total_abono
         deudas_afectadas_ids = []

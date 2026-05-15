@@ -35,6 +35,17 @@ async def get_cuentas_credito(
             ]
         })
         
+    # Restricción por sucursal si no es administrador global
+    from app.domain.models.user import UserRole
+    is_global_admin = current_user.role in [UserRole.SUPERADMIN, UserRole.ADMIN_MATRIZ]
+    
+    if not is_global_admin and current_user.sucursal_id:
+        # Encontrar IDs de cuentas que tienen deudas (activas o pagadas) en esta sucursal
+        cuentas_ids = await Deuda.find(Deuda.sucursal_id == current_user.sucursal_id).distinct("cuenta_id")
+        from bson import ObjectId
+        # Nota: Beanie maneja IDs como ObjectId internamente si se pasan así
+        filters.append({"_id": {"$in": [ObjectId(cid) for cid in cuentas_ids]}})
+        
     query = CuentaCredito.find(*filters)
     total = await query.count()
     skip = (page - 1) * limit
@@ -96,6 +107,11 @@ async def get_deudas_por_cuenta(
     if estado:
         filters.append(Deuda.estado == estado)
         
+    from app.domain.models.user import UserRole
+    is_global_admin = current_user.role in [UserRole.SUPERADMIN, UserRole.ADMIN_MATRIZ]
+    if not is_global_admin and current_user.sucursal_id:
+        filters.append(Deuda.sucursal_id == current_user.sucursal_id)
+        
     deudas = await Deuda.find(*filters).sort(-Deuda.fecha_emision).to_list()
     
     return [
@@ -123,9 +139,14 @@ async def get_transacciones_cuenta(
     if not cuenta or cuenta.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
         
-    historial = await TransaccionCredito.find(
-        TransaccionCredito.cuenta_id == cuenta_id
-    ).sort(-TransaccionCredito.created_at).to_list()
+    filters = [TransaccionCredito.cuenta_id == cuenta_id]
+    
+    from app.domain.models.user import UserRole
+    is_global_admin = current_user.role in [UserRole.SUPERADMIN, UserRole.ADMIN_MATRIZ]
+    if not is_global_admin and current_user.sucursal_id:
+        filters.append(TransaccionCredito.sucursal_id == current_user.sucursal_id)
+        
+    historial = await TransaccionCredito.find(*filters).sort(-TransaccionCredito.created_at).to_list()
     
     return [
         {
