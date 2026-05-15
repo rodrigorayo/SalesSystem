@@ -389,7 +389,7 @@ export default function POSPage() {
                                                 ? <img src={p.image_url} alt={p.descripcion} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                                 : <div className="w-full h-full flex items-center justify-center"><Package size={24} className="text-gray-200" /></div>}
                                         </div>
-                                        <p className="text-xs text-gray-900 font-semibold line-clamp-2 leading-tight mb-0.5">{p.descripcion}</p>
+                                        <p className="text-xs text-gray-900 font-semibold leading-tight mb-0.5">{p.descripcion}</p>
                                         {p.codigo_corto && <p className="text-[10px] text-gray-400 font-mono mb-1">{p.codigo_corto}</p>}
                                         <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-gray-100">
                                             <span className="text-sm font-black text-gray-900">${fmt(p.precio_venta)}</span>
@@ -493,7 +493,7 @@ export default function POSPage() {
                                         className="flex items-center gap-2 bg-gray-50 rounded-xl p-2.5"
                                     >
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-semibold text-gray-900 truncate">{item.product.descripcion}</p>
+                                            <p className="text-xs font-semibold text-gray-900">{item.product.descripcion}</p>
                                             <p className="text-[11px] text-gray-400">
                                                 ${fmt(item.precio)} × {item.quantity} =&nbsp;
                                                 <span className="font-bold text-gray-700">${fmt(item.precio * item.quantity)}</span>
