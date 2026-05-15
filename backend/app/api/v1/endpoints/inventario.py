@@ -35,8 +35,11 @@ async def get_inventario(
     
     prod_match = {"tenant_id": tenant_id}
     if search and search.strip():
-        # Using $text native index search! Extremely fast.
-        prod_match["$text"] = {"$search": search.strip()}
+        # Escapar caracteres para búsqueda segura y permitir coincidencias parciales
+        import re
+        safe_search = re.escape(search.strip())
+        prod_match["descripcion"] = {"$regex": safe_search, "$options": "i"}
+        
     if categoria_id:
         prod_match["categoria_id"] = categoria_id
 

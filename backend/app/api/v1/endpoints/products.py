@@ -42,11 +42,13 @@ async def get_products(
 
     if search and search.strip():
         # Search by description or codigo_corto
-        from beanie.operators import Or
+        import re
+        from beanie.operators import Or, RegEx
+        safe_search = re.escape(search.strip())
         base_filter.append(
             Or(
-                RegEx(Product.descripcion, search, options="i"),
-                RegEx(Product.codigo_corto, search, options="i")
+                RegEx(Product.descripcion, safe_search, options="i"),
+                RegEx(Product.codigo_corto, safe_search, options="i")
             )
         )
         

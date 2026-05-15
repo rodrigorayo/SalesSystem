@@ -56,6 +56,7 @@ class CreditoService:
         
         # 3. Update CuentaCredito
         cuenta.saldo_total = DecimalMoney(str(Decimal(str(cuenta.saldo_total)) + monto_deuda))
+        cuenta.updated_at = datetime.utcnow()
         await cuenta.save(session=session)
         
         # 4. Transaccion de Cargo

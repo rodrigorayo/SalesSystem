@@ -83,6 +83,7 @@ async def get_sales(
     end_date: Optional[str] = None,
     solo_facturas: bool = False,
     qr_confirmed: Optional[bool] = None,
+    search: Optional[str] = None,
     page: int = 1,
     limit: int = 50,
     current_user: User = Depends(get_current_active_user)
@@ -97,6 +98,17 @@ async def get_sales(
         
     if sucursal_id:
         filters.append(Sale.sucursal_id == sucursal_id)
+
+    if search and search.strip():
+        import re
+        from beanie.operators import Or, RegEx
+        safe_q = re.escape(search.strip())
+        filters.append(Or(
+            RegEx(Sale.id, safe_q, options="i"),
+            RegEx(Sale.cashier_name, safe_q, options="i"),
+            RegEx(Sale.cliente.razon_social, safe_q, options="i"),
+            RegEx(Sale.cliente.nit, safe_q, options="i")
+        ))
 
     if start_date and end_date:
         from app.utils.date_utils import get_range_bolivia

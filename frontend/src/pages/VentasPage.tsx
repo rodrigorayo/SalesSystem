@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSales, anularSale, getSucursales, toggleFacturaEmitida, checkPosibleDuplicado, getSesionesAbiertas, type MotivoAnulacion } from '../api/api';
 import { useAuthStore } from '../store/authStore';
@@ -348,6 +348,16 @@ export default function VentasPage() {
     const [page, setPage] = useState(1);
     const limit = 50;
 
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
     // Estado del nuevo modal de anulación
     const [anularVenta, setAnularVenta] = useState<Sale | null>(null);
 
@@ -357,8 +367,8 @@ export default function VentasPage() {
     });
 
     const { data: ventasRes, isLoading } = useQuery({
-        queryKey: ['sales-history', selectedSucursal, page, soloFacturas, startDate, endDate, metodoPago],
-        queryFn: () => getSales(selectedSucursal || undefined, page, limit, metodoPago || undefined, soloFacturas, undefined, undefined, startDate || undefined, endDate || undefined)
+        queryKey: ['sales-history', selectedSucursal, page, soloFacturas, startDate, endDate, metodoPago, debouncedSearch],
+        queryFn: () => getSales(selectedSucursal || undefined, page, limit, metodoPago || undefined, soloFacturas, undefined, undefined, startDate || undefined, endDate || undefined, debouncedSearch || undefined)
     });
 
     const ventas = ventasRes?.items || [];
@@ -380,11 +390,8 @@ export default function VentasPage() {
         onError: (err: any) => alert(err.message || 'Error al actualizar el estado de la factura.')
     });
 
-    const filteredVentas = ventas.filter(v => {
-        if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
-        return (v._id || '').toLowerCase().includes(search) || (v.cashier_name || '').toLowerCase().includes(search);
-    });
+    // We now filter on the server
+    const filteredVentas = ventas;
 
     return (
         <div className="max-w-7xl mx-auto px-3 py-4 md:p-4 space-y-4 pb-20 md:pb-4">

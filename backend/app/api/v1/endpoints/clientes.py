@@ -63,25 +63,22 @@ async def listar_clientes(
     tenant_id = current_user.tenant_id or "default"
     filters = [Cliente.tenant_id == tenant_id, Cliente.is_active == True]
     
-    # Or query equivalent done with beanie:
-    if q:
+    if q and q.strip():
         import re
-        pattern = re.compile(q, re.IGNORECASE)
-        # Beanie motor raw query fallback for $or regex
-        query = {
-            "tenant_id": tenant_id,
-            "is_active": True,
-            "$or": [
-                {"nombre": {"$regex": pattern}},
-                {"nit_ci": {"$regex": pattern}},
-                {"telefono": {"$regex": pattern}}
-            ]
-        }
-        clientes_cursor = Cliente.find(query)
-    else:
-        clientes_cursor = Cliente.find(*filters)
+        from beanie.operators import Or, RegEx
         
-    clientes = await clientes_cursor.skip(skip).limit(limit).sort("-created_at").to_list()
+        # Escapar caracteres especiales para evitar errores de regex y permitir búsqueda literal
+        safe_q = re.escape(q.strip())
+        
+        # Filtro de búsqueda por nombre, nit o teléfono
+        search_filter = Or(
+            RegEx(Cliente.nombre, safe_q, options="i"),
+            RegEx(Cliente.nit_ci, safe_q, options="i"),
+            RegEx(Cliente.telefono, safe_q, options="i")
+        )
+        filters.append(search_filter)
+        
+    clientes = await Cliente.find(*filters).skip(skip).limit(limit).sort("-created_at").to_list()
     
     return clientes
 
