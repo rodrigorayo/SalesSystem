@@ -690,7 +690,6 @@ export default function VentasPage() {
                     <TicketPrinter 
                         sale={printSale} 
                         tenantName={user?.tenant_id || "Mi Tienda"} 
-                        isReimprint={true}
                         sucursalName={sucursales.find(s => s._id === printSale.sucursal_id)?.nombre}
                     />
                 )}

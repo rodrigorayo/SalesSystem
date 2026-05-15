@@ -6,10 +6,9 @@ interface TicketPrinterProps {
     sale: Sale;
     tenantName?: string;
     sucursalName?: string;
-    isReimprint?: boolean;
 }
 
-export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName = 'TABOADA', sucursalName, isReimprint }) => {
+export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName = 'TABOADA', sucursalName }) => {
     // Format currency
     const fmt = (n: number) => {
         return new Intl.NumberFormat('es-BO', { style: 'decimal', minimumFractionDigits: 2 }).format(n);
@@ -18,7 +17,6 @@ export const TicketPrinter: React.FC<TicketPrinterProps> = ({ sale, tenantName =
 
 
     const c = sale.cliente;
-    const isFactura = c?.es_factura;
 
     return (
         <div className="print-only" style={{ width: '80mm', margin: '0 auto', fontSize: '11px', fontFamily: 'monospace', color: '#000', padding: '5px' }}>
