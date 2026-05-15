@@ -3,10 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getInventario, getProducts, downloadPedidoPDF } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 
-import {
     ClipboardList, Plus, Truck, CheckCircle2, Clock,
     X, Check, Loader2, ChevronDown, ChevronRight, Package,
-    CheckSquare, Ban, AlertTriangle, Download
+    CheckSquare, Ban, AlertTriangle, Download, Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -507,96 +506,185 @@ export default function PedidosPage() {
                                 </div>
                             </div>
 
-                            {/* Lista de Productos */}
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-[300px]">
-                                <div className="p-4 border-b border-gray-50 flex items-center justify-between gap-4">
-                                    <div>
+                            {/* Lista de Productos y Buscador Directo */}
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-[400px] overflow-visible">
+                                <div className="p-4 border-b border-gray-50">
+                                    <div className="mb-4">
                                         <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Selección de Productos</label>
-                                        <p className="text-[10px] text-gray-400 mt-0.5">Agrega los ítems que deseas trasladar.</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Busca un producto y haz clic para agregarlo al pedido.</p>
                                     </div>
-                                    <div className="flex-1 max-w-xs relative">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Filtrar catálogo..." 
-                                            value={searchProd} 
-                                            onChange={e => setSearchProd(e.target.value)}
-                                            className="w-full border border-gray-200 rounded-xl px-4 py-2 text-xs font-medium text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none placeholder-gray-400 bg-gray-50" 
-                                        />
+                                    
+                                    <div className="relative group">
+                                        <div className="relative">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                                <Search size={18} />
+                                            </div>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Escribe el nombre del producto o código..." 
+                                                value={searchProd} 
+                                                onChange={e => setSearchProd(e.target.value)}
+                                                className="w-full border-2 border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none placeholder-gray-400 bg-gray-50/50 transition-all" 
+                                            />
+                                        </div>
+
+                                        {/* Resultados de Búsqueda (Dropdown) */}
+                                        <AnimatePresence>
+                                            {searchProd.length > 0 && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[60] max-h-64 overflow-y-auto divide-y divide-gray-50"
+                                                >
+                                                    {filteredCatalog.length === 0 ? (
+                                                        <div className="p-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
+                                                            No se encontraron productos
+                                                        </div>
+                                                    ) : (
+                                                        filteredCatalog.map((p: any) => (
+                                                            <button
+                                                                key={p.producto_id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Check if already in list
+                                                                    const exists = orderItems.find(item => item.producto_id === p.producto_id);
+                                                                    if (exists) {
+                                                                        setOrderItems(prev => prev.map(item => 
+                                                                            item.producto_id === p.producto_id 
+                                                                            ? { ...item, cantidad: item.cantidad + 1 } 
+                                                                            : item
+                                                                        ));
+                                                                    } else {
+                                                                        setOrderItems(prev => [...prev, { producto_id: p.producto_id, cantidad: 1 }]);
+                                                                    }
+                                                                    setSearchProd(''); // Limpiar buscador
+                                                                }}
+                                                                className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 transition-colors text-left group/item"
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-bold text-gray-900 group-hover/item:text-indigo-600 transition-colors">{p.producto_nombre}</span>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold">STOCK: {p.cantidad}</span>
+                                                                        <span className="text-[10px] text-gray-400 font-medium">Bs. {(Number(p.precio)||0).toFixed(2)}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                                    <Plus size={16} />
+                                                                </div>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
-                                    <button 
-                                        type="button" 
-                                        onClick={addItem} 
-                                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-2 rounded-xl text-[11px] font-black transition-all flex items-center gap-2 border border-indigo-100"
-                                    >
-                                        <Plus size={14} /> AGREGAR LÍNEA
-                                    </button>
                                 </div>
 
-                                <div className="p-4 space-y-3">
-                                    {orderItems.map((item, i) => (
-                                        <div key={i} className="flex gap-3 items-end animate-in slide-in-from-left-2 duration-200">
-                                            <div className="flex-1">
-                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-wider">Producto</label>
-                                                <select required value={item.producto_id} onChange={e => updateItem(i, 'producto_id', e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs font-bold bg-white transition-all">
-                                                    <option value="">-- Seleccionar --</option>
-                                                    {filteredCatalog.map((p: any) => (
-                                                        <option key={p.producto_id} value={p.producto_id}>
-                                                            {p.producto_nombre} (Stock: {p.cantidad}) — Bs.{(Number(p.precio)||0).toFixed(2)}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                <div className="p-4 flex-1">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Productos en el Pedido</h4>
+                                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-bold">{orderItems.length} ítems</span>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {orderItems.map((item, i) => {
+                                            const p = availableProducts.find((ap: any) => ap.producto_id === item.producto_id);
+                                            return (
+                                                <div key={item.producto_id} className="flex gap-4 items-center bg-gray-50/50 p-3 rounded-2xl border border-gray-100 animate-in slide-in-from-right-4 duration-200">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-bold text-gray-900 truncate">{p?.producto_nombre || 'Cargando...'}</div>
+                                                        <div className="text-[10px] text-gray-500 font-medium mt-0.5">
+                                                            Unitario: Bs. {(Number(p?.precio)||0).toFixed(2)} · Subtotal: <span className="text-indigo-600 font-bold">Bs. {(item.cantidad * (Number(p?.precio)||0)).toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => updateItem(i, 'cantidad', Math.max(1, item.cantidad - 1))}
+                                                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        >
+                                                            <ChevronDown size={14} />
+                                                        </button>
+                                                        <input 
+                                                            type="number" 
+                                                            min="1" 
+                                                            value={item.cantidad} 
+                                                            onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
+                                                            className="w-12 text-center text-sm font-black text-gray-900 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        />
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => updateItem(i, 'cantidad', item.cantidad + 1)}
+                                                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        >
+                                                            <Plus size={14} />
+                                                        </button>
+                                                    </div>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => removeItem(i)} 
+                                                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                    >
+                                                        <X size={20} />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                        
+                                        {orderItems.length === 0 && (
+                                            <div className="text-center py-16 text-gray-400">
+                                                <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-gray-100 rotate-3">
+                                                    <Package size={32} className="opacity-20" />
+                                                </div>
+                                                <p className="text-xs font-black text-gray-300 uppercase tracking-[0.2em]">El pedido está vacío</p>
+                                                <p className="text-[10px] text-gray-400 mt-2">Usa el buscador de arriba para agregar productos</p>
                                             </div>
-                                            <div className="w-24">
-                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-wider">Cant.</label>
-                                                <input required type="number" min="1" value={item.cantidad} onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
-                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-black font-mono focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm text-center bg-white transition-all"
-                                                />
-                                            </div>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => removeItem(i)} 
-                                                className="mb-1 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            >
-                                                <X size={20} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    
-                                    {orderItems.length === 0 && (
-                                        <div className="text-center py-12 text-gray-400">
-                                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                                                <Package size={24} className="opacity-20" />
-                                            </div>
-                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No hay productos seleccionados</p>
-                                            <button type="button" onClick={addItem} className="mt-4 text-[10px] font-black text-indigo-600 hover:underline">PRESIONA AQUÍ PARA EMPEZAR</button>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
+                                
+                                {orderItems.length > 0 && (
+                                    <div className="p-4 bg-indigo-600 rounded-b-2xl flex justify-between items-center text-white">
+                                        <span className="text-xs font-black uppercase tracking-widest">Total Estimado</span>
+                                        <span className="text-lg font-black">
+                                            Bs. {orderItems.reduce((acc, item) => {
+                                                const p = availableProducts.find((ap: any) => ap.producto_id === item.producto_id);
+                                                return acc + (item.cantidad * (Number(p?.precio)||0));
+                                            }, 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Comentarios Adicionales</label>
+                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Comentarios y Observaciones</label>
                                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none resize-none text-xs font-medium transition-all"
+                                    className="w-full border-2 border-gray-50 rounded-2xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none resize-none text-sm font-medium transition-all bg-gray-50/30"
                                     placeholder="Instrucciones para el despacho, motivos especiales, etc."
                                 />
                             </div>
 
-                            <div className="flex gap-3 pt-2">
+                            <div className="flex gap-4 pt-2">
                                 <button 
                                     type="button" 
                                     onClick={() => { setShowCreate(false); resetForm(); }}
-                                    className="flex-1 py-4 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                                    className="flex-1 py-4 text-sm font-black text-gray-400 hover:text-gray-600 transition-colors"
                                 >
-                                    Descartar
+                                    DESCARTAR
                                 </button>
                                 <button 
                                     type="submit" 
                                     disabled={createMut.isPending || orderItems.length === 0}
-                                    className="flex-[2] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-4 rounded-2xl text-sm font-black flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 transition-all active:scale-95"
+                                    className="flex-[2] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-5 rounded-2xl text-base font-black flex items-center justify-center gap-3 shadow-2xl shadow-indigo-200 transition-all active:scale-95 group"
                                 >
-                                    {createMut.isPending ? <Loader2 size={20} className="animate-spin" /> : <><Check size={20} /> CREAR PEDIDO</>}
+                                    {createMut.isPending ? <Loader2 size={24} className="animate-spin" /> : (
+                                        <>
+                                            <Check size={24} /> 
+                                            CREAR PEDIDO AHORA
+                                            <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>
