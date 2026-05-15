@@ -41,7 +41,8 @@ async def get_cuentas_credito(
     
     if not is_global_admin and current_user.sucursal_id:
         # Encontrar IDs de cuentas que tienen deudas (activas o pagadas) en esta sucursal
-        cuentas_ids = await Deuda.find(Deuda.sucursal_id == current_user.sucursal_id).distinct("cuenta_id")
+        # Usamos el motor collection directo para distinct ya que FindMany no lo tiene
+        cuentas_ids = await Deuda.get_motor_collection().distinct("cuenta_id", {"sucursal_id": current_user.sucursal_id})
         from bson import ObjectId
         # Nota: Beanie maneja IDs como ObjectId internamente si se pasan así
         filters.append({"_id": {"$in": [ObjectId(cid) for cid in cuentas_ids]}})
