@@ -27,7 +27,8 @@ class CreditoService:
         
         if not cuenta:
             from app.domain.models.cliente import Cliente # Import here to avoid circular imports if needed
-            cliente = await Cliente.get(cliente_id)
+            # IMPORTANT: Pass session=session so it can read uncommitted clients in the current transaction!
+            cliente = await Cliente.get(cliente_id, session=session)
             cuenta = CuentaCredito(
                 tenant_id=sale.tenant_id,
                 cliente_id=cliente_id,

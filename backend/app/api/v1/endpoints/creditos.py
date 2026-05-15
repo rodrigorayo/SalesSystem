@@ -48,12 +48,18 @@ async def get_cuentas_credito(
         c_nit = getattr(c, "cliente_nit", None)
         c_telefono = getattr(c, "cliente_telefono", None)
         
-        if not c_nombre:
+        if not c_nombre or c_nombre == "Desconocido":
             cli = await Cliente.get(c.cliente_id)
             if cli:
                 c_nombre = cli.nombre
                 c_nit = cli.nit_ci
                 c_telefono = cli.telefono
+                
+                # Auto-heal the database for future queries
+                c.cliente_nombre = c_nombre
+                c.cliente_nit = c_nit
+                c.cliente_telefono = c_telefono
+                await c.save()
 
         result_items.append({
             "id": str(c.id),
