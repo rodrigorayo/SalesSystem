@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClientes, createCliente, updateCliente, deleteCliente } from '../api/clientes';
-import type { Cliente } from '../api/clientes';
 import { toast } from 'sonner';
 
 export const useClientes = (page: number = 1, limit: number = 50, q: string = '') => {
