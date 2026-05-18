@@ -4,7 +4,7 @@ import { getDailyReport, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     Calendar, Loader2, TrendingUp, Wallet, 
-    ShoppingBag, Ban, ArrowDownCircle, Printer, Package, FileDown
+    ShoppingBag, Ban, ArrowDownCircle, Printer, Package, FileDown, Tag
 } from 'lucide-react';
 import { getBoliviaTodayISO, formatFullDate } from '../utils/dateUtils';
 import { descargarPDFJornada } from '../utils/reportPDF';
@@ -174,6 +174,10 @@ export default function DailyReportView() {
                         <div className="pt-4 border-t border-dashed border-gray-200 flex justify-between">
                             <span className="font-bold text-red-500 text-sm flex items-center gap-1.5"><Ban size={14}/> Ventas Anuladas</span>
                             <span className="font-black text-red-600">{formatBs(resumen_ventas.anuladas.monto)} ({resumen_ventas.anuladas.cantidad})</span>
+                        </div>
+                        <div className="pt-2 flex justify-between">
+                            <span className="font-bold text-orange-500 text-sm flex items-center gap-1.5"><Tag size={14}/> Descuentos Otorgados</span>
+                            <span className="font-black text-orange-600">{formatBs(resumen_ventas.total_descuentos)}</span>
                         </div>
                     </div>
                 </div>
