@@ -564,10 +564,11 @@ export default function CajaPage() {
         ? totalFisicoFinal - (resumen?.saldo_calculado ?? 0)
         : null;
 
-    // ── Handlers ──────────────────────────────────────────────────────────
+    const [isSubmittingLocal, setIsSubmittingLocal] = useState(false);
 
     const handleAbrirCaja = () => {
-        if (totalAperturaFinal <= 0) return;
+        if (totalAperturaFinal <= 0 || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         abrirMut.mutate({ monto_inicial: totalAperturaFinal }, {
             onSuccess: () => { 
                 setMontoInicial(''); 
@@ -575,33 +576,39 @@ export default function CajaPage() {
                 setMonedas({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
                 closeModal(); 
             },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleGasto = () => {
-        if (!gastoMonto || !gastoDesc) return;
+        if (!gastoMonto || !gastoDesc || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         gastoMut.mutate({
             monto: parseFloat(gastoMonto),
             descripcion: gastoDesc,
             categoria_id: gastoCategId || undefined,
         }, {
             onSuccess: () => { setGastoMonto(''); setGastoDesc(''); setGastoCategId(''); closeModal(); },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleIngreso = () => {
-        if (!ingresoMonto || !ingresoDesc) return;
+        if (!ingresoMonto || !ingresoDesc || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         ingresoMut.mutate({
             monto: parseFloat(ingresoMonto),
             descripcion: ingresoDesc,
             metodo: ingresoMetodo,
         }, {
             onSuccess: () => { setIngresoMonto(''); setIngresoDesc(''); setIngresoMetodo('EFECTIVO'); closeModal(); },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleCierre = () => {
-        if (!sesion || totalFisicoFinal === 0) return;
+        if (!sesion || totalFisicoFinal === 0 || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         cerrarMut.mutate({
             sesionId: sesion._id,
             data: { monto_fisico_contado: totalFisicoFinal, notas: notasCierre || undefined },
@@ -614,13 +621,16 @@ export default function CajaPage() {
                 closeModal();
                 setTab('historial');
             },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleCrearCategoria = () => {
-        if (!catNombre) return;
+        if (!catNombre || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         catMut.mutate({ nombre: catNombre, descripcion: catDesc || undefined, icono: catIcono }, {
             onSuccess: () => { setCatNombre(''); setCatDesc(''); setCatIcono('receipt'); closeModal(); },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
