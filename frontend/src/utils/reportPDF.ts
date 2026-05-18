@@ -125,6 +125,7 @@ export function descargarPDFJornada(report: any, fecha: string, sucursalNombre: 
         head: [['Método', 'Monto (Bs.)']],
         body: [
             ...metodos.map(([m, v]) => [m, bs(v)]),
+            ['Vueltos Entregados (Cambio)', bs(resumen_ventas.total_cambio || 0)],
             ['Anuladas', `${bs(resumen_ventas.anuladas?.monto || 0)} (${resumen_ventas.anuladas?.cantidad || 0})`],
         ],
         styles: { fontSize: 9, cellPadding: 3 },

@@ -386,6 +386,7 @@ async def get_daily_report(
         "resumen_ventas": {
             "total_bruto":      float(total_ventas),
             "total_descuentos": float(total_descuentos),
+            "total_cambio":     float(total_cambio),
             "por_metodo":       {k: float(v) for k, v in ventas_por_metodo.items()},
             "anuladas": {
                 "cantidad": anuladas_count,
