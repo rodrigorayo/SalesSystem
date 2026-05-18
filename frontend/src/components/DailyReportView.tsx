@@ -73,7 +73,7 @@ export default function DailyReportView() {
                         <select 
                             value={selectedSucursal}
                             onChange={(e) => setSelectedSucursal(e.target.value)}
-                            className="bg-gray-50 border-transparent focus:ring-2 focus:ring-indigo-200 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-all"
+                            className="bg-gray-50 text-gray-900 border-transparent focus:ring-2 focus:ring-indigo-200 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-all"
                         >
                             {sucursales.map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                         </select>
