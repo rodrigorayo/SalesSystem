@@ -238,7 +238,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                         <select 
                             value={destinoId} 
                             onChange={(e) => setDestinoId(e.target.value)}
-                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
                         >
                             <option value="">-- Seleccionar Destino --</option>
                             {sucursales.filter((s: any) => s._id !== user?.sucursal_id).map((s: any) => (
@@ -251,7 +251,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                         <label className="block text-sm font-bold text-gray-700 mb-2">Agregar Productos</label>
                         <select 
                             onChange={(e) => addItem(e.target.value)}
-                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
                             value=""
                         >
                             <option value="">Buscar producto...</option>
