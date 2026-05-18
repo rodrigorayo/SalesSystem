@@ -321,17 +321,24 @@ async def get_daily_report(
     ).to_list()
 
     total_gastos = _ZERO
+    total_cambio = _ZERO
     gastos_list = []
     
     for m in movimientos:
-        if m.tipo == "EGRESO" and m.subtipo == SubtipoMovimiento.GASTO:
-            total_gastos += m.monto
-            gastos_list.append({
-                "descripcion": m.descripcion,
-                "monto": float(m.monto),
-                "cajero": m.cajero_name,
-                "hora": m.fecha.strftime("%H:%M")
-            })
+        if m.tipo == "EGRESO":
+            if m.subtipo == SubtipoMovimiento.GASTO:
+                total_gastos += m.monto
+                gastos_list.append({
+                    "descripcion": m.descripcion,
+                    "monto": float(m.monto),
+                    "cajero": m.cajero_name,
+                    "hora": m.fecha.strftime("%H:%M")
+                })
+            elif m.subtipo == SubtipoMovimiento.CAMBIO:
+                total_cambio += m.monto
+
+    # Ajustar el total en efectivo restando los cambios entregados (vueltos)
+    ventas_por_metodo["EFECTIVO"] = max(_ZERO, ventas_por_metodo.get("EFECTIVO", _ZERO) - total_cambio)
 
     # 3. Simple inventory items sold count
     items_vendidos_pipeline = [
