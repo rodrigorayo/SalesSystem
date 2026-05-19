@@ -172,16 +172,8 @@ export const usePosStore = create<PosState>()((set, get) => ({
         if (desc.tipo === 'MONTO') finalC = sub - val;
         else finalC = sub - (sub * val / 100);
 
-        // Redondeo comercial manual (Manejo de monedas físicas)
-        const intPart = Math.floor(finalC);
-        const frac = finalC - intPart;
-        const fracFixed = Math.round(frac * 100) / 100;
-
-        if (fracFixed < 0.5) finalC = intPart;
-        else if (fracFixed > 0.5) finalC = intPart + 1;
-        else finalC = intPart + 0.5;
-
-        return Math.max(0, finalC);
+        // Se eliminó el redondeo comercial a moneda física para permitir centavos exactos
+        return Math.max(0, Math.round(finalC * 100) / 100);
     },
     totalCubierto: () => get().pagos.reduce((acc, p) => acc + p.monto, 0),
     restante: () => Math.max(0, get().total() - get().totalCubierto()),
