@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Truck, Plus, ArrowRight, Package, CheckCircle2, Clock, XCircle, FileText } from 'lucide-react';
 import { getTraslados, despacharTraslado, recibirTraslado, cancelarTraslado } from '../api/traslados';
-import { getSucursales, getProducts } from '../api/api';
+import { getSucursales, getInventario } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 
@@ -180,18 +180,19 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
     const [destinoId, setDestinoId] = useState('');
     const [notas, setNotas] = useState('');
     const [items, setItems] = useState<any[]>([]);
+    const [search, setSearch] = useState('');
 
-    const { data: productosResponse } = useQuery({
-        queryKey: ['products'],
-        queryFn: () => getProducts(1, 1000),
+    const sucursalId = user?.sucursal_id || 'CENTRAL';
+
+    const { data: inventarioResponse, isLoading: isLoadingInventario } = useQuery({
+        queryKey: ['inventario-traslado', sucursalId, search],
+        queryFn: () => getInventario(sucursalId, 1, 100, search || undefined),
     });
-    const productos = (productosResponse as any)?.items || [];
-
-    const getUserStock = (prod: any) => {
-        const branchId = user?.sucursal_id || 'CENTRAL';
-        const inv = prod.inventario?.find((i: any) => i.sucursal_id === branchId);
-        return inv ? inv.cantidad : 0;
-    };
+    const inventario = (inventarioResponse as any)?.items || [];
+    // Only show products that are NOT already in the items list
+    const productosDisponibles = inventario.filter((inv: any) => 
+        !items.find(i => i.producto_id === inv.producto_id)
+    );
 
     const mutation = useMutation({
         mutationFn: despacharTraslado,
@@ -201,42 +202,45 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
             onClose();
         },
         onError: (err: any) => {
-            toast.error(err.response?.data?.detail || 'Error al despachar el traslado');
+            const msg = (err as any)?.message || 'Error al despachar el traslado';
+            toast.error(msg);
         }
     });
 
-    const addItem = (productoId: string) => {
-        if (!productoId) return;
-        const prod = productos.find((p: any) => p._id === productoId);
-        if (prod) {
-            const stock = getUserStock(prod);
-            if (stock <= 0) {
-                toast.error(`No tienes stock de '${prod.descripcion}' en tu sucursal para transferir.`);
-                return;
-            }
-            if (!items.find(i => i.producto_id === productoId)) {
-                setItems([...items, { producto_id: productoId, descripcion: prod.descripcion, cantidad: 1, maxStock: stock }]);
-            }
+    const addItem = (inv: any) => {
+        if (!inv) return;
+        if (inv.cantidad <= 0) {
+            toast.error(`No tienes stock de '${inv.producto_nombre}' en tu sucursal.`);
+            return;
+        }
+        if (!items.find(i => i.producto_id === inv.producto_id)) {
+            setItems([...items, { 
+                producto_id: inv.producto_id, 
+                descripcion: inv.producto_nombre, 
+                cantidad: 1, 
+                maxStock: inv.cantidad 
+            }]);
+            setSearch('');
         }
     };
 
     const updateQty = (id: string, qty: number) => {
         const item = items.find(i => i.producto_id === id);
         if (item && qty > item.maxStock) {
-            toast.warning(`La cantidad ingresada supera el stock disponible (${item.maxStock})`);
+            toast.warning(`Stock insuficiente. Máximo disponible: ${item.maxStock}`);
         }
         setItems(items.map(i => i.producto_id === id ? { ...i, cantidad: qty } : i));
     };
 
+    const hasErrors = items.some(i => i.cantidad > i.maxStock || i.cantidad < 1);
+
     const handleSubmit = () => {
         if (!destinoId) return toast.error("Selecciona una sucursal destino");
         if (items.length === 0) return toast.error("Agrega al menos un producto");
-        
         const exceedsItem = items.find(i => i.cantidad > i.maxStock);
         if (exceedsItem) {
-            return toast.error(`No tienes suficiente inventario para '${exceedsItem.descripcion}'. Stock disponible: ${exceedsItem.maxStock}`);
+            return toast.error(`Stock insuficiente para '${exceedsItem.descripcion}'. Disponible: ${exceedsItem.maxStock}`);
         }
-        
         mutation.mutate({
             sucursal_destino_id: destinoId,
             notas,
@@ -254,7 +258,8 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto space-y-6">
+                <div className="p-6 overflow-y-auto space-y-5">
+                    {/* Destino */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">Sucursal Destino</label>
                         <select 
@@ -269,59 +274,93 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                         </select>
                     </div>
 
+                    {/* Buscador de productos */}
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Agregar Productos</label>
-                        <select 
-                            onChange={(e) => addItem(e.target.value)}
-                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
-                            value=""
-                        >
-                            <option value="">Buscar producto...</option>
-                            {productos.map((p: any) => {
-                                const stock = getUserStock(p);
-                                return (
-                                    <option key={p._id} value={p._id}>
-                                        {p.descripcion} (Stock disponible: {stock})
-                                    </option>
-                                );
-                            })}
-                        </select>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Buscar Producto de tu Sucursal
+                        </label>
+                        <div className="relative">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Buscar por nombre..."
+                                className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
+                            />
+                        </div>
+
+                        {/* Resultados de búsqueda */}
+                        {search && (
+                            <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden shadow-lg max-h-52 overflow-y-auto">
+                                {isLoadingInventario ? (
+                                    <div className="p-3 text-sm text-gray-400 text-center">Buscando...</div>
+                                ) : productosDisponibles.length === 0 ? (
+                                    <div className="p-3 text-sm text-gray-400 text-center">No se encontraron productos con stock</div>
+                                ) : (
+                                    productosDisponibles.map((inv: any) => (
+                                        <button
+                                            key={inv.producto_id}
+                                            onClick={() => addItem(inv)}
+                                            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-indigo-50 text-left transition-colors border-b border-gray-50 last:border-0"
+                                        >
+                                            <span className="text-sm font-medium text-gray-800">{inv.producto_nombre}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${
+                                                inv.cantidad > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                                            }`}>
+                                                Stock: {inv.cantidad}
+                                            </span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        )}
                     </div>
 
+                    {/* Tabla de ítems seleccionados */}
                     {items.length > 0 && (
                         <div className="border border-gray-200 rounded-xl overflow-hidden">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-50 text-gray-500">
+                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                                     <tr>
-                                        <th className="p-3">Producto</th>
-                                        <th className="p-3 text-center">Disponible</th>
-                                        <th className="p-3 w-32 text-center">Cantidad</th>
-                                        <th className="p-3 w-16"></th>
+                                        <th className="px-4 py-3">Producto</th>
+                                        <th className="px-4 py-3 text-center">Disponible</th>
+                                        <th className="px-4 py-3 w-32 text-center">Cantidad</th>
+                                        <th className="px-4 py-3 w-10"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {items.map(item => {
-                                        const hasError = item.cantidad > item.maxStock;
+                                        const hasError = item.cantidad > item.maxStock || item.cantidad < 1;
                                         return (
-                                            <tr key={item.producto_id}>
-                                                <td className="p-3 font-medium text-gray-700">{item.descripcion}</td>
-                                                <td className="p-3 text-center font-bold text-gray-500">{item.maxStock}</td>
-                                                <td className="p-3">
+                                            <tr key={item.producto_id} className={hasError ? 'bg-red-50' : ''}>
+                                                <td className="px-4 py-3 font-medium text-gray-800">{item.descripcion}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-gray-500">{item.maxStock}</td>
+                                                <td className="px-4 py-3">
                                                     <input 
                                                         type="number" 
                                                         min="1"
+                                                        max={item.maxStock}
                                                         value={item.cantidad}
                                                         onChange={e => updateQty(item.producto_id, parseInt(e.target.value) || 1)}
                                                         onFocus={(e) => e.target.select()}
-                                                        className={`w-full p-2 border rounded-lg text-center font-bold ${
+                                                        className={`w-full p-2 border rounded-lg text-center font-bold transition-colors ${
                                                             hasError 
-                                                                ? 'border-red-500 bg-red-50 text-red-600 focus:ring-red-500 focus:border-red-500' 
-                                                                : 'border-gray-200 text-black focus:ring-indigo-500 focus:border-indigo-500'
+                                                                ? 'border-red-400 bg-red-100 text-red-700' 
+                                                                : 'border-gray-200 text-black'
                                                         }`}
                                                     />
+                                                    {hasError && (
+                                                        <p className="text-[10px] text-red-500 text-center mt-1">
+                                                            Máx. {item.maxStock}
+                                                        </p>
+                                                    )}
                                                 </td>
-                                                <td className="p-3">
-                                                    <button onClick={() => setItems(items.filter(i => i.producto_id !== item.producto_id))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
+                                                <td className="px-4 py-3">
+                                                    <button 
+                                                        onClick={() => setItems(items.filter(i => i.producto_id !== item.producto_id))} 
+                                                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                                                    >
                                                         <XCircle size={18} />
                                                     </button>
                                                 </td>
@@ -333,6 +372,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                         </div>
                     )}
 
+                    {/* Notas */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">Notas (Opcional)</label>
                         <input 
@@ -340,7 +380,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                             value={notas}
                             onChange={(e) => setNotas(e.target.value)}
                             placeholder="Ej. Envío por bus, caja azul..."
-                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
                         />
                     </div>
                 </div>
@@ -351,7 +391,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                     </button>
                     <button 
                         onClick={handleSubmit}
-                        disabled={mutation.isPending || items.some(i => i.cantidad > i.maxStock)}
+                        disabled={mutation.isPending || hasErrors}
                         className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center gap-2"
                     >
                         {mutation.isPending ? <Clock size={16} className="animate-spin" /> : <Truck size={16} />}
