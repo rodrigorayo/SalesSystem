@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Truck, Plus, ArrowRight, Package, CheckCircle2, Clock, XCircle, FileText } from 'lucide-react';
+import { Truck, Plus, ArrowRight, Package, CheckCircle2, Clock, XCircle, FileText, Search } from 'lucide-react';
 import { getTraslados, despacharTraslado, recibirTraslado, cancelarTraslado } from '../api/traslados';
 import { getSucursales, getInventario } from '../api/api';
 import { useAuthStore } from '../store/authStore';
