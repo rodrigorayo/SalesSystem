@@ -80,7 +80,7 @@ async def get_inventario(
         "$facet": {
             "metadata": [{"$count": "total"}],
             "data": [
-                {"$sort": {"score": {"$meta": "textScore"}} if search else {"_id": -1}},
+                {"$sort": {"descripcion": 1} if search else {"_id": -1}},
                 {"$skip": skip},
                 {"$limit": limit}
             ]
