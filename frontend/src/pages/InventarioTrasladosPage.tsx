@@ -8,11 +8,14 @@ import { toast } from 'sonner';
 import { formatFullDate } from '../utils/dateUtils';
 
 export default function InventarioTrasladosPage() {
+    const { user } = useAuthStore();
     const queryClient = useQueryClient();
     const [tab, setTab] = useState<'enviados' | 'recibidos'>('enviados');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isReceiveModalOpen, setIsReceiveModalOpen] = useState<string | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState<any | null>(null);
+
+    const canManage = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN_SUCURSAL' || user?.role === 'ADMIN';
 
     // Queries
     const { data: trasladosData, isLoading } = useQuery({
@@ -50,13 +53,15 @@ export default function InventarioTrasladosPage() {
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">Mueve stock entre sucursales sin afectar la caja.</p>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 w-full sm:w-auto justify-center"
-                >
-                    <Plus size={20} />
-                    Nuevo Traslado
-                </button>
+                {canManage && (
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 w-full sm:w-auto justify-center"
+                    >
+                        <Plus size={20} />
+                        Nuevo Traslado
+                    </button>
+                )}
             </div>
 
             {/* Tabs */}
@@ -200,6 +205,8 @@ export default function InventarioTrasladosPage() {
 // ─── Componentes Hijos (Modales) ─────────────────────────────────────────────
 
 function TrasladoDetailModal({ traslado: t, onClose, onReceive, onCancel, tab }: any) {
+    const { user } = useAuthStore();
+    const canManage = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN_SUCURSAL' || user?.role === 'ADMIN';
     const bs = (n: number) => `Bs. ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
     const handlePDF = async () => {
@@ -434,12 +441,12 @@ function TrasladoDetailModal({ traslado: t, onClose, onReceive, onCancel, tab }:
                 {/* Footer actions */}
                 <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex flex-wrap justify-between items-center gap-3">
                     <div className="flex gap-2">
-                        {tab === 'recibidos' && t.estado === 'EN_TRANSITO' && (
+                        {canManage && tab === 'recibidos' && t.estado === 'EN_TRANSITO' && (
                             <button onClick={() => onReceive(t)} className="px-4 py-2 bg-emerald-500 text-white font-bold text-sm rounded-xl hover:bg-emerald-600 transition-colors flex items-center gap-2">
                                 <CheckCircle2 size={16} /> Recibir Mercadería
                             </button>
                         )}
-                        {tab === 'enviados' && t.estado === 'EN_TRANSITO' && (
+                        {canManage && tab === 'enviados' && t.estado === 'EN_TRANSITO' && (
                             <button onClick={() => onCancel(t._id)} className="px-4 py-2 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors">
                                 Cancelar Envío
                             </button>
