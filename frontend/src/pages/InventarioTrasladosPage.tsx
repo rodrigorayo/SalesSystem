@@ -855,9 +855,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
             </div>
         </div>
     );
-
-
-
+}
 
 function ReceiveTrasladoModal({ onClose, traslado, onSuccess }: any) {
     const [items, setItems] = useState<any[]>(traslado.items.map((i: any) => ({ ...i, cantidad_recibida: i.cantidad_enviada })));
