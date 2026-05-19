@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Truck, Plus, ArrowRight, Package, CheckCircle2, Clock, XCircle, FileText, Search, Download, Eye } from 'lucide-react';
+import { Truck, Plus, ArrowRight, Package, CheckCircle2, Clock, XCircle, FileText, Search, Download, Eye, User2, Building2 } from 'lucide-react';
 import { getTraslados, despacharTraslado, recibirTraslado, cancelarTraslado } from '../api/traslados';
-import { getSucursales, getInventario } from '../api/api';
+import { getSucursales, getInventario, getClientes, createCliente } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 
@@ -440,10 +440,17 @@ function TrasladoDetailModal({ traslado: t, onClose, onReceive, onCancel, tab }:
 
 function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
     const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const [destinoTipo, setDestinoTipo] = useState<'SUCURSAL' | 'CLIENTE'>('SUCURSAL');
     const [destinoId, setDestinoId] = useState('');
     const [notas, setNotas] = useState('');
     const [items, setItems] = useState<any[]>([]);
     const [search, setSearch] = useState('');
+    const [clienteSearch, setClienteSearch] = useState('');
+    const [clienteSeleccionado, setClienteSeleccionado] = useState<any | null>(null);
+    const [showNuevoCliente, setShowNuevoCliente] = useState(false);
+    const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', telefono: '', ci: '' });
+    const [confirmando, setConfirmando] = useState(false);
 
     const sucursalId = user?.sucursal_id || 'CENTRAL';
 
@@ -452,64 +459,406 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
         queryFn: () => getInventario(sucursalId, 1, 100, search || undefined),
     });
     const inventario = (inventarioResponse as any)?.items || [];
-    // Only show products that are NOT already in the items list
-    const productosDisponibles = inventario.filter((inv: any) => 
+    const productosDisponibles = inventario.filter((inv: any) =>
         !items.find(i => i.producto_id === inv.producto_id)
     );
+
+    const { data: clientesData } = useQuery({
+        queryKey: ['clientes-search', clienteSearch],
+        queryFn: () => getClientes(clienteSearch || undefined),
+        enabled: destinoTipo === 'CLIENTE',
+    });
+    const clientes = Array.isArray(clientesData) ? clientesData : [];
+
+    const crearClienteMutation = useMutation({
+        mutationFn: createCliente,
+        onSuccess: (newClient: any) => {
+            setClienteSeleccionado(newClient);
+            setShowNuevoCliente(false);
+            queryClient.invalidateQueries({ queryKey: ['clientes-search'] });
+            toast.success(`Cliente "${newClient.nombre}" registrado.`);
+        },
+        onError: () => toast.error('Error al registrar el cliente'),
+    });
 
     const mutation = useMutation({
         mutationFn: despacharTraslado,
         onSuccess: () => {
-            toast.success('Traslado despachado exitosamente');
+            toast.success(destinoTipo === 'CLIENTE' ? 'Entrega al cliente registrada exitosamente' : 'Traslado despachado exitosamente');
             onSuccess();
             onClose();
         },
-        onError: (err: any) => {
-            const msg = (err as any)?.message || 'Error al despachar el traslado';
-            toast.error(msg);
-        }
+        onError: (err: any) => toast.error(err?.message || 'Error al despachar')
     });
 
     const addItem = (inv: any) => {
         if (!inv) return;
         if (inv.cantidad <= 0) {
-            toast.error(`No tienes stock de '${inv.producto_nombre}' en tu sucursal.`);
+            toast.error(`Sin stock de '${inv.producto_nombre}'.`);
             return;
         }
         if (!items.find(i => i.producto_id === inv.producto_id)) {
-            setItems([...items, { 
-                producto_id: inv.producto_id, 
-                descripcion: inv.producto_nombre, 
-                cantidad: 1, 
-                maxStock: inv.cantidad 
-            }]);
+            setItems([...items, { producto_id: inv.producto_id, descripcion: inv.producto_nombre, cantidad: 1, maxStock: inv.cantidad }]);
             setSearch('');
         }
     };
 
     const updateQty = (id: string, qty: number) => {
         const item = items.find(i => i.producto_id === id);
-        if (item && qty > item.maxStock) {
-            toast.warning(`Stock insuficiente. Máximo disponible: ${item.maxStock}`);
-        }
+        if (item && qty > item.maxStock) toast.warning(`Stock máx.: ${item.maxStock}`);
         setItems(items.map(i => i.producto_id === id ? { ...i, cantidad: qty } : i));
     };
 
     const hasErrors = items.some(i => i.cantidad > i.maxStock || i.cantidad < 1);
 
-    const handleSubmit = () => {
-        if (!destinoId) return toast.error("Selecciona una sucursal destino");
-        if (items.length === 0) return toast.error("Agrega al menos un producto");
-        const exceedsItem = items.find(i => i.cantidad > i.maxStock);
-        if (exceedsItem) {
-            return toast.error(`Stock insuficiente para '${exceedsItem.descripcion}'. Disponible: ${exceedsItem.maxStock}`);
+    const puedeConfirmar = () => {
+        if (items.length === 0) return false;
+        if (hasErrors) return false;
+        if (destinoTipo === 'SUCURSAL' && !destinoId) return false;
+        if (destinoTipo === 'CLIENTE' && !clienteSeleccionado) return false;
+        return true;
+    };
+
+    const handleConfirmar = () => {
+        if (!puedeConfirmar()) {
+            if (items.length === 0) return toast.error('Agrega al menos un producto');
+            if (destinoTipo === 'SUCURSAL' && !destinoId) return toast.error('Selecciona la sucursal destino');
+            if (destinoTipo === 'CLIENTE' && !clienteSeleccionado) return toast.error('Selecciona o registra un cliente');
+            return;
         }
+        setConfirmando(true);
+    };
+
+    const handleDespachar = () => {
         mutation.mutate({
-            sucursal_destino_id: destinoId,
+            destino_tipo: destinoTipo,
+            sucursal_destino_id: destinoTipo === 'SUCURSAL' ? destinoId : undefined,
+            cliente_destino_id: destinoTipo === 'CLIENTE' ? clienteSeleccionado?._id : undefined,
+            cliente_destino_nombre: destinoTipo === 'CLIENTE' ? clienteSeleccionado?.nombre : undefined,
             notas,
             items: items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad }))
         });
     };
+
+    const destinoNombre = destinoTipo === 'SUCURSAL'
+        ? (sucursales.find((s: any) => s._id === destinoId)?.nombre || '')
+        : clienteSeleccionado?.nombre || '';
+
+    const totalValor = items.reduce((acc: number, i: any) => {
+        const inv = inventario.find((p: any) => p.producto_id === i.producto_id);
+        return acc + (inv ? (inv.precio || 0) * i.cantidad : 0);
+    }, 0);
+
+    // ─ Confirmation step ─
+    if (confirmando) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+                    <div className="bg-gradient-to-r from-indigo-700 to-indigo-600 px-6 py-5">
+                        <h2 className="text-xl font-black text-white">Confirmar Traslado</h2>
+                        <p className="text-indigo-200 text-sm mt-0.5">Revisa los datos antes de despachar</p>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex gap-3">
+                            <div className="flex-1 bg-gray-50 rounded-2xl p-4">
+                                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Origen</p>
+                                <p className="font-black text-gray-800 mt-0.5">{sucursales.find((s: any) => s._id === sucursalId)?.nombre || 'Tu Sucursal'}</p>
+                            </div>
+                            <div className="flex items-center text-gray-300"><ArrowRight size={20} /></div>
+                            <div className="flex-1 bg-indigo-50 rounded-2xl p-4">
+                                <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">{destinoTipo === 'SUCURSAL' ? 'Sucursal Destino' : 'Cliente'}</p>
+                                <p className="font-black text-indigo-800 mt-0.5">{destinoNombre}</p>
+                            </div>
+                        </div>
+
+                        <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 text-gray-500 text-xs">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left">Producto</th>
+                                        <th className="px-4 py-2 text-center">Cant.</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {items.map((item: any) => (
+                                        <tr key={item.producto_id}>
+                                            <td className="px-4 py-2 font-medium text-gray-800">{item.descripcion}</td>
+                                            <td className="px-4 py-2 text-center font-bold text-indigo-700">{item.cantidad}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {destinoTipo === 'CLIENTE' && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 font-medium">
+                                ⚠️ La entrega a cliente se registra como COMPLETADA inmediatamente. El stock sale de tu sucursal ahora.
+                            </div>
+                        )}
+
+                        {notas && <p className="text-sm text-gray-500 italic">“{notas}”</p>}
+                    </div>
+                    <div className="px-6 py-4 border-t bg-gray-50 flex justify-between gap-3">
+                        <button onClick={() => setConfirmando(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">
+                            ← Volver
+                        </button>
+                        <button
+                            onClick={handleDespachar}
+                            disabled={mutation.isPending}
+                            className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {mutation.isPending ? <Clock size={16} className="animate-spin" /> : <Truck size={16} />}
+                            {destinoTipo === 'CLIENTE' ? 'Confirmar Entrega' : 'Despachar a Sucursal'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <h2 className="text-xl font-black text-gray-800">Nuevo Traslado</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                        <XCircle size={24} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto space-y-5">
+                    {/* Destination type toggle */}
+                    <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl">
+                        <button
+                            onClick={() => { setDestinoTipo('SUCURSAL'); setClienteSeleccionado(null); }}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                                destinoTipo === 'SUCURSAL' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            <Building2 size={16} /> A Sucursal
+                        </button>
+                        <button
+                            onClick={() => { setDestinoTipo('CLIENTE'); setDestinoId(''); }}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                                destinoTipo === 'CLIENTE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            <User2 size={16} /> A Cliente
+                        </button>
+                    </div>
+
+                    {/* Sucursal selector */}
+                    {destinoTipo === 'SUCURSAL' && (
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Sucursal Destino</label>
+                            <select
+                                value={destinoId}
+                                onChange={(e) => setDestinoId(e.target.value)}
+                                className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
+                            >
+                                <option value="">-- Seleccionar Sucursal --</option>
+                                {sucursales.filter((s: any) => s._id !== user?.sucursal_id).map((s: any) => (
+                                    <option key={s._id} value={s._id}>{s.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Client selector */}
+                    {destinoTipo === 'CLIENTE' && (
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Cliente Destino</label>
+                            {clienteSeleccionado ? (
+                                <div className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                                    <User2 size={20} className="text-indigo-500 shrink-0" />
+                                    <div className="flex-1">
+                                        <p className="font-bold text-indigo-800">{clienteSeleccionado.nombre}</p>
+                                        {clienteSeleccionado.telefono && <p className="text-xs text-indigo-500">{clienteSeleccionado.telefono}</p>}
+                                    </div>
+                                    <button onClick={() => setClienteSeleccionado(null)} className="text-indigo-400 hover:text-indigo-700">
+                                        <XCircle size={18} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="relative mb-2">
+                                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={clienteSearch}
+                                            onChange={(e) => setClienteSearch(e.target.value)}
+                                            placeholder="Buscar cliente por nombre..."
+                                            className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-black"
+                                        />
+                                    </div>
+                                    {clienteSearch && (
+                                        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-md max-h-44 overflow-y-auto mb-2">
+                                            {clientes.length === 0 ? (
+                                                <div className="p-3 text-sm text-gray-400 text-center">Sin resultados</div>
+                                            ) : (
+                                                clientes.map((c: any) => (
+                                                    <button
+                                                        key={c._id}
+                                                        onClick={() => { setClienteSeleccionado(c); setClienteSearch(''); }}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 text-left border-b border-gray-50 last:border-0"
+                                                    >
+                                                        <User2 size={15} className="text-gray-400" />
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-800">{c.nombre}</p>
+                                                            {c.telefono && <p className="text-xs text-gray-400">{c.telefono}</p>}
+                                                        </div>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => setShowNuevoCliente(!showNuevoCliente)}
+                                        className="text-sm text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-1"
+                                    >
+                                        <Plus size={14} /> Registrar cliente nuevo
+                                    </button>
+                                    {showNuevoCliente && (
+                                        <div className="mt-3 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-3">
+                                            <p className="text-sm font-black text-indigo-700">Nuevo Cliente</p>
+                                            <input type="text" placeholder="Nombre completo *" value={nuevoCliente.nombre}
+                                                onChange={e => setNuevoCliente({...nuevoCliente, nombre: e.target.value})}
+                                                className="w-full p-2.5 rounded-xl border border-indigo-200 bg-white text-sm text-black outline-none focus:ring-2 focus:ring-indigo-400"
+                                            />
+                                            <div className="flex gap-2">
+                                                <input type="text" placeholder="Teléfono" value={nuevoCliente.telefono}
+                                                    onChange={e => setNuevoCliente({...nuevoCliente, telefono: e.target.value})}
+                                                    className="flex-1 p-2.5 rounded-xl border border-indigo-200 bg-white text-sm text-black outline-none focus:ring-2 focus:ring-indigo-400"
+                                                />
+                                                <input type="text" placeholder="CI (opcional)" value={nuevoCliente.ci}
+                                                    onChange={e => setNuevoCliente({...nuevoCliente, ci: e.target.value})}
+                                                    className="flex-1 p-2.5 rounded-xl border border-indigo-200 bg-white text-sm text-black outline-none focus:ring-2 focus:ring-indigo-400"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (!nuevoCliente.nombre.trim()) return toast.error('El nombre es requerido');
+                                                    crearClienteMutation.mutate({ nombre: nuevoCliente.nombre, telefono: nuevoCliente.telefono, ci: nuevoCliente.ci });
+                                                }}
+                                                disabled={crearClienteMutation.isPending}
+                                                className="w-full py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50"
+                                            >
+                                                {crearClienteMutation.isPending ? 'Guardando...' : 'Guardar Cliente'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Product search */}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Buscar Producto de tu Sucursal</label>
+                        <div className="relative">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Buscar por nombre..."
+                                className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
+                            />
+                        </div>
+                        {search && (
+                            <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden shadow-lg max-h-52 overflow-y-auto">
+                                {isLoadingInventario ? (
+                                    <div className="p-3 text-sm text-gray-400 text-center">Buscando...</div>
+                                ) : productosDisponibles.length === 0 ? (
+                                    <div className="p-3 text-sm text-gray-400 text-center">Sin resultados con stock</div>
+                                ) : (
+                                    productosDisponibles.map((inv: any) => (
+                                        <button key={inv.producto_id} onClick={() => addItem(inv)}
+                                            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-indigo-50 text-left transition-colors border-b border-gray-50 last:border-0"
+                                        >
+                                            <span className="text-sm font-medium text-gray-800">{inv.producto_nombre}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${inv.cantidad > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                                Stock: {inv.cantidad}
+                                            </span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Items table */}
+                    {items.length > 0 && (
+                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-4 py-3">Producto</th>
+                                        <th className="px-4 py-3 text-center">Disponible</th>
+                                        <th className="px-4 py-3 w-32 text-center">Cantidad</th>
+                                        <th className="px-4 py-3 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {items.map(item => {
+                                        const hasError = item.cantidad > item.maxStock || item.cantidad < 1;
+                                        return (
+                                            <tr key={item.producto_id} className={hasError ? 'bg-red-50' : ''}>
+                                                <td className="px-4 py-3 font-medium text-gray-800">{item.descripcion}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-gray-500">{item.maxStock}</td>
+                                                <td className="px-4 py-3">
+                                                    <input type="number" min="1" max={item.maxStock}
+                                                        value={item.cantidad}
+                                                        onChange={e => updateQty(item.producto_id, parseInt(e.target.value) || 1)}
+                                                        onFocus={(e) => e.target.select()}
+                                                        className={`w-full p-2 border rounded-lg text-center font-bold transition-colors ${
+                                                            hasError ? 'border-red-400 bg-red-100 text-red-700' : 'border-gray-200 text-black'
+                                                        }`}
+                                                    />
+                                                    {hasError && <p className="text-[10px] text-red-500 text-center mt-1">Máx. {item.maxStock}</p>}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <button onClick={() => setItems(items.filter(i => i.producto_id !== item.producto_id))}
+                                                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors">
+                                                        <XCircle size={18} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Notes */}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Notas (Opcional)</label>
+                        <input type="text" value={notas} onChange={(e) => setNotas(e.target.value)}
+                            placeholder="Ej. Envío por bus, caja azul..."
+                            className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-black"
+                        />
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center gap-3">
+                    <button onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleConfirmar}
+                        disabled={!puedeConfirmar()}
+                        className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        <Truck size={16} />
+                        Revisar y Despachar →
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in">

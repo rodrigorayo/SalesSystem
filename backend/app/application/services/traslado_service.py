@@ -21,30 +21,40 @@ class TrasladoService:
     async def despachar_traslado(body: TrasladoCreate, current_user: User) -> TrasladoInventario:
         tenant_id = current_user.tenant_id or "default"
         sucursal_origen_id = current_user.sucursal_id or "CENTRAL"
-        
-        if sucursal_origen_id == body.sucursal_destino_id:
-            raise HTTPException(status_code=400, detail="La sucursal origen y destino no pueden ser la misma.")
+
+        # Validate destination
+        destino_tipo = body.destino_tipo or "SUCURSAL"
+        if destino_tipo == "SUCURSAL":
+            if not body.sucursal_destino_id:
+                raise HTTPException(status_code=400, detail="Debe indicar la sucursal destino.")
+            if sucursal_origen_id == body.sucursal_destino_id:
+                raise HTTPException(status_code=400, detail="La sucursal origen y destino no pueden ser la misma.")
+        else:  # CLIENTE
+            if not body.cliente_destino_nombre:
+                raise HTTPException(status_code=400, detail="Debe indicar el nombre del cliente destino.")
             
         client = get_client()
 
         async def _run_transaction() -> TrasladoInventario:
             async with await client.start_session() as session:
                 async with session.start_transaction():
-                    # Resolve Destino Name
-                    dest_name = "Central"
-                    if body.sucursal_destino_id != "CENTRAL":
-                        suc_dest = await Sucursal.get(body.sucursal_destino_id, session=session)
-                        if not suc_dest or suc_dest.tenant_id != tenant_id:
-                            raise HTTPException(status_code=404, detail="Sucursal destino no encontrada.")
-                        dest_name = suc_dest.nombre
-                    
                     # Resolve Origen Name
                     orig_name = "Central"
                     if sucursal_origen_id != "CENTRAL":
                         suc_orig = await Sucursal.get(sucursal_origen_id, session=session)
                         orig_name = suc_orig.nombre if suc_orig else "Desconocida"
 
-                    traslado_items: List[TrasladoItem] = []
+                    # Resolve Destino Name (only for SUCURSAL)
+                    dest_name = None
+                    if destino_tipo == "SUCURSAL":
+                        dest_name = "Central"
+                        if body.sucursal_destino_id != "CENTRAL":
+                            suc_dest = await Sucursal.get(body.sucursal_destino_id, session=session)
+                            if not suc_dest or suc_dest.tenant_id != tenant_id:
+                                raise HTTPException(status_code=404, detail="Sucursal destino no encontrada.")
+                            dest_name = suc_dest.nombre
+
+                    traslado_items = []
                     valor_total = DecimalMoney("0.0")
 
                     for item_in in body.items:
@@ -52,7 +62,7 @@ class TrasladoService:
                         if not product or product.tenant_id != tenant_id:
                             raise HTTPException(status_code=404, detail=f"Producto {item_in.producto_id} no encontrado")
 
-                        # Descontar stock de origen
+                        # Descontar stock de origen (atomic check)
                         updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
                             {
                                 "tenant_id": tenant_id,
@@ -60,9 +70,7 @@ class TrasladoService:
                                 "producto_id": item_in.producto_id,
                                 "cantidad": {"$gte": item_in.cantidad}
                             },
-                            {
-                                "$inc": {"cantidad": -item_in.cantidad}
-                            },
+                            {"$inc": {"cantidad": -item_in.cantidad}},
                             return_document=ReturnDocument.AFTER,
                             session=session.client_session if hasattr(session, "client_session") else session
                         )
@@ -86,6 +94,7 @@ class TrasladoService:
                         ))
 
                         # Log Kárdex Origen
+                        notas_log = f"Traslado hacia {dest_name}" if destino_tipo == "SUCURSAL" else f"Entrega a cliente: {body.cliente_destino_nombre}"
                         await InventoryLog(
                             tenant_id=tenant_id,
                             sucursal_id=sucursal_origen_id,
@@ -98,27 +107,42 @@ class TrasladoService:
                             precio_venta_momento=product.precio_venta,
                             usuario_id=str(current_user.id),
                             usuario_nombre=current_user.full_name or current_user.username,
-                            notas=f"Traslado despachado hacia {dest_name}",
+                            notas=notas_log,
                             referencia_id="PENDING"
                         ).create(session=session)
 
-                    # Crear el traslado
+                    # For CLIENT transfers: immediately COMPLETADO (goods delivered in hand)
+                    estado_inicial = EstadoTraslado.COMPLETADO if destino_tipo == "CLIENTE" else EstadoTraslado.EN_TRANSITO
+                    completado_at = datetime.utcnow() if destino_tipo == "CLIENTE" else None
+
+                    # Mark items as received if cliente (complete immediately)
+                    if destino_tipo == "CLIENTE":
+                        for ti in traslado_items:
+                            ti.cantidad_recibida = ti.cantidad_enviada
+
                     traslado = TrasladoInventario(
                         tenant_id=tenant_id,
+                        destino_tipo=destino_tipo,
                         sucursal_origen_id=sucursal_origen_id,
                         sucursal_origen_nombre=orig_name,
-                        sucursal_destino_id=body.sucursal_destino_id,
+                        sucursal_destino_id=body.sucursal_destino_id if destino_tipo == "SUCURSAL" else None,
                         sucursal_destino_nombre=dest_name,
-                        estado=EstadoTraslado.EN_TRANSITO,
+                        cliente_destino_id=body.cliente_destino_id if destino_tipo == "CLIENTE" else None,
+                        cliente_destino_nombre=body.cliente_destino_nombre if destino_tipo == "CLIENTE" else None,
+                        estado=estado_inicial,
                         items=traslado_items,
                         valor_total_enviado=valor_total,
+                        valor_total_recibido=valor_total if destino_tipo == "CLIENTE" else DecimalMoney("0.0"),
                         notas=body.notas,
                         despachado_por_id=str(current_user.id),
-                        despachado_por_nombre=current_user.full_name or current_user.username
+                        despachado_por_nombre=current_user.full_name or current_user.username,
+                        recibido_por_id=str(current_user.id) if destino_tipo == "CLIENTE" else None,
+                        recibido_por_nombre=(current_user.full_name or current_user.username) if destino_tipo == "CLIENTE" else None,
+                        completado_at=completado_at,
                     )
                     await traslado.create(session=session)
 
-                    # Update logs con el ID real
+                    # Update Kardex logs with real traslado ID
                     await InventoryLog.find(
                         InventoryLog.tenant_id == tenant_id,
                         InventoryLog.referencia_id == "PENDING",
@@ -128,6 +152,7 @@ class TrasladoService:
                     return traslado
 
         return await retry_on_write_conflict(_run_transaction)
+
 
     @staticmethod
     async def recibir_traslado(traslado_id: str, body: TrasladoReceive, current_user: User) -> TrasladoInventario:

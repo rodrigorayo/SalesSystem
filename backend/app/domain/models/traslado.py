@@ -10,6 +10,10 @@ class EstadoTraslado(str, Enum):
     COMPLETADO = "COMPLETADO"
     CANCELADO = "CANCELADO"
 
+class DestinoTipo(str, Enum):
+    SUCURSAL = "SUCURSAL"
+    CLIENTE = "CLIENTE"
+
 class TrasladoItem(BaseModel):
     producto_id: str
     descripcion: str
@@ -20,10 +24,13 @@ class TrasladoItem(BaseModel):
 
 class TrasladoInventario(Document):
     tenant_id: str
+    destino_tipo: DestinoTipo = DestinoTipo.SUCURSAL
     sucursal_origen_id: str
     sucursal_origen_nombre: str
-    sucursal_destino_id: str
-    sucursal_destino_nombre: str
+    sucursal_destino_id: Optional[str] = None
+    sucursal_destino_nombre: Optional[str] = None
+    cliente_destino_id: Optional[str] = None
+    cliente_destino_nombre: Optional[str] = None
     
     estado: EstadoTraslado = EstadoTraslado.EN_TRANSITO
     items: List[TrasladoItem]

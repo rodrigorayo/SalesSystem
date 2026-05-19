@@ -6,7 +6,10 @@ export interface TrasladoItemCreate {
 }
 
 export interface TrasladoCreate {
-    sucursal_destino_id: string;
+    destino_tipo: 'SUCURSAL' | 'CLIENTE';
+    sucursal_destino_id?: string;
+    cliente_destino_id?: string;
+    cliente_destino_nombre?: string;
     notas?: string;
     items: TrasladoItemCreate[];
 }
