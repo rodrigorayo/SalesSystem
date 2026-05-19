@@ -135,16 +135,8 @@ class SalesService:
                             computed_total -= (computed_total * val / Decimal("100"))
                         computed_total = max(Decimal("0.0"), computed_total)
 
-                    int_part = Decimal(math.floor(float(computed_total)))
-                    frac = computed_total - int_part
-                    frac_fixed = round(float(frac), 2)
-
-                    if frac_fixed < 0.5:
-                        computed_total = int_part
-                    elif frac_fixed > 0.5:
-                        computed_total = int_part + Decimal("1")
-                    else:
-                        computed_total = int_part + Decimal("0.5")
+                    # Se eliminó el redondeo comercial a moneda física para permitir centavos exactos
+                    computed_total = Decimal(str(computed_total)).quantize(Decimal("0.00"), rounding="ROUND_HALF_UP")
 
                     has_credit = any(p.metodo == "CREDITO" for p in sale_in.pagos)
                     if has_credit:
