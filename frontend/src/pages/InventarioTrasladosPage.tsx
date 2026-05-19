@@ -587,6 +587,14 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
                                         </tr>
                                     ))}
                                 </tbody>
+                                {totalValor > 0 && (
+                                    <tfoot>
+                                        <tr className="bg-indigo-50/50 border-t border-indigo-100 text-indigo-900 font-black text-xs">
+                                            <td className="px-4 py-2 text-right uppercase">Valor Estimado</td>
+                                            <td className="px-4 py-2 text-center whitespace-nowrap">Bs. {totalValor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
                             </table>
                         </div>
 
