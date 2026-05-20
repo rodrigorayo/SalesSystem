@@ -28,6 +28,7 @@ export default function ExpensesReportView() {
     // Categories CRUD state
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [editingCategory, setEditingCategory] = useState<any>(null);
+    const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
     const [newCatName, setNewCatName] = useState('');
     const [newCatDesc, setNewCatDesc] = useState('');
 
@@ -146,8 +147,26 @@ export default function ExpensesReportView() {
                                     <p className="text-xs font-bold text-amber-700 uppercase mb-4">Categorías Existentes</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
                                         {categories.map((cat: any) => (
-                                            <div key={cat._id} className="bg-white p-3 rounded-xl border border-amber-100 flex items-center justify-between group hover:shadow-sm transition-all">
-                                                {editingCategory?._id === cat._id ? (
+                                            <div key={cat._id} className="bg-white p-3 rounded-xl border border-amber-100 flex items-center justify-between group hover:shadow-sm transition-all min-h-[58px]">
+                                                {deletingCatId === cat._id ? (
+                                                    <div className="flex-1 flex items-center justify-between bg-red-50/50 p-1.5 rounded-lg border border-red-100 animate-in fade-in duration-200">
+                                                        <span className="text-[10px] font-black text-red-700 uppercase tracking-wider">¿Eliminar {cat.nombre}?</span>
+                                                        <div className="flex gap-1.5">
+                                                            <button 
+                                                                onClick={() => { deleteCatMut.mutate(cat._id); setDeletingCatId(null); }}
+                                                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold transition-all shadow-sm"
+                                                            >
+                                                                Sí
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setDeletingCatId(null)}
+                                                                className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded text-[10px] font-bold transition-all"
+                                                            >
+                                                                No
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : editingCategory?._id === cat._id ? (
                                                     <div className="flex-1 flex gap-2">
                                                         <input 
                                                             autoFocus
@@ -171,7 +190,7 @@ export default function ExpensesReportView() {
                                                         </div>
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button onClick={() => setEditingCategory(cat)} className="p-1.5 text-gray-400 hover:text-indigo-600"><Edit2 size={14}/></button>
-                                                            <button onClick={() => { if(confirm('¿Eliminar esta categoría?')) deleteCatMut.mutate(cat._id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                                            <button onClick={() => setDeletingCatId(cat._id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
                                                         </div>
                                                     </>
                                                 )}
