@@ -13,6 +13,7 @@ Routes:
 """
 from datetime import datetime
 from typing import Optional
+from bson import ObjectId
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -349,8 +350,10 @@ async def create_categoria(body: CategoriaGastoIn, current_user: User = Depends(
 
 @router.put("/categorias-gasto/{cat_id}")
 async def update_categoria(cat_id: str, body: CategoriaGastoIn, current_user: User = Depends(get_current_active_user)):
+    if not ObjectId.is_valid(cat_id):
+        raise HTTPException(status_code=400, detail="ID de categoría inválido")
     tenant_id = current_user.tenant_id or "default"
-    cat = await CajaGastoCategoria.find_one(CajaGastoCategoria.id == cat_id, CajaGastoCategoria.tenant_id == tenant_id)
+    cat = await CajaGastoCategoria.find_one(CajaGastoCategoria.id == ObjectId(cat_id), CajaGastoCategoria.tenant_id == tenant_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     
@@ -363,8 +366,10 @@ async def update_categoria(cat_id: str, body: CategoriaGastoIn, current_user: Us
 
 @router.delete("/categorias-gasto/{cat_id}")
 async def delete_categoria(cat_id: str, current_user: User = Depends(get_current_active_user)):
+    if not ObjectId.is_valid(cat_id):
+        raise HTTPException(status_code=400, detail="ID de categoría inválido")
     tenant_id = current_user.tenant_id or "default"
-    cat = await CajaGastoCategoria.find_one(CajaGastoCategoria.id == cat_id, CajaGastoCategoria.tenant_id == tenant_id)
+    cat = await CajaGastoCategoria.find_one(CajaGastoCategoria.id == ObjectId(cat_id), CajaGastoCategoria.tenant_id == tenant_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     

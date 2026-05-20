@@ -122,14 +122,14 @@ export default function ExpensesReportView() {
                                             placeholder="Nombre (ej. Limpieza)"
                                             value={newCatName}
                                             onChange={e => setNewCatName(e.target.value)}
-                                            className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                            className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                                         />
                                         <input 
                                             type="text" 
                                             placeholder="Descripción corta"
                                             value={newCatDesc}
                                             onChange={e => setNewCatDesc(e.target.value)}
-                                            className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                            className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                                         />
                                         <button 
                                             onClick={() => createCatMut.mutate({ nombre: newCatName, descripcion: newCatDesc })}
@@ -151,7 +151,7 @@ export default function ExpensesReportView() {
                                                     <div className="flex-1 flex gap-2">
                                                         <input 
                                                             autoFocus
-                                                            className="flex-1 text-xs font-bold px-2 py-1 bg-amber-50 border border-amber-200 rounded"
+                                                            className="flex-1 text-xs font-bold px-2 py-1 bg-amber-50 border border-amber-200 rounded text-amber-950"
                                                             value={editingCategory.nombre}
                                                             onChange={e => setEditingCategory({...editingCategory, nombre: e.target.value})}
                                                         />
