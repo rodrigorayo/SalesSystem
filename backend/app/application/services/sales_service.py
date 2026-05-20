@@ -402,6 +402,40 @@ class SalesService:
                                 referencia_id=str(sale.id)
                             ).create(session=session)
 
+                    # ── 1.5 Revertir deuda de crédito (si la venta fue a crédito) ──
+                    has_credit_payment = any(p.metodo == "CREDITO" for p in sale.pagos)
+                    if has_credit_payment:
+                        from app.domain.models.credito import Deuda, EstadoDeuda, CuentaCredito, TransaccionCredito
+                        deuda = await Deuda.find_one(Deuda.sale_id == str(sale.id), session=session)
+                        if deuda and deuda.estado != EstadoDeuda.ANULADA:
+                            cuenta = await CuentaCredito.get(deuda.cuenta_id, session=session)
+                            if cuenta:
+                                from decimal import Decimal
+                                nuevo_saldo = max(Decimal("0"), Decimal(str(cuenta.saldo_total)) - Decimal(str(deuda.saldo_pendiente)))
+                                cuenta.saldo_total = DecimalMoney(str(nuevo_saldo))
+                                cuenta.updated_at = datetime.utcnow()
+                                await cuenta.save(session=session)
+
+                            # Registrar una transacción de crédito para reflejar la anulación
+                            transaccion = TransaccionCredito(
+                                tenant_id=sale.tenant_id,
+                                sucursal_id=sale.sucursal_id,
+                                cuenta_id=deuda.cuenta_id,
+                                cliente_id=deuda.cliente_id,
+                                tipo="ABONO",
+                                monto=deuda.saldo_pendiente,  # Se abona el saldo pendiente restante para cancelarlo
+                                sale_id=str(sale.id),
+                                cajero_id=str(current_user.id),
+                                cajero_nombre=current_user.full_name or current_user.username,
+                                notas=f"Reverso por Anulación de Venta #{str(sale.id)[-6:].upper()} — Motivo: {motivo}"
+                            )
+                            await transaccion.insert(session=session)
+
+                            deuda.saldo_pendiente = DecimalMoney("0")
+                            deuda.estado = EstadoDeuda.ANULADA
+                            deuda.updated_at = datetime.utcnow()
+                            await deuda.save(session=session)
+
                     # ── 2. Ajuste de caja según motivo ───────────────────────────
                     if afectar_caja:
                         if caja_sesion_id:
