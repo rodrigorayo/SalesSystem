@@ -332,7 +332,10 @@ async def get_movimientos(current_user: User = Depends(get_current_active_user))
 @router.get("/categorias-gasto")
 async def get_categorias(current_user: User = Depends(get_current_active_user)):
     tenant_id = current_user.tenant_id or "default"
-    return await CajaGastoCategoria.find(CajaGastoCategoria.tenant_id == tenant_id).to_list()
+    return await CajaGastoCategoria.find(
+        CajaGastoCategoria.tenant_id == tenant_id,
+        CajaGastoCategoria.is_active == True
+    ).to_list()
 
 
 @router.post("/categorias-gasto")
@@ -373,5 +376,7 @@ async def delete_categoria(cat_id: str, current_user: User = Depends(get_current
     if not cat:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     
-    await cat.soft_delete()
+    cat.is_active = False
+    cat.deleted_at = datetime.utcnow()
+    await cat.save()
     return {"status": "deleted"}
