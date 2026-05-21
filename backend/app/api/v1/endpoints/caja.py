@@ -102,6 +102,7 @@ async def get_sesiones(
         total_qr      = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "QR") + sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_QR)
         total_tarjeta = sum(float(p.monto) for sale in sales for p in (sale.pagos or []) if str(p.metodo).upper() == "TARJETA") + sum(float(m.monto) for m in movs if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
         total_ventas  = sum(float(p.monto) for sale in sales for p in (sale.pagos or []))
+        total_descuentos = sum(float(sale.get_total_descuento()) for sale in sales)
 
         result.append({
             "id":              str(s.id),
@@ -119,6 +120,7 @@ async def get_sesiones(
             "total_qr":        round(total_qr, 2),
             "total_tarjeta":   round(total_tarjeta, 2),
             "total_ventas":    round(total_ventas, 2),
+            "total_descuentos": round(total_descuentos, 2),
             "num_transacciones": len(sales),
             "monto_cierre_fisico": float(s.monto_cierre_fisico) if s.monto_cierre_fisico is not None else None,
             "diferencia":      round(float(s.monto_cierre_fisico) - saldo, 2) if s.monto_cierre_fisico is not None else None,
@@ -229,6 +231,7 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
     total_qr += sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_QR)
     total_tarjeta += sum((float(m.monto) if m.tipo == "INGRESO" else -float(m.monto)) for m in movimientos if m.subtipo == SubtipoMovimiento.INGRESO_TARJETA)
     total_ventas_general = total_qr + total_tarjeta + total_efectivo_sales
+    total_descuentos = sum(float(sale.get_total_descuento()) for sale in sales_in_session)
     num_transacciones    = len(sales_in_session)
 
     return ResumenCaja(
@@ -247,6 +250,7 @@ async def get_resumen(sesion_id: str, current_user: User = Depends(get_current_a
         total_ingresos_efectivo = total_ingresos_ef,
         total_ingresos_qr       = total_ingresos_qr,
         total_ingresos_tarjeta  = total_ingresos_tj,
+        total_descuentos       = total_descuentos,
         num_transacciones      = num_transacciones,
         movimientos            = [m.model_dump(mode="json") for m in movimientos],
     )

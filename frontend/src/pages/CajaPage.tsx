@@ -54,7 +54,7 @@ function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
         'Transacciones', 'Monto inicial',
         'Ef. recibido', 'Cambio entregado', 'Ef. neto',
         'QR', 'Tarjeta', 'Gastos',
-        'Total ventas', 'Saldo caja',
+        'Descuentos', 'Total ventas', 'Saldo caja',
         'Cierre físico', 'Diferencia', 'Notas cierre',
     ];
     const rows = sesiones.map(s => [
@@ -70,6 +70,7 @@ function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
         s.total_qr.toFixed(2),
         s.total_tarjeta.toFixed(2),
         s.total_gastos.toFixed(2),
+        (s.total_descuentos || 0).toFixed(2),
         s.total_ventas.toFixed(2),
         s.saldo_calculado.toFixed(2),
         s.monto_cierre_fisico != null ? s.monto_cierre_fisico.toFixed(2) : '',
@@ -120,9 +121,9 @@ function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen
 
     return (
         <tr className="bg-slate-50">
-            <td colSpan={12} className="px-4 py-4">
+            <td colSpan={13} className="px-4 py-4">
                 {/* ── Summary KPIs ── */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4 text-xs">
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mb-4 text-xs">
                     <div className="bg-white rounded-xl p-2.5 border border-gray-100">
                         <p className="text-gray-400 font-semibold mb-0.5 text-[10px]">Inicial</p>
                         <p className="font-mono font-black text-blue-700">{fmt(sesion.monto_inicial)}</p>
@@ -142,6 +143,13 @@ function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen
                     <div className="bg-white rounded-xl p-2.5 border border-red-100">
                         <p className="text-gray-400 font-semibold mb-0.5 text-[10px]">Gastos</p>
                         <p className="font-mono font-black text-red-500">{fmt(sesion.total_gastos)}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 border border-orange-100">
+                        <p className="text-gray-400 font-semibold mb-0.5 text-[10px] flex items-center gap-1">
+                            Descuentos
+                            <span title="Total de descuentos otorgados en ventas del turno"><Info size={9} className="text-gray-300 cursor-help" /></span>
+                        </p>
+                        <p className="font-mono font-black text-orange-600">{fmt(sesion.total_descuentos ?? 0)}</p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 border border-indigo-100">
                         <p className="text-gray-400 font-semibold mb-0.5 text-[10px]">Saldo caja</p>
@@ -388,6 +396,11 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                             </th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
                                 <div className="flex items-center justify-end gap-1">
+                                    Descuentos <span title="Total de descuentos aplicados en ventas de la sesión"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
                                     Total <span title="Suma de todas las ventas (Efectivo + QR + Tarjeta)"><Info size={10} className="text-gray-300 cursor-help" /></span>
                                 </div>
                             </th>
@@ -426,6 +439,7 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                                         <td className="px-3 py-2.5 text-right font-mono text-purple-700">{fmt(s.total_tarjeta)}</td>
                                         <td className="px-3 py-2.5 text-right font-mono text-green-700">{fmt(efNeto)}</td>
                                         <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmt(s.total_gastos)}</td>
+                                        <td className="px-3 py-2.5 text-right font-mono text-orange-600">{fmt(s.total_descuentos ?? 0)}</td>
                                         <td className="px-3 py-2.5 text-right font-bold font-mono text-indigo-700">{fmt(s.total_ventas)}</td>
                                         <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900">{fmt(s.saldo_calculado)}</td>
                                         <td className="px-2 py-2.5 text-gray-400">
@@ -775,22 +789,40 @@ export default function CajaPage() {
                             </div>
                         </div>
 
-                        {/* Canales Digitales y Totales */}
-                        <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
-                             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between mb-2 px-1">
-                                 <span>Pagos Digitales (Directo a Banco)</span>
-                                 <span className="text-[9px] lowercase opacity-60">Estos ingresos no se contabilizan en el flujo físico</span>
-                             </h3>
-                             <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-xl p-2 border border-sky-100 bg-sky-50/50 flex justify-between items-center text-sky-800">
-                                    <span className="text-[11px] font-semibold">QR Total</span>
-                                    <span className="text-xs font-bold font-mono text-sky-900">{fmt(resumen.total_qr)}</span>
-                                </div>
-                                <div className="rounded-xl p-2 border border-purple-100 bg-purple-50/50 flex justify-between items-center text-purple-800">
-                                    <span className="text-[11px] font-semibold">Tarjeta / POS</span>
-                                    <span className="text-xs font-bold font-mono text-purple-900">{fmt(resumen.total_tarjeta)}</span>
-                                </div>
-                             </div>
+                        {/* Canales Digitales y Descuentos */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* Canales Digitales */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+                                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between mb-2 px-1">
+                                     <span>Pagos Digitales (Directo a Banco)</span>
+                                     <span className="text-[9px] lowercase opacity-60">Estos ingresos no se contabilizan en el flujo físico</span>
+                                 </h3>
+                                 <div className="grid grid-cols-2 gap-2">
+                                    <div className="rounded-xl p-2 border border-sky-100 bg-sky-50/50 flex justify-between items-center text-sky-800">
+                                        <span className="text-[11px] font-semibold">QR Total</span>
+                                        <span className="text-xs font-bold font-mono text-sky-900">{fmt(resumen.total_qr)}</span>
+                                    </div>
+                                    <div className="rounded-xl p-2 border border-purple-100 bg-purple-50/50 flex justify-between items-center text-purple-800">
+                                        <span className="text-[11px] font-semibold">Tarjeta / POS</span>
+                                        <span className="text-xs font-bold font-mono text-purple-900">{fmt(resumen.total_tarjeta)}</span>
+                                    </div>
+                                 </div>
+                            </div>
+
+                            {/* Descuentos y Trazabilidad */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+                                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between mb-2 px-1">
+                                     <span>Descuentos y Trazabilidad</span>
+                                     <span className="text-[9px] lowercase opacity-60">Información analítica de rebajas otorgadas</span>
+                                 </h3>
+                                 <div className="rounded-xl p-2 border border-orange-100 bg-orange-50/50 flex justify-between items-center text-orange-850">
+                                     <span className="text-[11px] font-semibold flex items-center gap-1">
+                                         Descuentos Otorgados
+                                         <span title="Total de descuentos aplicados en las ventas de este turno"><Info size={10} className="text-orange-400 cursor-help" /></span>
+                                     </span>
+                                     <span className="text-xs font-bold font-mono text-orange-950">{fmt(resumen.total_descuentos ?? 0)}</span>
+                                 </div>
+                            </div>
                         </div>
 
                         {/* Panel de Auditoría / Insights Automáticos */}

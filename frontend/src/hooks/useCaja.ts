@@ -63,6 +63,8 @@ export interface ResumenCaja {
     total_ingresos_efectivo: number;
     total_ingresos_qr: number;
     total_ingresos_tarjeta: number;
+    // discounts
+    total_descuentos?: number;
     // grand total
     total_ventas_general: number;
     num_transacciones: number;
@@ -85,6 +87,7 @@ export interface CajaSesionResumen {
     total_qr: number;
     total_tarjeta: number;
     total_ventas: number;
+    total_descuentos?: number;
     num_transacciones: number;
     monto_cierre_fisico?: number;
     diferencia?: number;

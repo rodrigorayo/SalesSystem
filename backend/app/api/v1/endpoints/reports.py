@@ -305,8 +305,7 @@ async def get_daily_report(
             continue
             
         total_ventas += s.total
-        if s.descuento:
-            total_descuentos += s.descuento.valor
+        total_descuentos += s.get_total_descuento()
             
         for p in s.pagos:
             metodo = p.metodo.upper()

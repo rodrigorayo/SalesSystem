@@ -63,6 +63,8 @@ class ResumenCaja(BaseModel):
     total_ingresos_efectivo: float = 0.0
     total_ingresos_qr: float = 0.0
     total_ingresos_tarjeta: float = 0.0
+    # Discounts
+    total_descuentos: float = 0.0
     # Metadata
     num_transacciones: int
     movimientos: List[dict]

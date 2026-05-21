@@ -80,6 +80,27 @@ class Sale(Document):
     # ── Corrección de método de pago (para ERROR_COBRO) ───────────────────────
     metodo_pago_correcto: Optional[str] = None      # El método que realmente se usó
 
+    def get_total_descuento(self):
+        from decimal import Decimal
+        # 1. Item-level discounts
+        item_discount_sum = Decimal("0.0")
+        for item in self.items:
+            desc_unit = Decimal(str(item.descuento_unitario))
+            item_discount_sum += desc_unit * Decimal(item.cantidad)
+        
+        # 2. Sale-level (global) discount
+        global_discount = Decimal("0.0")
+        if self.descuento:
+            val = Decimal(str(self.descuento.valor))
+            if self.descuento.tipo == 'MONTO':
+                global_discount = val
+            elif self.descuento.tipo == 'PORCENTAJE':
+                subtotal = sum(Decimal(str(item.subtotal)) for item in self.items)
+                global_discount = subtotal * (val / Decimal("100"))
+                
+        total_desc = item_discount_sum + global_discount
+        return total_desc.quantize(Decimal("0.00"))
+
     class Settings:
         name = "sales"
         indexes = [

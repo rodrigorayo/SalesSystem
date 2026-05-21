@@ -595,23 +595,26 @@ export function descargarPDFVentasCaja(sessions: any[], startDate: string, endDa
     const totalVentas = sessions.reduce((acc, s) => acc + (s.total_ventas || 0), 0);
     const totalQR = sessions.reduce((acc, s) => acc + (s.total_qr || 0), 0);
     const totalEfectivo = sessions.reduce((acc, s) => acc + (s.total_efectivo + (s.total_ingresos_ef || 0) - s.total_cambio), 0);
+    const totalDescuentos = sessions.reduce((acc, s) => acc + (s.total_descuentos || 0), 0);
 
     // KPIs
-    const kpiW = (pw - 30) / 3;
+    const kpiW = (pw - 32) / 4;
     drawKPI(doc, 10, y, kpiW - 2, 'Ventas Totales', bs(totalVentas), C.primary);
     drawKPI(doc, 10 + kpiW, y, kpiW - 2, 'Total QR (Digital)', bs(totalQR), C.sky);
     drawKPI(doc, 10 + (kpiW * 2), y, kpiW - 2, 'Ef. Neto (Cajón)', bs(totalEfectivo), C.green);
+    drawKPI(doc, 10 + (kpiW * 3), y, kpiW - 2, 'Total Descuentos', bs(totalDescuentos), C.amber);
     y += 28;
 
     autoTable(doc, {
         startY: y,
-        head: [['Fecha Apertura', 'Sucursal', 'Cajero / Sesión', 'Ventas QR', 'Ef. Neto', 'Total Ventas', 'Estado']],
+        head: [['Fecha Apertura', 'Sucursal', 'Cajero / Sesión', 'Ventas QR', 'Ef. Neto', 'Descuentos', 'Total Ventas', 'Estado']],
         body: sessions.map(s => [
             new Date(s.abierta_at).toLocaleString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
             s.sucursal_id,
             s.cajero_name,
             bs(s.total_qr),
             bs(s.total_efectivo + (s.total_ingresos_ef || 0) - s.total_cambio),
+            bs(s.total_descuentos || 0),
             bs(s.total_ventas),
             s.estado
         ]),
@@ -621,8 +624,9 @@ export function descargarPDFVentasCaja(sessions: any[], startDate: string, endDa
         columnStyles: {
             3: { halign: 'right' },
             4: { halign: 'right' },
-            5: { halign: 'right', fontStyle: 'bold' },
-            6: { halign: 'center' }
+            5: { halign: 'right', fontStyle: 'bold', textColor: C.amber },
+            6: { halign: 'right', fontStyle: 'bold' },
+            7: { halign: 'center' }
         },
         margin: { left: 10, right: 10 },
     });

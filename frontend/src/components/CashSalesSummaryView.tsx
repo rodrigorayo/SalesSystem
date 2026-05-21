@@ -45,6 +45,7 @@ export default function CashSalesSummaryView() {
     const totalVentas = sessions.reduce((acc, s) => acc + (s.total_ventas || 0), 0);
     const totalQR = sessions.reduce((acc, s) => acc + (s.total_qr || 0), 0);
     const totalEfectivo = sessions.reduce((acc, s) => acc + (s.total_efectivo + (s.total_ingresos_ef || 0) - s.total_cambio), 0);
+    const totalDescuentos = sessions.reduce((acc, s) => acc + (s.total_descuentos || 0), 0);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -98,7 +99,7 @@ export default function CashSalesSummaryView() {
                     </div>
                 )}
 
-                <div className="ml-auto flex items-center gap-3">
+                <div className="ml-auto flex items-center gap-3 flex-wrap">
                     <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 flex items-center gap-3">
                         <div className="text-right">
                             <p className="text-[9px] uppercase font-bold text-indigo-400 leading-none mb-1">Ventas Totales</p>
@@ -109,6 +110,14 @@ export default function CashSalesSummaryView() {
                         <div className="text-right">
                             <p className="text-[9px] uppercase font-bold text-sky-400 leading-none mb-1">Total QR</p>
                             <p className="text-sm font-black text-sky-900 leading-none">{formatBs(totalQR)}</p>
+                        </div>
+                    </div>
+                    <div className="bg-orange-50 px-4 py-2 rounded-xl border border-orange-100 flex items-center gap-3">
+                        <div className="text-right">
+                            <p className="text-[9px] uppercase font-bold text-orange-500 leading-none mb-1 flex items-center gap-1 justify-end">
+                                Descuentos <span title="Total de descuentos aplicados en las ventas"><Info size={9} className="text-orange-300 cursor-help" /></span>
+                            </p>
+                            <p className="text-sm font-black text-orange-900 leading-none">{formatBs(totalDescuentos)}</p>
                         </div>
                     </div>
                 </div>
@@ -132,6 +141,11 @@ export default function CashSalesSummaryView() {
                                     <th className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-1">
                                             Ef. Neto <span title="Ventas Ef. + Ingresos Manuales - Vueltos"><Info size={12} className="text-gray-300 cursor-help" /></span>
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            Descuentos <span title="Total de descuentos aplicados en ventas de la sesión"><Info size={12} className="text-gray-300 cursor-help" /></span>
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 text-right">
@@ -160,6 +174,7 @@ export default function CashSalesSummaryView() {
                                         </td>
                                         <td className="px-6 py-4 text-right font-mono text-sky-600 font-bold">{formatBs(s.total_qr)}</td>
                                         <td className="px-6 py-4 text-right font-mono text-green-600 font-bold">{formatBs(s.total_efectivo + (s.total_ingresos_ef || 0) - s.total_cambio)}</td>
+                                        <td className="px-6 py-4 text-right font-mono text-orange-600 font-bold">{formatBs(s.total_descuentos ?? 0)}</td>
                                         <td className="px-6 py-4 text-right font-mono text-indigo-700 font-black">{formatBs(s.total_ventas)}</td>
                                         <td className="px-6 py-4 text-center">
                                             <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${s.estado === 'ABIERTA' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -170,7 +185,7 @@ export default function CashSalesSummaryView() {
                                 ))}
                                 {sessions.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-20 text-center text-gray-400 font-medium italic">No se encontraron sesiones en este rango.</td>
+                                        <td colSpan={8} className="px-6 py-20 text-center text-gray-400 font-medium italic">No se encontraron sesiones en este rango.</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -179,6 +194,7 @@ export default function CashSalesSummaryView() {
                                     <td colSpan={3} className="px-6 py-4 text-xs uppercase tracking-widest">Totales del Periodo</td>
                                     <td className="px-6 py-4 text-right font-mono text-sky-400">{formatBs(totalQR)}</td>
                                     <td className="px-6 py-4 text-right font-mono text-green-400">{formatBs(totalEfectivo)}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-orange-400">{formatBs(totalDescuentos)}</td>
                                     <td className="px-6 py-4 text-right font-mono text-indigo-300">{formatBs(totalVentas)}</td>
                                     <td></td>
                                 </tr>
