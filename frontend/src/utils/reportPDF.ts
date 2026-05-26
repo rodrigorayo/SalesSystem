@@ -120,14 +120,19 @@ export function descargarPDFJornada(report: any, fecha: string, sucursalNombre: 
     y += 4;
 
     const metodos = Object.entries(resumen_ventas.por_metodo || {}) as [string, number][];
+    const bodyRows = [
+        ...metodos.map(([m, v]) => [m, bs(v)]),
+        ['Vueltos Entregados (Cambio)', bs(resumen_ventas.total_cambio || 0)],
+        ['Anuladas', `${bs(resumen_ventas.anuladas?.monto || 0)} (${resumen_ventas.anuladas?.cantidad || 0})`],
+    ];
+    if (resumen_ventas.total_creditos && resumen_ventas.total_creditos > 0) {
+        bodyRows.push(['Créditos Otorgados (no afecta efectivo)', bs(resumen_ventas.total_creditos)]);
+    }
+
     autoTable(doc, {
         startY: y,
         head: [['Método', 'Monto (Bs.)']],
-        body: [
-            ...metodos.map(([m, v]) => [m, bs(v)]),
-            ['Vueltos Entregados (Cambio)', bs(resumen_ventas.total_cambio || 0)],
-            ['Anuladas', `${bs(resumen_ventas.anuladas?.monto || 0)} (${resumen_ventas.anuladas?.cantidad || 0})`],
-        ],
+        body: bodyRows,
         styles: { fontSize: 9, cellPadding: 3 },
         headStyles: { fillColor: C.primary, textColor: C.white, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: C.light },

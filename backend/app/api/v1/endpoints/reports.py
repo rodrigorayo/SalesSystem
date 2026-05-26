@@ -295,6 +295,7 @@ async def get_daily_report(
     }
     total_ventas    = _ZERO
     total_descuentos = _ZERO
+    total_creditos   = _ZERO
     anuladas_count  = 0
     anuladas_monto  = _ZERO
     
@@ -306,6 +307,11 @@ async def get_daily_report(
             
         total_ventas += s.total
         total_descuentos += s.get_total_descuento()
+
+        if s.estado_pago in ["PENDIENTE", "PARCIAL"]:
+            pagado = sum((p.monto for p in s.pagos), _ZERO)
+            credito_otorgado = s.total - pagado
+            total_creditos += credito_otorgado
             
         for p in s.pagos:
             metodo = p.metodo.upper()
@@ -386,6 +392,7 @@ async def get_daily_report(
             "total_bruto":      float(total_ventas),
             "total_descuentos": float(total_descuentos),
             "total_cambio":     float(total_cambio),
+            "total_creditos":   float(total_creditos),
             "por_metodo":       {k: float(v) for k, v in ventas_por_metodo.items()},
             "anuladas": {
                 "cantidad": anuladas_count,

@@ -183,6 +183,12 @@ export default function DailyReportView() {
                             <span className="font-bold text-gray-500 text-sm flex items-center gap-1.5"><Coins size={14}/> Vueltos Entregados (Cambio)</span>
                             <span className="font-black text-gray-700">{formatBs(resumen_ventas.total_cambio || 0)}</span>
                         </div>
+                        {resumen_ventas.total_creditos !== undefined && resumen_ventas.total_creditos > 0 && (
+                            <div className="pt-2 flex justify-between border-t border-gray-100 mt-2">
+                                <span className="font-bold text-purple-600 text-sm flex items-center gap-1.5" title="Crédito otorgado a clientes, no ingresa a caja física hoy"><Coins size={14}/> Créditos Otorgados (no afecta efectivo)</span>
+                                <span className="font-black text-purple-700">{formatBs(resumen_ventas.total_creditos)}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
