@@ -13,6 +13,15 @@ import { useOnClickOutside } from 'usehooks-ts';
 const formatBs = (n: number) =>
     `Bs. ${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
+const formatReadableDate = (dateStr: string) => {
+    if (!dateStr || dateStr === "—") return dateStr;
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    return dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+};
+
 const getTodayDateString = () => {
     const d = new Date();
     // Ajustar a zona horaria local
@@ -361,7 +370,14 @@ export default function HourlyMultiyearChart() {
                     <p className="text-gray-500 text-sm flex flex-wrap items-center gap-2">
                         <span>Eje temporal forzado <strong>08:00 – 20:00</strong>.</span>
                         <span className="text-gray-300">•</span>
-                        <span>Año seleccionado vs −364 días vs −728 días.</span>
+                        {meta ? (
+                            <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                                {meta.holiday_name ? `Comparando festividad: ${meta.holiday_name} ` : ''}
+                                ({formatReadableDate(meta.real_label)} vs {formatReadableDate(meta.anio1_label)} vs {formatReadableDate(meta.anio2_label)})
+                            </span>
+                        ) : (
+                            <span>Año seleccionado vs −364 días vs −728 días.</span>
+                        )}
                         {meta?.es_hoy && (
                             <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 font-black flex items-center gap-1 text-xs">
                                 <Activity size={10} /> + Predicción IA activa
@@ -440,18 +456,18 @@ export default function HourlyMultiyearChart() {
                 <div className="flex flex-wrap items-center gap-6 mb-6">
                     <div className="flex items-center gap-2 text-sm">
                         <div className="w-3 h-3 rounded-full bg-indigo-600 shadow-md shadow-indigo-200"></div>
-                        <span className="font-black text-gray-800">{meta.real_label}</span>
+                        <span className="font-black text-gray-800">{formatReadableDate(meta.real_label)}</span>
                         <span className="text-gray-400 text-xs font-semibold">(Real)</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm opacity-80 hover:opacity-100 transition-opacity">
                         <div className="w-3 h-3 rounded-full bg-amber-500 shadow-md shadow-amber-200"></div>
-                        <span className="font-bold text-gray-600">{meta.anio1_label}</span>
-                        <span className="text-gray-400 text-xs font-semibold">(−364d)</span>
+                        <span className="font-bold text-gray-600">{formatReadableDate(meta.anio1_label)}</span>
+                        <span className="text-gray-400 text-xs font-semibold">({meta.holiday_name ? 'Festividad Año -1' : '−364d'})</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm opacity-80 hover:opacity-100 transition-opacity">
                         <div className="w-3 h-3 rounded-full bg-rose-400 shadow-md shadow-rose-200"></div>
-                        <span className="font-bold text-gray-600">{meta.anio2_label}</span>
-                        <span className="text-gray-400 text-xs font-semibold">(−728d)</span>
+                        <span className="font-bold text-gray-600">{formatReadableDate(meta.anio2_label)}</span>
+                        <span className="text-gray-400 text-xs font-semibold">({meta.holiday_name ? 'Festividad Año -2' : '−728d'})</span>
                     </div>
                     {hasPrediction && (
                         <div className="flex items-center gap-2 text-sm">

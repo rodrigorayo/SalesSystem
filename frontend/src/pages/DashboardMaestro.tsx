@@ -9,6 +9,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import HourlyMultiyearChart from '../components/HourlyMultiyearChart';
+import SpecialDatesChart from '../components/SpecialDatesChart';
 import RegionalAndProductMix from '../components/RegionalAndProductMix';
 import SalesPercentileTracker from '../components/SalesPercentileTracker';
 
@@ -17,6 +18,13 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const formatRangeLabel = (startStr: string, endStr: string) => {
+    if (!startStr || !endStr) return "";
+    const s = new Date(startStr);
+    const e = new Date(endStr);
+    return `del ${s.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })} al ${e.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+};
 
 export default function DashboardMaestro() {
     const { role } = useAuthStore();
@@ -50,18 +58,6 @@ export default function DashboardMaestro() {
         }
     }, [timeRange, selectedMonth, selectedYear]);
 
-    const getModeLabel = () => {
-        if (timeRange === 'today') return 'Hoy';
-        if (timeRange === '7days') return 'Últimos 7 Días';
-        if (timeRange === '30days') return 'Últimos 30 Días';
-        if (timeRange === 'this_month') return 'Mes Actual';
-        if (timeRange === 'this_year') return 'Año Actual';
-        if (timeRange === 'historico') return 'Histórico Total';
-        if (timeRange === 'custom_month') return `Mes: ${selectedMonth}`;
-        if (timeRange === 'custom_year') return `Año: ${selectedYear}`;
-        if (timeRange === 'custom') return 'Fechas';
-        return 'Fechas';
-    };
 
     const [isBackendOffline, setIsBackendOffline] = useState(false);
 
@@ -157,9 +153,13 @@ export default function DashboardMaestro() {
                         </div>
                         Panel General — Día a Día
                     </h1>
-                    <p className="text-gray-500 mt-2 text-base font-medium flex items-center gap-2">
+                    <p className="text-gray-500 mt-2 text-base font-medium flex flex-wrap items-center gap-2">
                         <Activity size={16} className="text-emerald-500" />
-                        Orquestación en tiempo real sobre ~46k Registros Históricos.
+                        <span>Orquestación en tiempo real sobre ~110k Registros Históricos.</span>
+                        <span className="text-gray-300">•</span>
+                        <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                            Período: {formatRangeLabel(dates.start, dates.end)}
+                        </span>
                     </p>
                 </div>
 
@@ -350,6 +350,9 @@ export default function DashboardMaestro() {
 
                     {/* CAPA 2: Comparativa Dinámica Horaria Multi-Año */}
                     <HourlyMultiyearChart />
+
+                    {/* CAPA 2.5: Comparativa de Fechas Especiales y Festividades */}
+                    <SpecialDatesChart />
 
                     {/* CAPA 2B: Radar de Percentiles con Semáforo */}
                     <SalesPercentileTracker />

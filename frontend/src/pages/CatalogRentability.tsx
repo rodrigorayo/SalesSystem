@@ -3,22 +3,12 @@ import { useAuthStore } from '../store/authStore';
 import { getAnalyticsDashboard } from '../api/api';
 import {
     AlertTriangle, Loader2, Target, Activity,
-    TrendingUp, Package, Calendar, ChevronDown, DollarSign,
-    Search, FileSpreadsheet, Store, Trophy, Clock
+    TrendingUp, Package, Calendar, DollarSign,
+    Search, FileSpreadsheet, Trophy, Clock
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import BcgMatrix from '../components/BcgMatrix';
-
-const SUCS = [
-    { value: '', label: 'Todas las Sucursales' },
-    { value: 'Heroinas', label: 'Heroínas' },
-    { value: 'Centro', label: 'Centro' },
-    { value: 'Norte', label: 'Norte' },
-    { value: 'Sur', label: 'Sur' },
-    { value: 'Quillacollo', label: 'Quillacollo' },
-];
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -33,12 +23,9 @@ export default function CatalogRentability() {
     const [isError, setIsError] = useState(false);
     const [data, setData] = useState<any>(null);
     const [timeRange, setTimeRange] = useState('30days');
-    const [showMenuRange, setShowMenuRange] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Custom date range state
-    const [customStart, setCustomStart] = useState('');
-    const [customEnd, setCustomEnd] = useState('');
     const [isCustom, setIsCustom] = useState(false);
     const [customStartDate, setCustomStartDate] = useState('2024-01-01T00:00:00.000Z');
     const [customEndDate, setCustomEndDate] = useState('2026-12-31T23:59:59.000Z');
@@ -50,7 +37,6 @@ export default function CatalogRentability() {
     // Vista semanal / mensual para el grÃ¡fico de evoluciÃ³n
     const [chartView, setChartView] = useState<'day' | 'week' | 'month'>('week');
     const [meta, setMeta] = useState<number>(0);
-    const [sucursalTrend, setSucursalTrend] = useState('');
 
     const rentRangeLabels: Record<string, string> = {
         'today': 'Hoy',
@@ -118,18 +104,9 @@ export default function CatalogRentability() {
         return () => { isMounted = false; };
     }, [timeRange, customStartDate, customEndDate, isCustom]);
 
-    const handleApplyCustomDates = () => {
-        if (!customStart || !customEnd) return;
-        setCustomStartDate(new Date(customStart).toISOString());
-        setCustomEndDate(new Date(customEnd + 'T23:59:59').toISOString());
-        setIsCustom(true);
-        setTimeRange('');
-    };
 
     const handlePresetClick = (key: string) => {
         setIsCustom(false);
-        setCustomStart('');
-        setCustomEnd('');
         setCustomStartDate('2024-01-01T00:00:00.000Z');
         setCustomEndDate('2026-12-31T23:59:59.000Z');
         setTimeRange(key);

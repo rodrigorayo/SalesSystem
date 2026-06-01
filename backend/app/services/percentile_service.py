@@ -172,6 +172,8 @@ async def get_sales_percentiles(
             "last_real":  last_real,
             "periods":    periods,
             "group_by":   group_by,
+            "start_date": start_dt.strftime("%Y-%m-%d"),
+            "end_date":   end_dt.strftime("%Y-%m-%d"),
         }
 
     except Exception as e:

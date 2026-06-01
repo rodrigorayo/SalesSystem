@@ -1,10 +1,9 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSalesPercentiles } from "../api/api";
-import { Activity, Loader2, AlertTriangle, Store, BarChart2, ChevronLeft, ChevronRight, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Loader2, AlertTriangle, Store, BarChart2, ChevronLeft, ChevronRight, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { clsx } from "clsx"; import { twMerge } from "tailwind-merge";
 function cn(...i: any[]) { return twMerge(clsx(i)); }
 const fmt  = (n: number) => `Bs. ${n.toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
-const fmtK = (n: number) => n >= 1000 ? `${(n/1000).toFixed(0)}k` : String(Math.round(n));
 const ZONES = {
   critico:{ label:"Critico", color:"text-red-700",    bg:"bg-red-100",    border:"border-red-300",    dot:"bg-red-500",    pill:"bg-red-500 text-white"    },
   bajo:   { label:"Bajo",    color:"text-amber-700",  bg:"bg-amber-100",  border:"border-amber-300",  dot:"bg-amber-400",  pill:"bg-amber-400 text-white"  },
@@ -80,10 +79,19 @@ export default function SalesPercentileTracker(){
   if(data?.periods){ for(const p of data.periods) byDate[p.fecha]=p; }
 
   const p    = data?.percentiles;
-  const sum  = data?.summary;
   const lastR= data?.last_real;
   const lastZ= lastR?(ZONES[lastR.zone as keyof typeof ZONES]??ZONES.normal):null;
   const p50  = p?.p50??0; const p25=p?.p25??0; const p75=p?.p75??0;
+
+  const histPeriods = data?.periods ? data.periods.filter((x: any) => !x.is_future) : [];
+  const totalSalesHist = histPeriods.reduce((acc: number, curr: any) => acc + curr.total, 0);
+
+  // Sparkline calculations
+  const last7Days = histPeriods.slice(-7);
+  const maxLast7 = last7Days.length > 0 ? Math.max(...last7Days.map((d: any) => d.total), 1) : 1;
+  const maxP = p75 || 1;
+  const p25Pct = (p25 / maxP) * 100;
+  const p50Pct = (p50 / maxP) * 100;
 
   const firstOfMonth = new Date(navYear,navMonth,1);
   const daysInMonth  = new Date(navYear,navMonth+1,0).getDate();
@@ -136,84 +144,151 @@ export default function SalesPercentileTracker(){
         </div>
       ):(
         <div className="space-y-6">
-          {/* ── SECCIÓN 1: Umbrales de referencia ── */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-1 h-5 bg-indigo-400 rounded-full"/>
-              <p className="text-sm font-black text-gray-700">Umbrales históricos</p>
-              <span className="text-xs text-gray-400 font-medium">— La Mediana (P50) es la referencia real del cliente tipico. El P75 es la meta. El promedio puede subir por ventas grandes atipicas.</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                {label:"Media",  value:p?.media,color:"text-gray-600",  bg:"bg-gray-50",  border:"border-gray-200",  sub:"Promedio — puede subir con ventas atipicas"},
-                {label:"P25",    value:p?.p25,  color:"text-red-600",   bg:"bg-red-50",   border:"border-red-100",   sub:"El 25% más bajo — zona roja"},
-                {label:"Mediana",value:p?.p50,  color:"text-amber-600", bg:"bg-amber-50", border:"border-amber-100", sub:"Venta tipica real — referencia mas fiable"},
-                {label:"P75",    value:p?.p75,  color:"text-violet-600",bg:"bg-violet-50",border:"border-violet-100",sub:"El 25% más alto — zona lila"},
-              ].map(k=>(
-                <div key={k.label} className={cn("rounded-2xl p-4 border",k.bg,k.border)}>
-                  <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1",k.color)}>{k.label}</p>
-                  <p className="text-xl font-black text-gray-900">{fmt(k.value??0)}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{k.sub}</p>
+          {/* Top KPI Cards in 2 rows with Sparkline bars */}
+          <div className="space-y-4">
+            
+            {/* Row 1: Main Statistics (2 larger cards) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              
+              {/* Card 1: Total Facturado */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[140px] hover:shadow-md transition-all">
+                <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1">
+                  💰 Total Facturado
+                </span>
+                <div className="flex items-end justify-between gap-4 mt-2">
+                  {/* Mini Bars */}
+                  <div className="flex items-end gap-1.5 h-16 w-32 pb-0.5">
+                    {last7Days.map((day: any, idx: number) => {
+                      const z = ZONES[day.zone as keyof typeof ZONES] ?? ZONES.normal;
+                      const pctHeight = (day.total / maxLast7) * 100;
+                      return (
+                        <div 
+                          key={idx} 
+                          className={cn("w-2.5 rounded-t-sm transition-all duration-300", z.dot)} 
+                          style={{ height: `${Math.max(pctHeight, 10)}%` }}
+                          title={`${day.label}: ${fmt(day.total)}`}
+                        />
+                      );
+                    })}
+                  </div>
+                  {/* Values */}
+                  <div className="text-right">
+                    <p className="text-3xl lg:text-4xl font-black text-slate-700 leading-none">{fmt(totalSalesHist)}</p>
+                    <span className="text-[10px] text-slate-400 font-extrabold block mt-2 leading-none">
+                      Promedio diario: {fmt(p?.media ?? 0)}
+                    </span>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Card 2: Última Venta */}
+              {lastR && lastZ && (
+                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[140px] hover:shadow-md transition-all">
+                  <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1">
+                    ⚡ Último Día ({lastR.label})
+                  </span>
+                  <div className="flex items-end justify-between gap-4 mt-2">
+                    {/* Mini Bars */}
+                    <div className="flex items-end gap-1.5 h-16 w-32 pb-0.5">
+                      {last7Days.map((day: any, idx: number) => {
+                        const z = ZONES[day.zone as keyof typeof ZONES] ?? ZONES.normal;
+                        const pctHeight = (day.total / maxLast7) * 100;
+                        const isLast = idx === last7Days.length - 1;
+                        return (
+                          <div 
+                            key={idx} 
+                            className={cn("w-2.5 rounded-t-sm transition-all duration-300", z.dot, isLast ? "opacity-100 shadow-sm ring-1 ring-black/5" : "opacity-40")} 
+                            style={{ height: `${Math.max(pctHeight, 10)}%` }}
+                            title={`${day.label}: ${fmt(day.total)}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    {/* Values */}
+                    <div className="text-right">
+                      <p className={cn("text-3xl lg:text-4xl font-black leading-none", lastZ.color)}>{fmt(lastR.total)}</p>
+                      <span className={cn("text-[10px] font-black leading-none block mt-2", lastR.pct_vs_p50 >= 0 ? "text-emerald-600" : "text-red-500")}>
+                        {lastR.pct_vs_p50 >= 0 ? "▲" : "▼"} {Math.abs(lastR.pct_vs_p50)}% vs P50 (Mediana)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Row 2: Percentile Thresholds (3 cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              
+              {/* Card 3: P25 Mínimo */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px] hover:shadow-md transition-all">
+                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-1">
+                  🔴 P25 (Mínimo)
+                </span>
+                <div className="flex items-end justify-between gap-2 mt-2">
+                  {/* Mini Bars */}
+                  <div className="flex items-end gap-2 h-12 w-24 pb-0.5">
+                    <div className="w-4 bg-red-500 rounded-t-sm transition-all duration-300" style={{ height: `${p25Pct}%` }} />
+                    <div className="w-4 bg-amber-400 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: `${p50Pct}%` }} />
+                    <div className="w-4 bg-violet-500 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: "100%" }} />
+                  </div>
+                  {/* Values */}
+                  <div className="text-right">
+                    <p className="text-2xl lg:text-3xl font-black text-red-600 leading-none">{fmt(p25)}</p>
+                    <span className="text-[9px] text-slate-400 font-bold block mt-1.5 leading-none">
+                      25% de los días menores
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4: Mediana (P50) */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px] hover:shadow-md transition-all">
+                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-1">
+                  🟡 P50 (Mediana)
+                </span>
+                <div className="flex items-end justify-between gap-2 mt-2">
+                  {/* Mini Bars */}
+                  <div className="flex items-end gap-2 h-12 w-24 pb-0.5">
+                    <div className="w-4 bg-red-500 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: `${p25Pct}%` }} />
+                    <div className="w-4 bg-amber-400 rounded-t-sm transition-all duration-300" style={{ height: `${p50Pct}%` }} />
+                    <div className="w-4 bg-violet-500 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: "100%" }} />
+                  </div>
+                  {/* Values */}
+                  <div className="text-right">
+                    <p className="text-2xl lg:text-3xl font-black text-amber-600 leading-none">{fmt(p50)}</p>
+                    <span className="text-[9px] text-slate-400 font-bold block mt-1.5 leading-none">
+                      La venta típica diaria
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 5: P75 (Meta) */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px] hover:shadow-md transition-all">
+                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-1">
+                  🟣 P75 (Meta)
+                </span>
+                <div className="flex items-end justify-between gap-2 mt-2">
+                  {/* Mini Bars */}
+                  <div className="flex items-end gap-2 h-12 w-24 pb-0.5">
+                    <div className="w-4 bg-red-500 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: `${p25Pct}%` }} />
+                    <div className="w-4 bg-amber-400 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: `${p50Pct}%` }} />
+                    <div className="w-4 bg-violet-500 rounded-t-sm transition-all duration-300" style={{ height: "100%" }} />
+                  </div>
+                  {/* Values */}
+                  <div className="text-right">
+                    <p className="text-2xl lg:text-3xl font-black text-violet-600 leading-none">{fmt(p75)}</p>
+                    <span className="text-[9px] text-slate-400 font-bold block mt-1.5 leading-none">
+                      Solo 25% de días arriba
+                    </span>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
-
-          {/* ── SECCIÓN 2: Estado actual ── */}
-          {lastR&&lastZ&&(
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-1 h-5 bg-indigo-400 rounded-full"/>
-                <p className="text-sm font-black text-gray-700">Último período registrado</p>
-                <span className="text-xs text-gray-400 font-medium">— Cómo cerró el período más reciente vs los umbrales históricos.</span>
-              </div>
-              <div className={cn("rounded-2xl p-4 border flex items-center gap-4",lastZ.bg,lastZ.border)}>
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0",lastZ.dot)}>
-                  <Activity size={18} className="text-white"/>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">Último período con datos</p>
-                  <p className={cn("text-xl font-black",lastZ.color)}>{fmt(lastR.total)}</p>
-                  <p className={cn("text-sm font-bold",lastZ.color)}>{lastZ.label}
-                    {lastR.pct_vs_p50!==0&&<span className="ml-2 text-gray-400 font-normal text-xs">({lastR.pct_vs_p50>0?"+":""}{lastR.pct_vs_p50}% vs mediana)</span>}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {[{l:"P25",passed:lastR.paso_p25,c:"bg-amber-400"},{l:"P50",passed:lastR.paso_p50,c:"bg-emerald-500"},{l:"P75",passed:lastR.paso_p75,c:"bg-violet-500"}].map(s=>(
-                    <div key={s.l} className={cn("flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl border text-center min-w-[52px]",s.passed?"bg-white border-gray-200 shadow-sm":"bg-gray-50 border-gray-200 opacity-50")}>
-                      <div className={cn("w-2.5 h-2.5 rounded-full",s.passed?s.c:"bg-gray-300")}/>
-                      <span className="text-[9px] font-black text-gray-600">{s.l}</span>
-                      <span className={cn("text-[8px] font-black px-1 py-0.5 rounded-full",s.passed?"bg-emerald-100 text-emerald-700":"bg-gray-200 text-gray-500")}>{s.passed?"✓":"✗"}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── SECCIÓN 3: Distribución histórica ── */}
-          {sum&&(
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-1 h-5 bg-indigo-400 rounded-full"/>
-                <p className="text-sm font-black text-gray-700">Distribución de períodos</p>
-                <span className="text-xs text-gray-400 font-medium">— Cuántos días/semanas/meses históricos cayeron en cada zona de color.</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(["critico","bajo","normal","alto"] as const).map(zone=>{
-                  const z=ZONES[zone]; const count=sum[zone]??0;
-                  const pct=sum.total_periods>0?Math.round(count/sum.total_periods*100):0;
-                  return(<div key={zone} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold",z.bg,z.border,z.color)}>
-                    <div className={cn("w-2 h-2 rounded-full",z.dot)}/>{z.label}: <span className="font-black ml-1">{count}</span><span className="text-gray-400 font-normal">({pct}%)</span>
-                  </div>);
-                })}
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-black">
-                  📈 {sum.pct_above_median}% superó la mediana
-                </div>
-              </div>
-            </div>
-          )}
-
+          
           {/* ── SECCIÓN 4: Vista por período ── */}
           <div className="flex items-center gap-2">
             <div className="w-1 h-5 bg-indigo-400 rounded-full"/>

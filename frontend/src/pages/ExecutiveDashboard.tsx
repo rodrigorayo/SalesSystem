@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { Building2, Lightbulb, Bot, AlertTriangle, UploadCloud, DownloadCloud, Database } from 'lucide-react';
+import { Building2, Lightbulb, Bot, AlertTriangle, UploadCloud, DownloadCloud } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -61,8 +61,9 @@ export default function ExecutiveDashboard() {
 
             await generateExecutivePDF(kpis?.kpis, bcg, orchestration);
             toast.success("PDF generado exitosamente.");
-        } catch (e: any) {
-            toast.error("Error al exportar PDF: " + e.message);
+        } catch (e) {
+            const error = e as Error;
+            toast.error("Error al exportar PDF: " + error.message);
         } finally {
             setIsExporting(false);
         }
@@ -166,17 +167,7 @@ export default function ExecutiveDashboard() {
                                 Predicciones AI
                             </button>
                             
-                            <button
-                                onClick={() => setActiveTab('importar')}
-                                className={cn(
-                                    "flex items-center gap-2 pb-4 sm:pb-5 text-[10px] sm:text-[11px] font-bold tracking-[0.15em] uppercase transition-all whitespace-nowrap border-b-[2px]",
-                                    activeTab === 'importar' 
-                                        ? "border-gray-900 text-gray-900" 
-                                        : "border-transparent text-gray-400 hover:text-gray-800"
-                                )}>
-                                <Database size={14} strokeWidth={2.5} className={cn(activeTab !== 'importar' && "opacity-60")} />
-                                Base de Datos
-                            </button>
+
                     </div>
                 </div>
             </div>
