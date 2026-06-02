@@ -79,8 +79,6 @@ export const exportValuedInventory = async (date?: string) => {
     window.URL.revokeObjectURL(url);
 };
 
-
-
 export const getFinancialReport = (startDate: string, endDate: string, sucursal_id: string = 'all') => {
     const params = new URLSearchParams({ 
         start_date: startDate, 
@@ -90,7 +88,6 @@ export const getFinancialReport = (startDate: string, endDate: string, sucursal_
     return client<any[]>(`/reports/financial-report?${params.toString()}`);
 };
 
-<<<<<<< HEAD
 export const getAnalyticsDashboard = (start_date: string, end_date: string, sucursal_id?: string, time_range?: string, clima_evento?: string) => {
     const params = new URLSearchParams({ start_date, end_date });
     if (sucursal_id) params.append('sucursal_id', sucursal_id);
@@ -153,7 +150,8 @@ export const getDemandPrediction = (predict_days: number = 7, sucursal_id?: stri
 
 export const uploadHistoricalData = (data: { sucursal_id: string, rows: any[] }) => {
     return client<any>('/analytics/import-historical', { method: 'POST', body: data });
-=======
+};
+
 export const getSalesByHour = (date: string, sucursal_id?: string) => {
     const params = new URLSearchParams({ date });
     if (sucursal_id) params.append('sucursal_id', sucursal_id);
@@ -205,8 +203,8 @@ export const getSalesMatrix = (start_date: string, end_date: string, sucursal_id
             days: Record<string, number>;
         }[];
     }>(`/reports/sales-matrix?${params.toString()}`);
->>>>>>> origin/main
 };
+
 
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');

@@ -90,9 +90,9 @@ export default function ImportadorInteligente() {
                         className="w-full h-12 bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                     >
                         <option value="">-- Elige la sucursal --</option>
-                        <option value="Heroínas">Heroínas</option>
-                        <option value="Quillacollo">Quillacollo</option>
-                        <option value="Sacaba">Sacaba</option>
+                        <option value="Heroinas">Heroínas</option>
+                        <option value="Recoleta">Recoleta</option>
+                        <option value="Calacoto">Calacoto</option>
                     </select>
                 </div>
 

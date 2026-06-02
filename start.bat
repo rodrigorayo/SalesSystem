@@ -12,15 +12,14 @@ echo.
 echo  [1/2] Iniciando Backend (FastAPI)...
 cd /d "%~dp0backend"
 
-if not exist "venv\Scripts\activate.bat" (
-    echo  [ERROR] No se encontro el entorno virtual en backend\venv
-    echo  Ejecuta: python -m venv venv ^&^& venv\Scripts\pip install -r requirements.txt
+if not exist "..\.venv\Scripts\activate.bat" (
+    echo  [ERROR] No se encontro el entorno virtual en la raiz (.venv)
+    echo  Ejecuta: python -m venv .venv ^&^& .venv\Scripts\pip install -r requirements.txt
     pause
     exit /b 1
 )
 
-call venv\Scripts\activate.bat
-start "SalesSystem Backend :8000" cmd /k "cd /d %~dp0backend && call venv\Scripts\activate.bat && python -m uvicorn app.main:app --reload --port 8000"
+start "SalesSystem Backend :8000" cmd /k "cd /d %~dp0backend && call ..\.venv\Scripts\activate.bat && python -m uvicorn app.main:app --reload --port 8000"
 
 :: Esperar 3 segundos para que el backend inicie
 timeout /t 3 /nobreak > nul

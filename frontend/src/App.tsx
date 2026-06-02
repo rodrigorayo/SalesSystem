@@ -21,21 +21,15 @@ import ControlQRPage from './pages/ControlQRPage';
 import PriceRequestsPage from './pages/PriceRequestsPage';
 import ReportsPage from './pages/ReportsPage';
 import CreditosPage from './pages/CreditosPage';
-<<<<<<< HEAD
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
-=======
 import ClientesPage from './pages/ClientesPage';
 import ReclamosFabrica from './pages/b2b/ReclamosFabrica';
 import ComunidadPage from './pages/ComunidadPage';
->>>>>>> origin/main
 import { useAuthStore } from './store/authStore';
 import { getMyFeatures } from './api/api';
 import { Toaster } from 'sonner';
-<<<<<<< HEAD
 import ChatbotAnalitico from './components/ChatbotAnalitico';
-=======
 import { ErrorModalProvider, useErrorModal } from './components/ErrorModal';
->>>>>>> origin/main
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -194,8 +188,6 @@ function App() {
                   </ProtectedRoute>
                 } />
 
-<<<<<<< HEAD
-=======
                 {/* Traslados de Inventario */}
                 <Route path="/traslados" element={
                   <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES} requiredFeature="INVENTARIO">
@@ -204,17 +196,13 @@ function App() {
                 } />
 
                 {/* B2B Orders */}
->>>>>>> origin/main
                 <Route path="/pedidos" element={
                   <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES} requiredFeature="PEDIDOS_INTERNOS">
                     <PedidosPage />
                   </ProtectedRoute>
                 } />
 
-<<<<<<< HEAD
-=======
                 {/* Historial de Ventas */}
->>>>>>> origin/main
                 <Route path="/ventas" element={
                   <ProtectedRoute allowedRoles={[...ALL_STAFF, 'FACTURADOR']} requiredFeature="VENTAS">
                     <VentasPage />
@@ -227,18 +215,13 @@ function App() {
                   </ProtectedRoute>
                 } />
 
-<<<<<<< HEAD
-=======
                 {/* Créditos */}
->>>>>>> origin/main
                 <Route path="/creditos" element={
                   <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CREDITOS">
                     <CreditosPage />
                   </ProtectedRoute>
                 } />
 
-<<<<<<< HEAD
-=======
                 {/* Clientes */}
                 <Route path="/clientes" element={
                   <ProtectedRoute allowedRoles={ALL_STAFF}>
@@ -261,7 +244,6 @@ function App() {
                 } />
 
                 {/* Descuentos */}
->>>>>>> origin/main
                 <Route path="/descuentos" element={
                   <ProtectedRoute allowedRoles={BRANCH_ROLES} requiredFeature="DESCUENTOS_AVANZADOS">
                     <DescuentosPage />
@@ -274,20 +256,14 @@ function App() {
                   </ProtectedRoute>
                 } />
 
-<<<<<<< HEAD
-=======
                 {/* Categories (parte de INVENTARIO) */}
->>>>>>> origin/main
                 <Route path="/categories" element={
                   <ProtectedRoute allowedRoles={MATRIZ_ROLES} requiredFeature="INVENTARIO">
                     <CategoriesPage />
                   </ProtectedRoute>
                 } />
 
-<<<<<<< HEAD
-=======
                 {/* Users */}
->>>>>>> origin/main
                 <Route path="/usuarios" element={
                   <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES}>
                     <UsersPage />

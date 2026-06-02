@@ -200,11 +200,9 @@ export default function SpecialDatesChart() {
 
     const SUCURSALES = [
         { value: '', label: 'Todas las Sucursales' },
-        { value: 'Heroinas', label: 'Heroinas' },
-        { value: 'Centro', label: 'Centro' },
-        { value: 'Norte', label: 'Norte' },
-        { value: 'Sur', label: 'Sur' },
-        { value: 'Quillacollo', label: 'Quillacollo' },
+        { value: 'Heroinas', label: 'Heroínas' },
+        { value: 'Recoleta', label: 'Recoleta' },
+        { value: 'Calacoto', label: 'Calacoto' },
     ];
 
     const fetchData = useCallback(async (holiday: string, year: number, suc: string) => {

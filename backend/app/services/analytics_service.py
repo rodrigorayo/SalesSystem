@@ -246,6 +246,7 @@ async def get_dashboard_metrics(
                 s_str = str(s).lower()
                 if 'heroinas' in s_str or 'heroína' in s_str: return 'Heroínas'
                 if 'recoleta' in s_str: return 'Recoleta'
+                if 'calacoto' in s_str: return 'Calacoto'
                 return str(s).capitalize()
                 
             df_filtrado['suc_clean'] = df_filtrado['sucursal'].apply(mapear_sucursal)
@@ -555,6 +556,7 @@ async def get_sales_by_branch_metrics(
         s_str = str(s).lower()
         if 'heroinas' in s_str or 'heroína' in s_str: return 'Heroínas'
         if 'recoleta' in s_str: return 'Recoleta'
+        if 'calacoto' in s_str: return 'Calacoto'
         return str(s).capitalize()
         
     sucursales_agrupadas = {}

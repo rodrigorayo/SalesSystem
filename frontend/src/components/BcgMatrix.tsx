@@ -135,10 +135,8 @@ const CATEGORIES = [
 const SUCS = [
     { value: '', label: 'Todas las Sucursales' },
     { value: 'Heroinas', label: 'Heroínas' },
-    { value: 'Centro', label: 'Centro' },
-    { value: 'Norte', label: 'Norte' },
-    { value: 'Sur', label: 'Sur' },
-    { value: 'Quillacollo', label: 'Quillacollo' },
+    { value: 'Recoleta', label: 'Recoleta' },
+    { value: 'Calacoto', label: 'Calacoto' },
 ];
 
 /* ─── Componente principal ───────────────────────────────── */

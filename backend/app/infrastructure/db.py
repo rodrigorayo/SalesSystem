@@ -26,13 +26,31 @@ from app.domain.models.traslado import TrasladoInventario
 
 from app.infrastructure.core.config import settings
 
+class ClientWrapper:
+    def __init__(self, client):
+        self._client = client
+    def __getattr__(self, name):
+        if name == "append_metadata":
+            return lambda *args, **kwargs: None
+        return getattr(self._client, name)
+
+class BeanieFixWrapper:
+    def __init__(self, db):
+        self._db = db
+    def __getitem__(self, item):
+        return self._db[item]
+    def __getattr__(self, name):
+        if name == "client":
+            return ClientWrapper(self._db.client)
+        return getattr(self._db, name)
+
 _client = None
 
 async def init_db():
     global _client
     _client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
     await init_beanie(
-        database=_client.salessystem,
+        database=BeanieFixWrapper(_client.salessystem),
         document_models=[
             User,
             Tenant,

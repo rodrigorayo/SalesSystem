@@ -11,9 +11,9 @@ const ZONES = {
   alto:   { label:"Alto",    color:"text-violet-700", bg:"bg-violet-100", border:"border-violet-300", dot:"bg-violet-500", pill:"bg-violet-500 text-white"  },
 } as const;
 const SUCS = [
-  {value:"",label:"Todas las Sucursales"},{value:"Heroinas",label:"Heroinas"},
-  {value:"Centro",label:"Centro"},{value:"Norte",label:"Norte"},
-  {value:"Sur",label:"Sur"},{value:"Quillacollo",label:"Quillacollo"},
+  {value:"",label:"Todas las Sucursales"},{value:"Heroinas",label:"Heroínas"},
+  {value:"Recoleta",label:"Recoleta"},
+  {value:"Calacoto",label:"Calacoto"},
 ];
 const DAYS  = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"];
 const MES   = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
