@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getProducts, downloadPedidoPDF } from '../api/api';
+import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getInventario, getProducts, downloadPedidoPDF } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 
 import {
     ClipboardList, Plus, Truck, CheckCircle2, Clock,
     X, Check, Loader2, ChevronDown, ChevronRight, Package,
-    CheckSquare, Ban, AlertTriangle, Download
+    CheckSquare, Ban, AlertTriangle, Download, Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,17 +41,68 @@ export default function PedidosPage() {
     const [receptionModal, setReceptionModal] = useState<{ isOpen: boolean; pedido: any }>({ isOpen: false, pedido: null });
 
     const [selectedSucursal, setSelectedSucursal] = useState('');
-    const [supervisorAction, setSupervisorAction] = useState<'PEDIR' | 'TRANSFERIR'>('PEDIR');
+    const [supervisorAction, setSupervisorAction] = useState<'PEDIR' | 'TRANSFERIR' | 'DEVOLVER'>('PEDIR');
     const [orderItems, setOrderItems] = useState<{ producto_id: string; cantidad: number }[]>([]);
     const [notas, setNotas] = useState('');
+    const [searchProd, setSearchProd] = useState('');
 
     const { data: pedidos = [], isLoading } = useQuery({
         queryKey: ['pedidos', tab],
         queryFn: () => getPedidos(undefined, tab === 'todos' ? undefined : tab),
     });
     const { data: sucursales = [] } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
-    const { data: productsData } = useQuery({ queryKey: ['products'], queryFn: () => getProducts(1, 1000) });
-    const products = productsData?.items || [];
+    
+    // Determine the true source of merchandise based on user role and action
+    const origenId = useMemo(() => {
+        if (isMatriz() || user?.role === 'SUPERADMIN') return "CENTRAL";
+        if (user?.role === 'SUPERVISOR') {
+            if (supervisorAction === 'PEDIR') return selectedSucursal;
+            if (supervisorAction === 'TRANSFERIR') return user.sucursal_id;
+            if (supervisorAction === 'DEVOLVER') return selectedSucursal;
+        }
+        if (isSucursal()) {
+            if (supervisorAction === 'PEDIR') return "CENTRAL";
+            if (supervisorAction === 'TRANSFERIR') return user?.sucursal_id;
+            if (supervisorAction === 'DEVOLVER') return selectedSucursal;
+        }
+        return "CENTRAL";
+    }, [user, supervisorAction, selectedSucursal, isMatriz, isSucursal]);
+
+    const { data: invData } = useQuery({
+        queryKey: ['inventario-for-order', origenId],
+        queryFn: () => getInventario(origenId, 1, 1000),
+        enabled: showCreate && !!origenId && origenId !== 'CENTRAL'
+    });
+    
+    // Matriz does not have strict stock limits; they can craft from factory.
+    // Fetch the global catalog unrestricted for CENTRAL orders.
+    const { data: productsData } = useQuery({ 
+        queryKey: ['products'], 
+        queryFn: () => getProducts(1, 1000),
+        enabled: showCreate && origenId === 'CENTRAL' 
+    });
+
+    const availableProducts = useMemo(() => {
+        let list = [];
+        if (origenId === 'CENTRAL') {
+            list = (productsData?.items || []).map((p: any) => ({
+                producto_id: p._id || p.id,
+                producto_nombre: p.descripcion || p.name,
+                cantidad: '∞',
+                precio: p.costo_producto ?? p.costo_unitario ?? 0
+            }));
+        } else {
+            list = (invData?.items || [])
+                .filter((inv: any) => inv.cantidad > 0)
+                .map((inv: any) => ({
+                    producto_id: inv.producto_id,
+                    producto_nombre: inv.producto_nombre || inv.descripcion || 'Producto',
+                    cantidad: inv.cantidad,
+                    precio: inv.precio_sucursal ?? inv.precio_venta ?? 0
+                }));
+        }
+        return list.sort((a: any, b: any) => a.producto_nombre.localeCompare(b.producto_nombre));
+    }, [origenId, invData, productsData]);
 
     const createMut = useMutation({
         mutationFn: createPedido,
@@ -75,8 +126,13 @@ export default function PedidosPage() {
         onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al aceptar pedido')
     });
 
-    const resetForm = () => { setSelectedSucursal(''); setOrderItems([]); setNotas(''); };
-    const addItem = () => setOrderItems(p => [...p, { producto_id: '', cantidad: 1 }]);
+    const filteredCatalog = useMemo(() => {
+        if (!searchProd) return availableProducts;
+        const low = searchProd.toLowerCase();
+        return availableProducts.filter((p: any) => p.producto_nombre.toLowerCase().includes(low));
+    }, [availableProducts, searchProd]);
+
+    const resetForm = () => { setSelectedSucursal(''); setOrderItems([]); setNotas(''); setSearchProd(''); };
     const updateItem = (i: number, f: 'producto_id' | 'cantidad', v: string | number) =>
         setOrderItems(p => p.map((item, idx) => idx === i ? { ...item, [f]: v } : item));
     const removeItem = (i: number) => setOrderItems(p => p.filter((_, idx) => idx !== i));
@@ -176,7 +232,7 @@ export default function PedidosPage() {
                                                 <tbody className="divide-y divide-gray-50">
                                                     {pedido.items.map((item, i) => (
                                                         <tr key={i} className="text-gray-800">
-                                                            <td className="py-1.5">{item.descripcion || item.producto_nombre || 'Producto Desconocido'}</td>
+                                                            <td className="py-1.5">{item.descripcion || item.producto_nombre || item.nombre || 'Producto Desconocido'}</td>
                                                             <td className="py-1.5 text-center">{item.cantidad}</td>
                                                             <td className="py-1.5 text-right">Bs. {(item.precio_mayorista || 0).toFixed(2)}</td>
                                                             <td className="py-1.5 text-right font-medium">Bs. {(item.cantidad * (item.precio_mayorista || 0)).toFixed(2)}</td>
@@ -201,7 +257,7 @@ export default function PedidosPage() {
                                                     Cancelar
                                                 </button>
                                             )}
-                                            {pedido.estado === 'CREADO' && isMatriz() && (
+                                            {pedido.estado === 'CREADO' && (isMatriz() || user?.role === 'SUPERADMIN' || user?.sucursal_id === pedido.sucursal_origen_id) && (
                                                 <button onClick={() => setConfirmModal({
                                                     isOpen: true, title: 'Aceptar Pedido',
                                                     message: '¿Estás seguro de ACEPTAR este pedido y comenzar a prepararlo?',
@@ -212,10 +268,10 @@ export default function PedidosPage() {
                                                     Aceptar Pedido
                                                 </button>
                                             )}
-                                            {pedido.estado === 'ACEPTADO' && isMatriz() && (
+                                            {pedido.estado === 'ACEPTADO' && (isMatriz() || user?.role === 'SUPERADMIN' || user?.sucursal_id === pedido.sucursal_origen_id) && (
                                                 <button onClick={() => setConfirmModal({
-                                                    isOpen: true, title: 'Despachar a Sucursal',
-                                                    message: '¿Confirmas que la fábrica ya envió los productos y están EN CAMINO a la sucursal?',
+                                                    isOpen: true, title: 'Despachar Pedido',
+                                                    message: '¿Confirmas que ya enviaste los productos y están EN CAMINO a su destino?',
                                                     type: 'info', action: () => despacharMut.mutate(pedido._id)
                                                 })} disabled={despacharMut.isPending}
                                                     className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
@@ -223,7 +279,7 @@ export default function PedidosPage() {
                                                     Despachar
                                                 </button>
                                             )}
-                                            {pedido.estado === 'DESPACHADO' && isSucursal() && (
+                                            {pedido.estado === 'DESPACHADO' && (user?.sucursal_id === pedido.sucursal_destino_id || user?.role === 'SUPERADMIN') && (
                                                 <button onClick={() => setReceptionModal({ isOpen: true, pedido })}
                                                     className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                                     <CheckCircle2 size={14} />
@@ -252,12 +308,22 @@ export default function PedidosPage() {
 
             {/* Create Pedido Modal */}
             {showCreate && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-base font-bold text-gray-900">Nuevo Pedido Interno</h2>
-                            <button onClick={() => { setShowCreate(false); resetForm(); }} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl border border-gray-100 max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                    <Plus className="text-indigo-600" size={24} />
+                                    Nuevo Pedido Interno
+                                </h2>
+                                <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Configuración de traslado de mercadería</p>
+                            </div>
+                            <button onClick={() => { setShowCreate(false); resetForm(); }} className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
+                                <X size={24} />
+                            </button>
                         </div>
+
                         <form onSubmit={e => {
                             e.preventDefault();
                             const validItems = orderItems.filter(i => i.producto_id.trim() !== '');
@@ -281,10 +347,31 @@ export default function PedidosPage() {
                                     payload.sucursal_destino_id = user.sucursal_id;
                                     payload.sucursal_id = user.sucursal_id;
                                     payload.sucursal_origen_id = selectedSucursal; // A physical branch
-                                } else {
+                                } else if (supervisorAction === 'TRANSFERIR') {
                                     payload.sucursal_destino_id = selectedSucursal; // A vendedor branch
                                     payload.sucursal_id = selectedSucursal;
                                     payload.sucursal_origen_id = user.sucursal_id;
+                                    payload.transferencia_directa = true;
+                                } else if (supervisorAction === 'DEVOLVER') {
+                                    payload.sucursal_destino_id = user.sucursal_id; 
+                                    payload.sucursal_id = user.sucursal_id;
+                                    payload.sucursal_origen_id = selectedSucursal; // A vendedor branch
+                                    payload.transferencia_directa = true;
+                                }
+                            } else if (isSucursal()) {
+                                if (supervisorAction === 'PEDIR') {
+                                    payload.sucursal_destino_id = user?.sucursal_id;
+                                    payload.sucursal_id = user?.sucursal_id;
+                                    payload.sucursal_origen_id = "CENTRAL";
+                                } else if (supervisorAction === 'TRANSFERIR') {
+                                    payload.sucursal_destino_id = selectedSucursal; // A supervisor
+                                    payload.sucursal_id = selectedSucursal;
+                                    payload.sucursal_origen_id = user?.sucursal_id;
+                                    payload.transferencia_directa = true;
+                                } else if (supervisorAction === 'DEVOLVER') {
+                                    payload.sucursal_destino_id = user?.sucursal_id;
+                                    payload.sucursal_id = user?.sucursal_id;
+                                    payload.sucursal_origen_id = selectedSucursal; // A supervisor
                                     payload.transferencia_directa = true;
                                 }
                             } else {
@@ -294,125 +381,312 @@ export default function PedidosPage() {
                             }
                             
                             createMut.mutate(payload);
-                        }} className="space-y-4">
-                            {user?.role === 'SUPERVISOR' && (
-                                <div className="mb-4">
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Movimiento</label>
-                                    <select value={supervisorAction} onChange={e => setSupervisorAction(e.target.value as any)}
-                                        className="w-full border border-indigo-200 bg-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                        <option value="PEDIR">Solicitar Mercadería (A una Sucursal)</option>
-                                        <option value="TRANSFERIR">Transferir Mercadería (A un Vendedor)</option>
-                                    </select>
+                        }} className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50">
+                            
+                            {/* Selector de Movimiento */}
+                            {(user?.role === 'SUPERVISOR' || isSucursal()) && (
+                                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Tipo de Operación</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        {(['PEDIR', 'TRANSFERIR', 'DEVOLVER'] as const).map((act) => (
+                                            <button
+                                                key={act}
+                                                type="button"
+                                                onClick={() => setSupervisorAction(act)}
+                                                className={`py-3 px-4 rounded-xl text-[11px] font-bold transition-all border ${
+                                                    supervisorAction === act 
+                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' 
+                                                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {act === 'PEDIR' && (isSucursal() ? 'ABASTECIMIENTO' : 'EXTRAER')}
+                                                {act === 'TRANSFERIR' && 'ENTREGAR'}
+                                                {act === 'DEVOLVER' && 'RECUPERAR'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="flex bg-gray-50 p-3 rounded-xl border border-gray-100 gap-3">
+                            {/* Ruta de Mercadería */}
+                            <div className="grid grid-cols-1 md:grid-cols-11 gap-4 items-center">
                                 {/* ORIGEN */}
-                                <div className="flex-1">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                        <Truck size={12} /> Origen
+                                <div className="md:col-span-5 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <Truck size={14} className="text-indigo-400" /> Punto de Salida
                                     </label>
                                     {isMatriz() || user?.role === 'SUPERADMIN' ? (
-                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
-                                            Matriz Principal
+                                        <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold">
+                                            Matriz Principal (Fábrica)
                                         </div>
                                     ) : user?.role === 'SUPERVISOR' ? (
                                         supervisorAction === 'PEDIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Seleccionar Sucursal...</option>
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Origen...</option>
                                                 {sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo).map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
+                                        ) : supervisorAction === 'DEVOLVER' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Vendedor...</option>
+                                                {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
                                         ) : (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
                                         )
                                     ) : (
-                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed">
-                                            Matriz Principal
-                                        </div>
+                                        supervisorAction === 'PEDIR' ? (
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold">
+                                                Matriz Principal
+                                            </div>
+                                        ) : supervisorAction === 'DEVOLVER' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Supervisor...</option>
+                                                {sucursales.filter(s => s.tipo === 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                                            </select>
+                                        ) : (
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
+                                            </div>
+                                        )
                                     )}
                                 </div>
 
                                 {/* ICON */}
-                                <div className="flex items-center justify-center pt-5">
-                                    <ChevronRight size={18} className="text-gray-400" />
+                                <div className="md:col-span-1 flex items-center justify-center">
+                                    <div className="bg-indigo-50 p-2 rounded-full border border-indigo-100">
+                                        <ChevronRight size={24} className="text-indigo-400" />
+                                    </div>
                                 </div>
 
                                 {/* DESTINO */}
-                                <div className="flex-1">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                        <Package size={12} /> Destino
+                                <div className="md:col-span-5 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <Package size={14} className="text-emerald-400" /> Punto de Destino
                                     </label>
                                     {isMatriz() || user?.role === 'SUPERADMIN' ? (
                                         <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                            className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                            <option value="">Sucursal Física...</option>
+                                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                            <option value="">Seleccionar Sucursal...</option>
                                             {sucursales.filter(s => s.tipo !== 'VENDEDOR' && s.tipo !== 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                         </select>
                                     ) : user?.role === 'SUPERVISOR' ? (
                                         supervisorAction === 'PEDIR' ? (
-                                            <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario'}
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
                                             </div>
-                                        ) : (
+                                        ) : supervisorAction === 'TRANSFERIR' ? (
                                             <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
-                                                className="w-full border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-900 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <option value="">Vendedor/Ruta...</option>
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Vendedor...</option>
                                                 {sucursales.filter(s => s.tipo === 'VENDEDOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
+                                        ) : (
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Mi Inventario Móvil'}
+                                            </div>
                                         )
                                     ) : (
-                                        <div className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 font-semibold cursor-not-allowed line-clamp-1">
-                                            {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="text-xs font-semibold text-gray-700">Productos *</label>
-                                    <button type="button" onClick={addItem} className="text-[11px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-bold">
-                                        <Plus size={12} /> Agregar
-                                    </button>
-                                </div>
-                                <div className="space-y-2">
-                                    {orderItems.map((item, i) => (
-                                        <div key={i} className="flex gap-1.5 items-center">
-                                            <select required value={item.producto_id} onChange={e => updateItem(i, 'producto_id', e.target.value)}
-                                                className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] bg-white">
-                                                <option value="">Producto…</option>
-                                                {products.map((p: any) => <option key={p._id || p.id} value={p._id || p.id}>{p.descripcion || p.name}</option>)}
+                                        supervisorAction === 'TRANSFERIR' ? (
+                                            <select required value={selectedSucursal} onChange={e => setSelectedSucursal(e.target.value)}
+                                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                                <option value="">Seleccionar Supervisor...</option>
+                                                {sucursales.filter(s => s.tipo === 'SUPERVISOR').map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                                             </select>
-                                            <input required type="number" min="1" value={item.cantidad} onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
-                                                className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-[11px] text-center"
-                                            />
-                                            <button type="button" onClick={() => removeItem(i)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
-                                        </div>
-                                    ))}
-                                    {orderItems.length === 0 && (
-                                        <div className="text-center py-4 text-gray-400 border border-dashed border-gray-200 rounded-xl">
-                                            <Package size={20} className="mx-auto mb-1 opacity-40" />
-                                            <p className="text-[11px] text-gray-500">Sin productos aún</p>
-                                        </div>
+                                        ) : (
+                                            <div className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-bold truncate">
+                                                {sucursales.find(s => s._id === user?.sucursal_id)?.nombre || 'Esta Sucursal'}
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Notas (opcional)</label>
+                            {/* Lista de Productos y Buscador Directo */}
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col min-h-[400px] overflow-visible">
+                                <div className="p-4 border-b border-gray-50">
+                                    <div className="mb-4">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Selección de Productos</label>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Busca un producto y haz clic para agregarlo al pedido.</p>
+                                    </div>
+                                    
+                                    <div className="relative group">
+                                        <div className="relative">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                                <Search size={18} />
+                                            </div>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Escribe el nombre del producto o código..." 
+                                                value={searchProd} 
+                                                onChange={e => setSearchProd(e.target.value)}
+                                                className="w-full border-2 border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none placeholder-gray-400 bg-gray-50/50 transition-all" 
+                                            />
+                                        </div>
+
+                                        {/* Resultados de Búsqueda (Dropdown) */}
+                                        <AnimatePresence>
+                                            {searchProd.length > 0 && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[60] max-h-64 overflow-y-auto divide-y divide-gray-50"
+                                                >
+                                                    {filteredCatalog.length === 0 ? (
+                                                        <div className="p-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
+                                                            No se encontraron productos
+                                                        </div>
+                                                    ) : (
+                                                        filteredCatalog.map((p: any) => (
+                                                            <button
+                                                                key={p.producto_id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Check if already in list
+                                                                    const exists = orderItems.find(item => item.producto_id === p.producto_id);
+                                                                    if (exists) {
+                                                                        setOrderItems(prev => prev.map(item => 
+                                                                            item.producto_id === p.producto_id 
+                                                                            ? { ...item, cantidad: item.cantidad + 1 } 
+                                                                            : item
+                                                                        ));
+                                                                    } else {
+                                                                        setOrderItems(prev => [...prev, { producto_id: p.producto_id, cantidad: 1 }]);
+                                                                    }
+                                                                    setSearchProd(''); // Limpiar buscador
+                                                                }}
+                                                                className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 transition-colors text-left group/item"
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-bold text-gray-900 group-hover/item:text-indigo-600 transition-colors">{p.producto_nombre}</span>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold">STOCK: {p.cantidad}</span>
+                                                                        <span className="text-[10px] text-gray-400 font-medium">Bs. {(Number(p.precio)||0).toFixed(2)}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                                    <Plus size={16} />
+                                                                </div>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 flex-1">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Productos en el Pedido</h4>
+                                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-bold">{orderItems.length} ítems</span>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {orderItems.map((item, i) => {
+                                            const p = availableProducts.find((ap: any) => ap.producto_id === item.producto_id);
+                                            return (
+                                                <div key={item.producto_id} className="flex gap-4 items-center bg-gray-50/50 p-3 rounded-2xl border border-gray-100 animate-in slide-in-from-right-4 duration-200">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-bold text-gray-900 truncate">{p?.producto_nombre || 'Cargando...'}</div>
+                                                        <div className="text-[10px] text-gray-500 font-medium mt-0.5">
+                                                            Unitario: Bs. {(Number(p?.precio)||0).toFixed(2)} · Subtotal: <span className="text-indigo-600 font-bold">Bs. {(item.cantidad * (Number(p?.precio)||0)).toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => updateItem(i, 'cantidad', Math.max(1, item.cantidad - 1))}
+                                                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        >
+                                                            <ChevronDown size={14} />
+                                                        </button>
+                                                        <input 
+                                                            type="number" 
+                                                            min="1" 
+                                                            value={item.cantidad} 
+                                                            onChange={e => updateItem(i, 'cantidad', parseInt(e.target.value) || 1)}
+                                                            className="w-12 text-center text-sm font-black text-gray-900 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        />
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => updateItem(i, 'cantidad', item.cantidad + 1)}
+                                                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        >
+                                                            <Plus size={14} />
+                                                        </button>
+                                                    </div>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => removeItem(i)} 
+                                                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                    >
+                                                        <X size={20} />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                        
+                                        {orderItems.length === 0 && (
+                                            <div className="text-center py-16 text-gray-400">
+                                                <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-gray-100 rotate-3">
+                                                    <Package size={32} className="opacity-20" />
+                                                </div>
+                                                <p className="text-xs font-black text-gray-300 uppercase tracking-[0.2em]">El pedido está vacío</p>
+                                                <p className="text-[10px] text-gray-400 mt-2">Usa el buscador de arriba para agregar productos</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {orderItems.length > 0 && (
+                                    <div className="p-4 bg-indigo-600 rounded-b-2xl flex justify-between items-center text-white">
+                                        <span className="text-xs font-black uppercase tracking-widest">Total Estimado</span>
+                                        <span className="text-lg font-black">
+                                            Bs. {orderItems.reduce((acc, item) => {
+                                                const p = availableProducts.find((ap: any) => ap.producto_id === item.producto_id);
+                                                return acc + (item.cantidad * (Number(p?.precio)||0));
+                                            }, 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Comentarios y Observaciones</label>
                                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
-                                    className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none text-[11px]"
-                                    placeholder="Instrucciones especiales..."
+                                    className="w-full border-2 border-gray-50 rounded-2xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none resize-none text-sm font-medium transition-all bg-gray-50/30"
+                                    placeholder="Instrucciones para el despacho, motivos especiales, etc."
                                 />
                             </div>
 
-                            <button type="submit" disabled={createMut.isPending || orderItems.length === 0}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
-                                {createMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Crear Pedido</>}
-                            </button>
+                            <div className="flex gap-4 pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setShowCreate(false); resetForm(); }}
+                                    className="flex-1 py-4 text-sm font-black text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    DESCARTAR
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={createMut.isPending || orderItems.length === 0}
+                                    className="flex-[2] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white py-5 rounded-2xl text-base font-black flex items-center justify-center gap-3 shadow-2xl shadow-indigo-200 transition-all active:scale-95 group"
+                                >
+                                    {createMut.isPending ? <Loader2 size={24} className="animate-spin" /> : (
+                                        <>
+                                            <Check size={24} /> 
+                                            CREAR PEDIDO AHORA
+                                            <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -493,7 +767,7 @@ function ReceptionModal({ pedido, onClose, onSuccess }: { pedido: any; onClose: 
     const [items, setItems] = useState<{producto_id: string, descripcion: string, cantidad_enviada: number, cantidad_recibida: number}[]>(
         pedido.items.map((i: any) => ({
             producto_id: i.producto_id,
-            descripcion: i.producto_nombre || i.descripcion,
+            descripcion: i.descripcion || i.producto_nombre || i.nombre || 'Producto',
             cantidad_enviada: i.cantidad,
             cantidad_recibida: i.cantidad // defecto: asume que todo llegó
         }))
@@ -527,11 +801,11 @@ function ReceptionModal({ pedido, onClose, onSuccess }: { pedido: any; onClose: 
                                 <th className="px-3 py-2 text-center w-32">Recibida</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 text-gray-900">
                             {items.map((i, idx) => (
                                 <tr key={idx} className="hover:bg-gray-50/50">
-                                    <td className="px-3 py-2 text-xs font-semibold">{i.descripcion}</td>
-                                    <td className="px-3 py-2 text-center font-bold text-gray-500 bg-gray-50/50">{i.cantidad_enviada}</td>
+                                    <td className="px-3 py-2 text-xs font-semibold text-gray-900">{i.descripcion}</td>
+                                    <td className="px-3 py-2 text-center font-bold text-gray-600 bg-gray-50/50">{i.cantidad_enviada}</td>
                                     <td className="px-3 py-2 relative">
                                         <input type="number" min="0" max={i.cantidad_enviada}
                                             value={i.cantidad_recibida}
@@ -539,7 +813,7 @@ function ReceptionModal({ pedido, onClose, onSuccess }: { pedido: any; onClose: 
                                                 const val = parseInt(e.target.value) || 0;
                                                 setItems(items.map((it, n) => n === idx ? { ...it, cantidad_recibida: Math.min(val, it.cantidad_enviada) } : it));
                                             }}
-                                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-center text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700 bg-indigo-50"
+                                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-center text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-gray-900 bg-indigo-50"
                                         />
                                         {i.cantidad_recibida !== i.cantidad_enviada && (
                                             <div className="absolute top-1/2 -right-6 -translate-y-1/2 text-amber-500" title="Diferencia de inventario detectada">

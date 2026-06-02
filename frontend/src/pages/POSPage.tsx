@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProducts, getInventario, getCategories, getSaleStatsToday } from '../api/api';
+import { getProducts, getInventario, getCategories, getSaleStatsToday, getUsers, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { usePosStore, type MetodoPago } from '../store/usePosStore';
 import { useDescuentos } from '../hooks/useDescuentos';
@@ -11,13 +11,14 @@ import {
     ShoppingCart, Search, Plus, Minus, Trash2,
     CreditCard, DollarSign, QrCode, X, CheckCircle2,
     Loader2, Tag, BarChart3, Package, ChevronUp, ChevronDown,
-    Lock,
+    Lock, User as UserIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
 import { toast } from 'sonner';
 import Pagination from '../components/Pagination';
 import { TicketPrinter } from '../components/TicketPrinter';
+import { ClientCombobox } from '../components/ClientCombobox';
 import type { Sale } from '../api/types';
 
 const fmt = (n?: number) => (n || 0).toFixed(2);
@@ -55,6 +56,7 @@ export default function POSPage() {
     const {
         items, addItem, removeItem, updateQty,
         cliente, setCliente,
+        vendedor, setVendedor,
         pagos, pendingPago, setPendingPago, addPago, removePago,
         descuento, setDescuento,
         total, totalCubierto, restante, cambio, canFinalize,
@@ -75,6 +77,18 @@ export default function POSPage() {
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
     const { data: stats } = useQuery({ queryKey: ['pos-stats'], queryFn: () => getSaleStatsToday(), refetchInterval: 60_000 });
     const { data: descuentosDisponibles = [], isLoading: loadingD } = useDescuentos();
+    const { data: usersData = [] } = useQuery({ queryKey: ['users'], queryFn: getUsers });
+    const { data: sucursales = [] } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
+    
+    // Filtrar usuarios que pueden ser vendedores (de la misma sucursal)
+    const vendedores = useMemo(() => {
+        return usersData.filter(u => 
+            u.is_active !== false && 
+            (u.sucursal_id === sucursalId || u.sucursal_id === 'CENTRAL' || !u.sucursal_id) &&
+            ['VENDEDOR', 'ADMIN_SUCURSAL', 'CAJERO'].includes(u.role)
+        );
+    }, [usersData, sucursalId]);
+
     const stockMap = useStockMap(sucursalId);
 
     // BARCODE SCANNER DETECTOR
@@ -84,7 +98,37 @@ export default function POSPage() {
         let lastTimestamp = 0;
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignorar si el usuario está tipeando en un input o textarea (ej. buscador)
+            // Hotkeys Globales
+            if (e.key === 'F1') {
+                e.preventDefault();
+                document.getElementById('pos-search-input')?.focus();
+                return;
+            }
+            if (e.key === 'F2') {
+                e.preventDefault();
+                document.getElementById('pos-payment-input')?.focus();
+                return;
+            }
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (canFinalize()) {
+                    // Validaciones de Cliente
+                    if (cliente.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliente.email)) {
+                        toast.error('El formato del correo electrónico es inválido');
+                        return;
+                    }
+                    if (cliente.razon_social && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(cliente.razon_social)) {
+                        toast.error('El nombre/razón social solo puede contener letras y espacios');
+                        return;
+                    }
+                    setConfirmSale(true);
+                } else {
+                    toast.error('No se puede finalizar. Verifica los pagos o agrega productos.');
+                }
+                return;
+            }
+
+            // Ignorar escáner si el usuario está tipeando en un input o textarea (ej. buscador)
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                 return;
             }
@@ -146,13 +190,16 @@ export default function POSPage() {
                 items: items.map(i => ({ producto_id: i.product._id, cantidad: i.quantity, precio: i.precio })),
                 pagos: pagos.map(p => ({ metodo: p.metodo, monto: p.monto })),
                 descuento: descuento.valor ? { nombre: descuento.nombre, tipo: descuento.tipo, valor: parseFloat(descuento.valor) } : undefined,
-                cliente: cliente.es_factura || cliente.nit ? {
+                cliente_id: cliente.cliente_id || undefined,
+                cliente: cliente.es_factura || cliente.nit || cliente.razon_social ? {
                     nit: cliente.nit || undefined,
                     razon_social: cliente.razon_social || undefined,
                     email: cliente.email || undefined,
                     telefono: cliente.telefono || undefined,
                     es_factura: cliente.es_factura,
                 } : undefined,
+                vendedor_id: vendedor.vendedor_id || undefined,
+                vendedor_name: vendedor.vendedor_name || undefined,
             },
         }),
         onSuccess: (data) => {
@@ -255,10 +302,18 @@ export default function POSPage() {
                     <div className="flex-1 relative">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
+                            id="pos-search-input"
                             type="text" value={search} onChange={e => setSearch(e.target.value)}
-                            placeholder="Buscar nombre, código corto o código de barras…"
+                            placeholder="Buscar nombre (F1)…"
                             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
                             autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    const first = document.querySelector('[data-product-idx="0"]') as HTMLElement;
+                                    if (first) first.focus();
+                                }
+                            }}
                         />
                     </div>
                     <div className="flex items-center gap-1.5 text-sm bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-xl shrink-0">
@@ -294,14 +349,38 @@ export default function POSPage() {
                     ) : (
                         <div className="flex flex-col h-full">
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-4">
-                                {paginatedFiltered.map(p => {
+                                {paginatedFiltered.map((p, idx) => {
                                     const stock = stockMap[p._id] ?? 0;
-                                const inCart = items.find(i => i.product._id === p._id)?.quantity ?? 0;
-                                const noStock = stock <= 0;
-                                return (
-                                    <button key={p._id} onClick={() => !noStock && addItem(p)} disabled={noStock}
-                                        className={`group relative bg-white rounded-2xl border p-3 text-left shadow-sm flex flex-col transition-all duration-200
-                                            ${noStock ? 'opacity-40 cursor-not-allowed border-gray-100' : 'hover:shadow-md hover:-translate-y-0.5 hover:border-indigo-300 border-gray-200 cursor-pointer active:scale-[0.97]'}`}>
+                                    const inCart = items.find(i => i.product._id === p._id)?.quantity ?? 0;
+                                    const noStock = stock <= 0;
+                                    return (
+                                        <button key={p._id} onClick={() => !noStock && addItem(p)} disabled={noStock}
+                                            data-product-idx={idx}
+                                            onKeyDown={(e) => {
+                                                if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
+                                                    e.preventDefault();
+                                                    let nextIdx = idx;
+                                                    if (e.key === 'ArrowRight') nextIdx = idx + 1;
+                                                    else if (e.key === 'ArrowLeft') nextIdx = idx - 1;
+                                                    else if (e.key === 'ArrowDown') nextIdx = idx + 2; // Assuming ~2-3 cols min
+                                                    else if (e.key === 'ArrowUp') nextIdx = idx - 2;
+                                                    
+                                                    if (nextIdx < 0) {
+                                                        document.getElementById('pos-search-input')?.focus();
+                                                    } else {
+                                                        const nextEl = document.querySelector(`[data-product-idx="${nextIdx}"]`) as HTMLElement;
+                                                        if (nextEl) {
+                                                            nextEl.focus();
+                                                        } else {
+                                                            const altNext = document.querySelector(`[data-product-idx="${idx + 1}"]`) as HTMLElement;
+                                                            if (altNext) altNext.focus();
+                                                            else (document.querySelector(`[data-product-idx="${idx - 1}"]`) as HTMLElement)?.focus();
+                                                        }
+                                                    }
+                                                }
+                                            }}
+                                            className={`group relative bg-white rounded-2xl border p-3 text-left shadow-sm flex flex-col transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                                                ${noStock ? 'opacity-40 cursor-not-allowed border-gray-100' : 'hover:shadow-md hover:-translate-y-0.5 hover:border-indigo-300 border-gray-200 cursor-pointer active:scale-[0.97]'}`}>
                                         <div className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full self-start mb-1.5 truncate max-w-full">
                                             {p.categoria_nombre ?? '–'}
                                         </div>
@@ -310,7 +389,7 @@ export default function POSPage() {
                                                 ? <img src={p.image_url} alt={p.descripcion} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                                 : <div className="w-full h-full flex items-center justify-center"><Package size={24} className="text-gray-200" /></div>}
                                         </div>
-                                        <p className="text-xs text-gray-900 font-semibold line-clamp-2 leading-tight mb-0.5">{p.descripcion}</p>
+                                        <p className="text-xs text-gray-900 font-semibold leading-tight mb-0.5">{p.descripcion}</p>
                                         {p.codigo_corto && <p className="text-[10px] text-gray-400 font-mono mb-1">{p.codigo_corto}</p>}
                                         <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-gray-100">
                                             <span className="text-sm font-black text-gray-900">${fmt(p.precio_venta)}</span>
@@ -414,7 +493,7 @@ export default function POSPage() {
                                         className="flex items-center gap-2 bg-gray-50 rounded-xl p-2.5"
                                     >
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-semibold text-gray-900 truncate">{item.product.descripcion}</p>
+                                            <p className="text-xs font-semibold text-gray-900">{item.product.descripcion}</p>
                                             <p className="text-[11px] text-gray-400">
                                                 ${fmt(item.precio)} × {item.quantity} =&nbsp;
                                                 <span className="font-bold text-gray-700">${fmt(item.precio * item.quantity)}</span>
@@ -460,15 +539,26 @@ export default function POSPage() {
                             className="shrink-0 border-t border-gray-100 overflow-hidden"
                         >
                             {/* Cliente/Factura */}
-                            <div className="px-3 py-1.5">
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                    <input type="checkbox" checked={cliente.es_factura}
-                                        onChange={e => setCliente({ ...cliente, es_factura: e.target.checked })}
-                                        className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 shrink-0" />
-                                    <span className="text-[11px] text-gray-600 font-medium">Solicitar factura (NIT)</span>
-                                </label>
+                            <div className="px-3 py-1.5 flex flex-col gap-1.5">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Asignar Cliente / Factura</span>
+                                
+                                <ClientCombobox 
+                                    selectedClient={cliente}
+                                    onSelect={(c) => setCliente(c)}
+                                    onClear={() => setCliente({ cliente_id: undefined, nit: '', razon_social: '', email: '', telefono: '', es_factura: false })}
+                                    disabled={ticketCovered}
+                                />
+
+                                <div className="flex items-center justify-between mt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                        <input type="checkbox" checked={cliente.es_factura}
+                                            onChange={e => setCliente({ es_factura: e.target.checked })}
+                                            className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 shrink-0" />
+                                        <span className="text-[11px] text-gray-600 font-medium">Solicitar factura (NIT)</span>
+                                    </label>
+                                </div>
                                 <AnimatePresence>
-                                    {cliente.es_factura && (
+                                    {(cliente.es_factura || (!cliente.cliente_id && cliente.razon_social)) && (
                                         <motion.div
                                             initial={{ height: 0, opacity: 0 }}
                                             animate={{ height: 'auto', opacity: 1 }}
@@ -480,20 +570,18 @@ export default function POSPage() {
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
                                                 value={cliente.nit} 
-                                                onChange={e => setCliente({ ...cliente, nit: e.target.value.replace(/\D/g, '') })}
+                                                onChange={e => setCliente({ nit: e.target.value.replace(/\D/g, '') })}
                                                 onKeyDown={e => {
-                                                    // Allow backspace, delete, tab, escape, enter, arrows
                                                     if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
-                                                    // Prevent any non-digit char
                                                     if (!/^[0-9]$/.test(e.key)) e.preventDefault();
                                                 }}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="NIT" 
                                             />
-                                            <input value={cliente.email} onChange={e => setCliente({ ...cliente, email: e.target.value })}
+                                            <input value={cliente.email} onChange={e => setCliente({ email: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Email" />
-                                            <input value={cliente.razon_social} onChange={e => setCliente({ ...cliente, razon_social: e.target.value })}
+                                            <input value={cliente.razon_social} onChange={e => setCliente({ razon_social: e.target.value })}
                                                 className="col-span-1 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-indigo-400 outline-none bg-gray-50 flex-1"
                                                 placeholder="Razón Social" />
                                             <input 
@@ -501,7 +589,7 @@ export default function POSPage() {
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
                                                 value={cliente.telefono} 
-                                                onChange={e => setCliente({ ...cliente, telefono: e.target.value.replace(/\D/g, '') })}
+                                                onChange={e => setCliente({ telefono: e.target.value.replace(/\D/g, '') })}
                                                 onKeyDown={e => {
                                                     if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
                                                     if (!/^[0-9]$/.test(e.key)) e.preventDefault();
@@ -512,6 +600,34 @@ export default function POSPage() {
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
+                            </div>
+
+                            {/* Vendedor */}
+                            <div className="px-3 pb-2 pt-1 border-t border-gray-100 mt-1 flex flex-col gap-1.5">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Vendedor Asignado (Opcional)</span>
+                                <div className="relative">
+                                    <UserIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <select 
+                                        value={vendedor.vendedor_id || ""}
+                                        onChange={(e) => {
+                                            const id = e.target.value;
+                                            if (!id) {
+                                                setVendedor({ vendedor_id: undefined, vendedor_name: undefined });
+                                            } else {
+                                                const v = vendedores.find(v => v._id === id);
+                                                if (v) setVendedor({ vendedor_id: v._id, vendedor_name: v.full_name || v.username });
+                                            }
+                                        }}
+                                        disabled={ticketCovered}
+                                        className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 bg-gray-50 outline-none focus:ring-1 focus:ring-indigo-400 appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Seleccione un vendedor...</option>
+                                        {vendedores.map(v => (
+                                            <option key={v._id} value={v._id}>{v.full_name || v.username}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                </div>
                             </div>
 
                             {/* Descuentos Predefinidos */}
@@ -581,13 +697,13 @@ export default function POSPage() {
                                 <div className="flex gap-1.5 mb-1.5">
                                     <div className="relative flex-1">
                                         <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <input type="number" step="0.10" min="0.10"
+                                        <input id="pos-payment-input" type="number" step="0.10" min="0.10"
                                             value={pendingPago.monto}
                                             onChange={e => setPendingPago({ monto: e.target.value })}
                                             onKeyDown={e => e.key === 'Enter' && addPago()}
                                             disabled={ticketCovered}
                                             className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 font-mono focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none disabled:opacity-40 disabled:bg-gray-50 transition-colors"
-                                            placeholder="0.00" />
+                                            placeholder="0.00 (F2)" />
                                     </div>
                                     <button onClick={addPago}
                                         disabled={!pendingPago.monto || parseFloat(pendingPago.monto) <= 0 || ticketCovered || !items.length || (pendingPago.metodo === 'CREDITO' && (!cliente.razon_social || !cliente.telefono))}
@@ -734,13 +850,10 @@ export default function POSPage() {
                         {/* Finalize */}
                         <button onClick={handleTryFinalize}
                             disabled={!canFinalize() || saleMut.isPending || !!lastSale}
-                            className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all
-                            ${canFinalize() && !lastSale
-                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 active:scale-[0.97]'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                            className={`w-full py-3.5 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all group ${canFinalize() && !lastSale ? 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95 cursor-pointer' : 'bg-gray-300 shadow-none cursor-not-allowed'}`}>
                             {saleMut.isPending
                                 ? <Loader2 size={18} className="animate-spin" />
-                                : <><CheckCircle2 size={18} /> Finalizar Venta</>}
+                                : canFinalize() ? <><CheckCircle2 className="group-hover:scale-110 transition-transform" /> Cobrar e Imprimir (F4)</> : <><Lock size={18} /> Faltan pagos</>}
                         </button>
                     </div>
                 </div>
@@ -779,6 +892,13 @@ export default function POSPage() {
                                         </div>
                                     ))}
                                 </div>
+                                
+                                {vendedor.vendedor_name && (
+                                    <div className="flex justify-between items-center border-t border-gray-100 pt-2">
+                                        <span className="text-gray-500 font-medium text-xs">Vendedor:</span>
+                                        <span className="text-xs font-bold text-gray-900">{vendedor.vendedor_name}</span>
+                                    </div>
+                                )}
 
                                 <div className="flex justify-between items-center border-t border-gray-100 pt-2">
                                     <span className="text-gray-500 font-medium text-sm">Total pagado:</span>
@@ -874,7 +994,13 @@ export default function POSPage() {
 
             {/* Hidden wrapper for thermal printing */}
             <div className="print-only">
-                {lastSale && <TicketPrinter sale={lastSale} tenantName={user?.tenant_id || "Mi Tienda"} />}
+                {lastSale && (
+                    <TicketPrinter 
+                        sale={lastSale} 
+                        tenantName={user?.tenant_id || "Mi Tienda"} 
+                        sucursalName={sucursales.find(s => s._id === sucursalId)?.nombre}
+                    />
+                )}
             </div>
         </div>
     );

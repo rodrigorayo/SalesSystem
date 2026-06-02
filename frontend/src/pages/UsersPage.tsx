@@ -86,14 +86,14 @@ export default function UsersPage() {
                         {paginatedEmployees.map(emp => (
                             <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start">
                             <div className="flex items-center gap-3 mr-auto">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emp.role === 'SUPERVISOR' ? 'bg-purple-50 text-purple-600' : emp.role === 'VENDEDOR' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emp.role === 'SUPERVISOR' ? 'bg-purple-50 text-purple-600' : emp.role === 'VENDEDOR' ? 'bg-amber-50 text-amber-600' : emp.role === 'FACTURADOR' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
                                     <Users size={20} />
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{emp.full_name ?? emp.username}</h3>
                                     <div className="flex items-center gap-2">
                                         <p className="text-sm text-gray-500">@{emp.username}</p>
-                                        <span className={`text-[10px] font-bold px-1.5 rounded uppercase ${emp.role === 'VENDEDOR' ? 'bg-amber-100 text-amber-700' : emp.role === 'SUPERVISOR' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        <span className={`text-[10px] font-bold px-1.5 rounded uppercase ${emp.role === 'VENDEDOR' ? 'bg-amber-100 text-amber-700' : emp.role === 'SUPERVISOR' ? 'bg-purple-100 text-purple-700' : emp.role === 'FACTURADOR' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
                                             {emp.role}
                                         </span>
                                     </div>
@@ -184,6 +184,7 @@ export default function UsersPage() {
                                     <option value="CAJERO">Cajero (Punto de Venta Fijo)</option>
                                     <option value="SUPERVISOR">Supervisor de Ventas (Móvil)</option>
                                     <option value="VENDEDOR">Vendedor Preventista (Móvil)</option>
+                                    <option value="FACTURADOR">Facturador (Gestión de Facturas)</option>
                                 </select>
                             </div>
                             <div>

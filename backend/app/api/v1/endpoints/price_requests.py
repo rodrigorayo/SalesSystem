@@ -2,11 +2,11 @@ from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.models.price_request import PriceChangeRequest, PriceRequestStatus
-from app.models.inventario import Inventario
-from app.models.product import Product
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
+from app.domain.models.price_request import PriceChangeRequest, PriceRequestStatus
+from app.domain.models.inventario import Inventario
+from app.domain.models.product import Product
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 

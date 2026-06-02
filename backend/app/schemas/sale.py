@@ -6,7 +6,8 @@ of schemas vs endpoint logic.
 """
 
 from typing import List, Optional, Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from decimal import Decimal
 
 
 class SaleItemIn(BaseModel):
@@ -45,6 +46,8 @@ class SaleCreate(BaseModel):
     descuento: Optional[dict] = None   # DescuentoInfo from models/sale.py
     cliente_id: Optional[str] = None
     cliente: Optional[ClienteIn] = None
+    vendedor_id: Optional[str] = None
+    vendedor_name: Optional[str] = None
 
 
 class SalesPaginated(BaseModel):
@@ -60,3 +63,14 @@ class QRInfoUpdate(BaseModel):
     banco: str
     referencia: str
     monto_transferido: float
+
+
+class ListaPrecioItemResponse(BaseModel):
+    id: str
+    producto_id: str
+    precio: Decimal
+    moneda: str = "Bs"
+    vigente: bool = True
+    
+    class Config:
+        from_attributes = True

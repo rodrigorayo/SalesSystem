@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.core.config import settings
-from app.db import init_db
+from app.infrastructure.core.config import settings
+from app.infrastructure.db import init_db
 from app.api.v1.router import api_router
+from app.infrastructure.core.rate_limit import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,6 +34,9 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.ENVIRONMENT != "production" else None,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 @app.get("/")
 def index():
     return {"message": "Welcome to Choco-Sys API", "docs": "/docs"}
@@ -44,6 +50,13 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# Permitir siempre la landing page de FEXCO
+if "https://taboada-fexco.vercel.app" not in origins:
+    origins.append("https://taboada-fexco.vercel.app")
+# Permitir localhost para pruebas de la landing
+if "http://localhost:4321" not in origins:
+    origins.append("http://localhost:4321")
 
 app.add_middleware(
     CORSMiddleware,

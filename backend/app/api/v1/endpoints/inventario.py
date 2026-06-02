@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
@@ -5,11 +6,12 @@ from pymongo import UpdateOne
 import pandas as pd
 import io
 import math
-from app.models.inventario import Inventario
-from app.models.product import Product
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
-from app.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
+from app.domain.models.inventario import Inventario
+from app.domain.models.product import Product
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
+from app.domain.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
+from app.utils.date_utils import get_day_range_bolivia
 
 router = APIRouter()
 
@@ -26,88 +28,87 @@ async def get_inventario(
 ):
     """
     Get inventory for a specific sucursal.
-    Resolves the fatal N+1 issue by using a MongoDB aggregation pipeline.
+    Starts from Product to leverage Text Indexes, then lookups Inventario.
     """
     tenant_id = current_user.tenant_id or ""
     skip = (page - 1) * limit
     
-    prod_coll = Product.get_collection_name()
-    
-    # 1. Match inventory entries and filter out visually invalid objectIds like "None"
-    match_stage = {
-        "tenant_id": tenant_id,
-        "sucursal_id": sucursal_id,
-        "producto_id": {"$regex": "^[a-fA-F0-9]{24}$"}
-    }
-    
-    pipeline = [
-        {"$match": match_stage},
-        # 2. Lookup the actual product
-        {
-            "$lookup": {
-                "from": prod_coll,
-                "let": {"pid": {"$toObjectId": "$producto_id"}},
-                "pipeline": [
-                    {"$match": {"$expr": {"$eq": ["$_id", "$$pid"]}}}
-                ],
-                "as": "product"
-            }
-        },
-        # Unwind so we only keep inventory entries that have a valid mapped product
-        {"$unwind": {"path": "$product", "preserveNullAndEmptyArrays": False}}
-    ]
-    
-    # 3. Apply optional text search and category filter on the newly joined product
-    product_match = {}
+    prod_match = {"tenant_id": tenant_id}
     if search and search.strip():
-        # Match using regex on product.descripcion or product.codigo_corto
-        regex = {"$regex": search.strip(), "$options": "i"}
-        product_match["$or"] = [
-            {"product.descripcion": regex},
-            {"product.codigo_corto": regex}
-        ]
+        # Escapar caracteres para búsqueda segura y permitir coincidencias parciales
+        import re
+        safe_search = re.escape(search.strip())
+        prod_match["descripcion"] = {"$regex": safe_search, "$options": "i"}
         
     if categoria_id:
-        product_match["product.categoria_id"] = categoria_id
-        
-    if product_match:
-        pipeline.append({"$match": product_match})
-        
+        prod_match["categoria_id"] = categoria_id
+
+    pipeline = [{"$match": prod_match}]
+    
+    # Lookup the inventory for this specific branch
+    inv_coll = Inventario.get_collection_name()
+    pipeline.append({
+        "$lookup": {
+            "from": inv_coll,
+            "let": {"pid": {"$toString": "$_id"}},
+            "pipeline": [
+                {"$match": {
+                    "$expr": {"$eq": ["$producto_id", "$$pid"]},
+                    "sucursal_id": sucursal_id,
+                    "tenant_id": tenant_id
+                }}
+            ],
+            "as": "inventory"
+        }
+    })
+    
+    # Unwind inventory, keeping products even if they have 0 stock (no doc yet)
+    pipeline.append({"$unwind": {"path": "$inventory", "preserveNullAndEmptyArrays": True}})
+    
     if stock_bajo:
-        pipeline.append({"$match": {"cantidad": {"$lte": 5}}})
+        # If no inventory doc exists, assumed 0, so it matches lte 5.
+        pipeline.append({
+            "$match": {
+                "$or": [
+                    {"inventory.cantidad": {"$lte": 5}},
+                    {"inventory": {"$exists": False}}
+                ]
+            }
+        })
         
-    # 4. Facet to get both paginated data and the total count in a single roundtrip to DB
     pipeline.append({
         "$facet": {
             "metadata": [{"$count": "total"}],
             "data": [
+                {"$sort": {"descripcion": 1} if search else {"_id": -1}},
                 {"$skip": skip},
                 {"$limit": limit}
             ]
         }
     })
-    motor_coll = Inventario.get_pymongo_collection()
+    
+    motor_coll = Product.get_pymongo_collection()
     cursor = motor_coll.aggregate(pipeline)
     raw_results = await cursor.to_list(length=1)
+    
     if not raw_results or not raw_results[0].get("metadata"):
         return InventarioPaginated(items=[], total=0, page=page, pages=1)
         
     total = raw_results[0]["metadata"][0]["total"]
     data = raw_results[0]["data"]
     
-    # 5. Map the raw aggregation dicts to InventarioItem Pydantic schema
     result = []
-    for entry in data:
-        product_doc = entry["product"]
+    for doc in data:
+        inv_doc = doc.get("inventory") or {}
         result.append(InventarioItem(
-            inventario_id=str(entry["_id"]),
-            producto_id=str(product_doc["_id"]),
-            producto_nombre=product_doc.get("descripcion", "Desconocido"),
-            precio=product_doc.get("precio_venta", 0.0),
-            precio_sucursal=entry.get("precio_sucursal"),
-            image_url=product_doc.get("image_url"),
-            sucursal_id=entry.get("sucursal_id", "CENTRAL"),
-            cantidad=entry.get("cantidad", 0),
+            inventario_id=str(inv_doc.get("_id", doc["_id"])), # Fallback id
+            producto_id=str(doc["_id"]),
+            producto_nombre=doc.get("descripcion", "Desconocido"),
+            precio=doc.get("precio_venta", 0.0),
+            precio_sucursal=inv_doc.get("precio_sucursal"),
+            image_url=doc.get("image_url"),
+            sucursal_id=sucursal_id,
+            cantidad=inv_doc.get("cantidad", 0),
         ))
         
     return InventarioPaginated(
@@ -116,6 +117,7 @@ async def get_inventario(
         page=page,
         pages=math.ceil(total / limit) if limit > 0 else 1
     )
+
 
 
 
@@ -151,7 +153,7 @@ async def ajustar_inventario(
     stock_anterior = entry.cantidad if entry else 0
     cantidad_cambio = 0
     
-    from app.models.inventario import TipoMovimiento, InventoryLog
+    from app.domain.models.inventario import TipoMovimiento, InventoryLog
 
     if ajuste.tipo == "ENTRADA":
         nuevo_stock = stock_anterior + ajuste.cantidad
@@ -202,11 +204,15 @@ async def ajustar_inventario(
 async def get_movimientos(
     producto_id: str = None,
     sucursal_id: str = "CENTRAL",
-    limit: int = 50,
+    start_date: Optional[str] = None, # YYYY-MM-DD
+    end_date: Optional[str] = None,   # YYYY-MM-DD
+    search: Optional[str] = None,
+    tipo_movimiento: Optional[str] = None,
+    limit: int = 1000,
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get the movement history (Kárdex) for a specific branch and optionally filtered by product.
+    Get the movement history (Kárdex) for a specific branch and optionally filtered by product and dates.
     """
     tenant_id = current_user.tenant_id or ""
     
@@ -214,19 +220,114 @@ async def get_movimientos(
     if producto_id:
         query["producto_id"] = producto_id
         
-    from app.models.inventario import InventoryLog
+    if tipo_movimiento:
+        query["tipo_movimiento"] = tipo_movimiento
+
+    # Soporte para búsqueda por texto en la descripción del log
+    if search:
+        # Escapar caracteres especiales como ( ) + * para que se busquen literalmente y no rompan el motor de regex
+        safe_search = re.escape(search)
+        query["descripcion"] = {"$regex": safe_search, "$options": "i"}
+        
+    # Rangos de fecha flexibles (pueden venir solo uno o ambos)
+    date_filter = {}
+    try:
+        if start_date:
+            start_dt, _ = get_day_range_bolivia(start_date)
+            date_filter["$gte"] = start_dt
+        if end_date:
+            _, end_dt = get_day_range_bolivia(end_date)
+            date_filter["$lte"] = end_dt
+            
+        if date_filter:
+            query["created_at"] = date_filter
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+            
+    from app.domain.models.inventario import InventoryLog
     
     movimientos = await InventoryLog.find(query).sort("-created_at").limit(limit).to_list()
     
-    # Enrich with product names for UI
+    # Enrich with product names directly from the snapshot stored in InventoryLog
+    # Eliminated N+1 queries here for massive performance boost
     result = []
     for mov in movimientos:
-        prod = await Product.get(mov.producto_id)
         data = mov.model_dump()
-        data["producto_nombre"] = prod.descripcion if prod else "Producto Desconocido"
+        data["producto_nombre"] = mov.descripcion or "Producto Sin Nombre"
         result.append(data)
         
     return result
+
+
+@router.get("/inventario/movimientos/exportar")
+async def exportar_movimientos(
+    producto_id: str = None,
+    sucursal_id: str = "CENTRAL",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
+    tipo_movimiento: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Exports the movement history (Kárdex) to Excel.
+    """
+    tenant_id = current_user.tenant_id or ""
+    
+    query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id}
+    if producto_id: query["producto_id"] = producto_id
+    if tipo_movimiento: query["tipo_movimiento"] = tipo_movimiento
+    if search:
+        safe_search = re.escape(search)
+        query["descripcion"] = {"$regex": safe_search, "$options": "i"}
+        
+    try:
+        date_filter = {}
+        if start_date:
+            start_dt, _ = get_day_range_bolivia(start_date)
+            date_filter["$gte"] = start_dt
+        if end_date:
+            _, end_dt = get_day_range_bolivia(end_date)
+            date_filter["$lte"] = end_dt
+        if date_filter: query["created_at"] = date_filter
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido")
+            
+    from app.domain.models.inventario import InventoryLog
+    from app.utils.date_utils import BOLIVIA_TZ
+    from datetime import datetime
+    
+    movimientos = await InventoryLog.find(query).sort("-created_at").limit(5000).to_list()
+    
+    rows = []
+    for mov in movimientos:
+        rows.append({
+            "FECHA": mov.created_at.astimezone(BOLIVIA_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+            "PRODUCTO": mov.descripcion or "Producto Sin Nombre",
+            "TIPO MOVIMIENTO": mov.tipo_movimiento.replace('_', ' '),
+            "CANTIDAD": float(mov.cantidad_movida),
+            "STOCK RESULTANTE": float(mov.stock_resultante),
+            "COSTO UNIT.": float(mov.costo_unitario_momento or 0),
+            "PRECIO VENTA UNIT.": float(mov.precio_venta_momento or 0),
+            "USUARIO": mov.usuario_nombre,
+            "NOTAS": mov.notas or ""
+        })
+        
+    df = pd.DataFrame(rows)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Kardex', index=False)
+        
+    output.seek(0)
+    
+    fecha_str = datetime.now(BOLIVIA_TZ).strftime("%Y-%m-%d")
+    filename = f"Kardex_{sucursal_id}_{fecha_str}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @router.get("/inventario/exportar-plantilla")
@@ -243,34 +344,48 @@ async def export_inventory_template(
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes exportar tu propia sucursal")
         
-    from app.models.sucursal import Sucursal
-    sucursal_db = await Sucursal.get(sucursal_id)
-    suc_name = sucursal_db.nombre.replace(" ", "").upper() if sucursal_db else "CENTRAL"
-        
+    from app.domain.models.sucursal import Sucursal
+    from app.domain.models.category import Category
+
+    # "CENTRAL" is a logical name, not a real ObjectId — handle gracefully
+    suc_name = "CENTRAL"
+    if sucursal_id and sucursal_id != "CENTRAL":
+        try:
+            sucursal_db = await Sucursal.get(sucursal_id)
+            if sucursal_db:
+                suc_name = sucursal_db.nombre.replace(" ", "").upper()
+        except Exception:
+            pass  # Invalid ObjectId or not found — fall back to "CENTRAL"
+
     products = await Product.find(Product.tenant_id == tenant_id, Product.is_active == True).to_list()
-    
+
+    # Build category map once (DRY) to resolve IDs → names without N+1 queries
+    categories = await Category.find(Category.tenant_id == tenant_id).to_list()
+    cat_name_map: dict = {str(c.id): c.name for c in categories}
+
     data = []
     for p in products:
         data.append({
-            "CODIGO": p.codigo_largo or "",
-            "CODIGO CORTO": p.codigo_corto,
-            "DESCRIPCION": p.descripcion,
-            "CATEGORIA": p.categoria_id, # Can be enriched if needed
-            f"INVENTARIO FISICO {suc_name}": "" # Leaves it empty for them to fill
+            "CODIGO":        p.codigo_largo or "",
+            "CODIGO CORTO":  p.codigo_corto or "",
+            "DESCRIPCION":   p.descripcion,
+            "CATEGORIA":     cat_name_map.get(p.categoria_id, p.categoria_id),  # name, not raw ID
+            "PROVEEDOR":     getattr(p, "proveedor", "") or "",
+            f"INVENTARIO FISICO {suc_name}": ""  # User fills this in
         })
-        
+
     df = pd.DataFrame(data)
-    
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='Conteo Fisico', index=False)
-            
+
     output.seek(0)
-    
+
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=plantilla_inventario_{sucursal_id}.xlsx"}
+        headers={"Content-Disposition": f"attachment; filename=plantilla_inventario_{suc_name}.xlsx"}
     )
 
 
@@ -280,153 +395,10 @@ async def import_inventory(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+    from app.application.services.inventario_service import InventarioService
+    contents = await file.read()
+    return await InventarioService.importar_inventario(sucursal_id, contents, file.filename, current_user)
         
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sucursal_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="Solo puedes importar a tu propia sucursal")
-        
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="Formato de archivo inválido. Solo se permite .xlsx o .xls")
-        
-    tenant_id = current_user.tenant_id or "default"
-    
-    try:
-        contents = await file.read()
-        df = pd.read_excel(io.BytesIO(contents))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error al leer el archivo Excel: {str(e)}")
-        
-    df.columns = df.columns.astype(str).str.strip().str.lower()
-    
-    required_cols = {"codigo_corto", "cantidad_fisica"}
-    if not required_cols.issubset(set(df.columns)):
-        missing = required_cols - set(df.columns)
-        raise HTTPException(status_code=400, detail=f"Faltan columnas obligatorias: {missing}")
-        
-    df['cantidad_fisica'] = pd.to_numeric(df['cantidad_fisica'], errors='coerce').fillna(0)
-    
-    products = await Product.find(Product.tenant_id == tenant_id, Product.is_active == True).to_list()
-    product_map = {p.codigo_corto: p for p in products if p.codigo_corto}
-    
-    current_inventory = await Inventario.find(
-        Inventario.tenant_id == tenant_id,
-        Inventario.sucursal_id == sucursal_id
-    ).to_list()
-    # Map by product_id
-    inventory_map = {i.producto_id: i for i in current_inventory}
-    
-    errores = []
-    procesados = 0
-    actualizados = 0
-    fallidos = 0
-    
-    from app.models.inventario import InventoryLog, TipoMovimiento
-    
-    logs_a_insertar = []
-    operaciones_inventario = []
-    codigo_sum_map = {}
-    
-    for index, row in df.iterrows():
-        procesados += 1
-        fila_num = index + 2 
-        
-        codigo_corto = str(row.get("codigo_corto", "")).strip()
-        cantidad_fisica = row.get("cantidad_fisica", 0)
-        
-        # Validations
-        if not codigo_corto or str(codigo_corto) == "nan":
-            errores.append({"fila": fila_num, "motivo": "codigo_corto está vacío"})
-            fallidos += 1
-            continue
-            
-        if codigo_corto not in product_map:
-            errores.append({"fila": fila_num, "motivo": f"El código '{codigo_corto}' no existe o está inactivo en el catálogo maestro"})
-            fallidos += 1
-            continue
-            
-        if codigo_corto not in codigo_sum_map:
-            codigo_sum_map[codigo_corto] = {
-                "cantidad": 0,
-                "filas": []
-            }
-        
-        codigo_sum_map[codigo_corto]["cantidad"] += cantidad_fisica
-        codigo_sum_map[codigo_corto]["filas"].append(fila_num)
-        
-    for codigo_corto, data in codigo_sum_map.items():
-        cantidad_final = int(data["cantidad"])
-        if cantidad_final < 0:
-            for f in data["filas"]:
-               errores.append({"fila": f, "motivo": "Cantidad física final no puede ser negativa acumulada"})
-               fallidos += 1
-            continue
-            
-        product = product_map[codigo_corto]
-        product_id = str(product.id)
-        
-        stock_anterior = 0
-        if product_id in inventory_map:
-            stock_anterior = inventory_map[product_id].cantidad
-            
-        if cantidad_final == stock_anterior:
-            # We skip them if there's no differential
-            continue
-            
-        cantidad_cambio = cantidad_final - stock_anterior
-        
-        # Concurrency safety wrapper: we use an atomic increment for the diff instead of a blind SET
-        operaciones_inventario.append(
-            UpdateOne(
-                {
-                    "tenant_id": tenant_id,
-                    "sucursal_id": sucursal_id,
-                    "producto_id": product_id
-                },
-                {
-                    "$setOnInsert": {
-                        "tenant_id": tenant_id,
-                        "sucursal_id": sucursal_id,
-                        "producto_id": product_id,
-                        "precio_sucursal": None
-                    },
-                    "$inc": {"cantidad": cantidad_cambio},
-                    "$currentDate": {"updated_at": True}
-                },
-                upsert=True
-            )
-        )
-            
-        logs_a_insertar.append(InventoryLog(
-            tenant_id=tenant_id,
-            sucursal_id=sucursal_id,
-            producto_id=product_id,
-            tipo_movimiento=TipoMovimiento.AJUSTE_FISICO,
-            cantidad_movida=cantidad_cambio,
-            stock_resultante=cantidad_final,
-            usuario_id=str(current_user.id),
-            usuario_nombre=current_user.full_name or current_user.username,
-            notas="Importación Masiva (Excel)"
-        ))
-        
-        actualizados += 1
-
-    if logs_a_insertar:
-        await InventoryLog.insert_many(logs_a_insertar)
-        
-    if operaciones_inventario:
-        collection = Inventario.get_pymongo_collection()
-        await collection.bulk_write(operaciones_inventario)
-        
-    return {
-        "resumen": {
-            "procesados": procesados,
-            "actualizados": actualizados,
-            "fallidos": fallidos
-        },
-        "errores": errores
-    }
-
 
 @router.post("/inventario/sincronizar-sucursal")
 async def sincronizar_inventario_sucursal(
@@ -434,194 +406,7 @@ async def sincronizar_inventario_sucursal(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Endpoint para CAJEROS / ADMIN_SUCURSAL.
-    Recibe el Excel maestro (ej: test1.xlsx) y extrae SOLO la columna de inventario correspondiente a su sucursal actual.
-    Ignora las columnas de otras sucursales, así como los productos que NO existen en el catálogo original.
-    """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-
-    sucursal_id_user = current_user.sucursal_id
-    if current_user.role in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-         # Para pruebas del admin matriz, se usa lo que envíe, sino CENTRAL
-         sucursal_id_user = sucursal_id or "CENTRAL"
-         
-    if not sucursal_id_user:
-        raise HTTPException(status_code=400, detail="El usuario no tiene una sucursal asignada")
-
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="Formato inválido. Solo .xlsx o .xls")
-
-    tenant_id = current_user.tenant_id or "default"
-
-    try:
-        contents = await file.read()
-        df = pd.read_excel(io.BytesIO(contents))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error leyendo Excel: {str(e)}")
-
-    # Estandarizamos cabeceras a mayúsculas sin espacios de más y con guión bajo para cruzar
-    df.columns = df.columns.astype(str).str.strip().str.upper()
-    df.columns = df.columns.str.replace(' ', '_')
-
-    # Identificar la columna objetivo del usuario actual
-    from app.models.sucursal import Sucursal
-    sucursal_db = None
-    suc_name = "CENTRAL"
-
-    if sucursal_id_user != "CENTRAL":
-        sucursal_db = await Sucursal.get(sucursal_id_user)
-        if not sucursal_db:
-             raise HTTPException(status_code=404, detail="Sucursal no encontrada en la BD")
-        # Remover espacios para match fácil (Ej: "LA PAZ" -> "LAPAZ")
-        suc_name = sucursal_db.nombre.replace(" ", "").upper()
-
-    columna_objetivo = f"INVENTARIO_FISICO_{suc_name}"
-    
-    # Algunas veces puede venir en otra variante como "INV_LAPAZ" o con un salto de linea "INVENTARIO FISICO \nLA PAZ"
-    # Buscamos en las columnas estandarizadas alguna que contenga INVENTARIO FISICO y el nombre
-    columna_exacta_en_df = None
-    for col in df.columns:
-        c_clean = col.replace("\n", "").replace("\r", "").replace("_-_", "_").replace("INVENTARIO_FISICO_", "").replace("INV_", "").replace("_", "")
-        if c_clean == suc_name:
-             columna_exacta_en_df = col
-             break
-
-    if not columna_exacta_en_df:
-        raise HTTPException(status_code=400, detail=f"No se encontró la columna de inventario para su sucursal ({suc_name}). Verifique el Excel.")
-
-    # Validamos CODIGO o CODIGO CORTO
-    col_codigo = "CODIGO_CORTO" if "CODIGO_CORTO" in df.columns else "CODIGOCORTO"
-    if col_codigo not in df.columns and "CODIGO" in df.columns:
-         col_codigo = "CODIGO"
-         
-    if col_codigo not in df.columns:
-         raise HTTPException(status_code=400, detail="El archivo no contiene la columna 'CODIGO' o 'CODIGO CORTO'.")
-
-    # Cache de productos
-    products = await Product.find(Product.tenant_id == tenant_id).to_list()
-    product_map = {p.codigo_corto: p for p in products if p.codigo_corto}
-
-    # Cache de inventario actual de ESTA SUCURSAL
-    current_inventory = await Inventario.find(
-        Inventario.tenant_id == tenant_id,
-        Inventario.sucursal_id == sucursal_id_user
-    ).to_list()
-    inventory_map = {str(i.producto_id): i for i in current_inventory}
-
-    errores = []
-    procesados = 0
-    actualizados = 0
-    fallidos = 0
-
-    from app.models.inventario import InventoryLog, TipoMovimiento
-    logs_a_insertar = []
-    operaciones_inventario = []
-    
-    # Preprocesar sumas de cantidades repetidas si hubiera filas del mismo producto
-    codigo_sum_map = {}
-    
-    for index, row in df.iterrows():
-        procesados += 1
-        fila_num = index + 2
-        
-        c = row.get(col_codigo, "")
-        if pd.isna(c): c = ""
-        codigo_corto = str(c).strip()
-        
-        # Validar numéricos en la columna de cantidad (ignorando strings raros, nans, vacíos)
-        val_cantidad = row.get(columna_exacta_en_df, 0)
-        try:
-             cantidad_fisica = int(float(val_cantidad)) if pd.notna(val_cantidad) and str(val_cantidad).strip() != "" else 0
-        except:
-             cantidad_fisica = 0
-
-        if not codigo_corto or codigo_corto == "nan":
-             errores.append({"fila": fila_num, "motivo": "Código vacío."})
-             fallidos += 1
-             continue
-
-        if codigo_corto not in product_map:
-             errores.append({"fila": fila_num, "motivo": f"El producto {codigo_corto} no existe en catálogo central."})
-             fallidos += 1
-             continue
-             
-        if codigo_corto not in codigo_sum_map:
-             codigo_sum_map[codigo_corto] = {"cantidad": 0, "filas": []}
-             
-        codigo_sum_map[codigo_corto]["cantidad"] += cantidad_fisica
-        codigo_sum_map[codigo_corto]["filas"].append(fila_num)
-
-    for codigo_corto, data in codigo_sum_map.items():
-        cantidad_final = data["cantidad"]
-        if cantidad_final < 0:
-            for f in data["filas"]: 
-                errores.append({"fila": f, "motivo": "Cantidad final no puede ser negativa."})
-                fallidos += 1
-            continue
-
-        product = product_map[codigo_corto]
-        product_id = str(product.id)
-
-        stock_anterior = 0
-        if product_id in inventory_map:
-            stock_anterior = inventory_map[product_id].cantidad
-            
-        if cantidad_final == stock_anterior:
-            continue
-            
-        cantidad_cambio = cantidad_final - stock_anterior
-
-        operaciones_inventario.append(
-            UpdateOne(
-                {
-                    "tenant_id": tenant_id,
-                    "sucursal_id": sucursal_id_user,
-                    "producto_id": product_id
-                },
-                {
-                    "$setOnInsert": {
-                        "tenant_id": tenant_id,
-                        "sucursal_id": sucursal_id_user,
-                        "producto_id": product_id,
-                        "precio_sucursal": None
-                    },
-                    "$set": {"cantidad": cantidad_final}, # Usamos SET porque es un Cierre de Conteo Físico
-                    "$currentDate": {"updated_at": True}
-                },
-                upsert=True
-            )
-        )
-
-        logs_a_insertar.append(InventoryLog(
-            tenant_id=tenant_id,
-            sucursal_id=sucursal_id_user,
-            producto_id=product_id,
-            tipo_movimiento=TipoMovimiento.AJUSTE_FISICO,
-            cantidad_movida=cantidad_cambio,
-            stock_resultante=cantidad_final,
-            usuario_id=str(current_user.id),
-            usuario_nombre=current_user.full_name or current_user.username,
-            notas="Sincronización por Excel de Sucursal"
-        ))
-        actualizados += 1
-
-    if logs_a_insertar:
-        await InventoryLog.insert_many(logs_a_insertar)
-        
-    if operaciones_inventario:
-        collection = Inventario.get_pymongo_collection()
-        await collection.bulk_write(operaciones_inventario)
-
-    return {
-        "resumen": {
-            "procesados": procesados,
-            "actualizados": actualizados,
-            "fallidos": fallidos,
-            "sucursal_objetivo": suc_name,
-            "columna_leida": columna_exacta_en_df
-        },
-        "errores": errores
-    }
+    from app.application.services.inventario_service import InventarioService
+    contents = await file.read()
+    return await InventarioService.sincronizar_sucursal(sucursal_id, contents, file.filename, current_user)
 

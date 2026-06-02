@@ -11,18 +11,42 @@ import { getResumenCaja, getCategoriasGasto } from '../api/api';
 import { generarPDFSesion } from '../utils/cajaPDF';
 import {
     Unlock, Lock, MinusCircle, Plus, X,
-    Receipt, Tag, RefreshCw, AlertCircle,
-    History, ChevronDown, ChevronUp, ShieldCheck, Download, FileText, Wallet
+    Receipt, Tag, RefreshCw, AlertCircle, AlertTriangle, Info,
+    History, ChevronDown, ChevronUp, ShieldCheck, Download, FileText, Wallet, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
+import { formatDate } from '../utils/dateUtils';
+import { useEffect } from 'react';
+
+function BoliviaClock() {
+    const [time, setTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const timeStr = time.toLocaleTimeString('es-BO', { 
+        timeZone: 'America/La_Paz',
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false 
+    });
+
+    return (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white rounded-xl shadow-lg border border-gray-700 font-mono text-sm">
+            <Clock size={14} className="text-indigo-400 animate-pulse" />
+            <span className="font-bold tracking-wider">{timeStr}</span>
+            <span className="text-[10px] text-gray-500 font-sans font-bold uppercase ml-1">BO</span>
+        </div>
+    );
+}
+
 
 const fmt = (n?: number) => `Bs. ${(n || 0).toFixed(2)}`;
 
-const formatDate = (dateStr: string, opts?: Intl.DateTimeFormatOptions) => {
-    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
-    return new Date(isoStr).toLocaleString('es-BO', opts);
-};
 
 function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
     const headers = [
@@ -30,7 +54,7 @@ function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
         'Transacciones', 'Monto inicial',
         'Ef. recibido', 'Cambio entregado', 'Ef. neto',
         'QR', 'Tarjeta', 'Gastos',
-        'Total ventas', 'Saldo caja',
+        'Descuentos', 'Total ventas', 'Saldo caja',
         'Cierre físico', 'Diferencia', 'Notas cierre',
     ];
     const rows = sesiones.map(s => [
@@ -42,10 +66,11 @@ function exportarHistorialCSV(sesiones: CajaSesionResumen[]) {
         s.monto_inicial.toFixed(2),
         s.total_efectivo.toFixed(2),
         s.total_cambio.toFixed(2),
-        (s.total_efectivo - s.total_cambio).toFixed(2),
+        (s.total_efectivo + (s.total_ingresos_ef || 0) - s.total_cambio).toFixed(2),
         s.total_qr.toFixed(2),
         s.total_tarjeta.toFixed(2),
         s.total_gastos.toFixed(2),
+        (s.total_descuentos || 0).toFixed(2),
         s.total_ventas.toFixed(2),
         s.saldo_calculado.toFixed(2),
         s.monto_cierre_fisico != null ? s.monto_cierre_fisico.toFixed(2) : '',
@@ -85,26 +110,20 @@ function SubtipoBadge({ subtipo }: { subtipo: string }) {
 
 // ─── Resumen Numbers ───────────────────────────────────────────────────────
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-    return (
-        <div className={`rounded-xl p-2.5 border ${color}`}>
-            <p className="text-[10px] font-semibold text-current opacity-60 mb-0.5">{label}</p>
-            <p className="text-sm font-black font-mono">{fmt(value)}</p>
-        </div>
-    );
-}
+
 
 // ─── Historial Session Detail ────────────────────────────────────────────────
 
 function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen, categoriasGlobal: CajaGastoCategoria[] }) {
     const { data: resumen, isLoading } = useResumenCaja(sesion.id);
-    const efNeto = sesion.total_efectivo - sesion.total_cambio + (sesion.total_ajustes || 0);
+    // Efectivo Neto: Ventas Efectivo + Ingresos Efectivo - Cambio + Ajustes (ingresos manuales adicionales)
+    const efNeto = sesion.total_efectivo + (sesion.total_ingresos_ef || 0) - sesion.total_cambio + (sesion.total_ajustes || 0);
 
     return (
         <tr className="bg-slate-50">
-            <td colSpan={12} className="px-4 py-4">
+            <td colSpan={13} className="px-4 py-4">
                 {/* ── Summary KPIs ── */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4 text-xs">
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mb-4 text-xs">
                     <div className="bg-white rounded-xl p-2.5 border border-gray-100">
                         <p className="text-gray-400 font-semibold mb-0.5 text-[10px]">Inicial</p>
                         <p className="font-mono font-black text-blue-700">{fmt(sesion.monto_inicial)}</p>
@@ -124,6 +143,13 @@ function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen
                     <div className="bg-white rounded-xl p-2.5 border border-red-100">
                         <p className="text-gray-400 font-semibold mb-0.5 text-[10px]">Gastos</p>
                         <p className="font-mono font-black text-red-500">{fmt(sesion.total_gastos)}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 border border-orange-100">
+                        <p className="text-gray-400 font-semibold mb-0.5 text-[10px] flex items-center gap-1">
+                            Descuentos
+                            <span title="Total de descuentos otorgados en ventas del turno"><Info size={9} className="text-gray-300 cursor-help" /></span>
+                        </p>
+                        <p className="font-mono font-black text-orange-600">{fmt(sesion.total_descuentos ?? 0)}</p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 border border-indigo-100">
                         <p className="text-gray-400 font-semibold mb-0.5 text-[10px]">Saldo caja</p>
@@ -163,17 +189,22 @@ function SessionDetail({ sesion, categoriasGlobal }: { sesion: CajaSesionResumen
 }
 // ─── Componentes del Reporte (Tab Session) ───────────────────────────────────
 
-function SessionTable({ resumen, categoriasGlobal }: { resumen: ResumenCaja | undefined, categoriasGlobal: CajaGastoCategoria[] }) {
+function SessionTable({ resumen, categoriasGlobal, filterCashOnly }: { resumen: ResumenCaja | undefined, categoriasGlobal: CajaGastoCategoria[], filterCashOnly?: boolean }) {
     if (!resumen || resumen.movimientos.length === 0) {
         return <p className="text-gray-400 text-xs italic">Sin movimientos registrados.</p>;
     }
 
     return (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+            {filterCashOnly && (
+                <div className="px-3 py-1 bg-yellow-50/80 border-b border-yellow-100 text-[10px] text-yellow-800 font-bold flex items-center justify-center">
+                    ⚠️ MODO AUDITORÍA: Mostrando solo transacciones que afectan al cajón de efectivo (Los pagos digitales están ocultos).
+                </div>
+            )}
             <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50">
                     <tr>
-                        <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Hora</th>
+                        <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Fecha / Hora</th>
                         <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Tipo</th>
                         <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Descripción</th>
                         <th className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Cajero</th>
@@ -181,15 +212,17 @@ function SessionTable({ resumen, categoriasGlobal }: { resumen: ResumenCaja | un
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                    {resumen.movimientos.map((m: any) => {
+                    {resumen.movimientos
+                        .filter((m: any) => filterCashOnly ? !['VENTA_QR', 'VENTA_TARJETA', 'INGRESO_QR', 'INGRESO_TARJETA'].includes(m.subtipo) : true)
+                        .map((m: any) => {
                         const isDigital = m.subtipo === 'VENTA_QR' || m.subtipo === 'VENTA_TARJETA';
                         const amtColor = m.tipo === 'EGRESO' ? 'text-red-500'
                             : isDigital ? (m.subtipo === 'VENTA_QR' ? 'text-sky-600' : 'text-purple-600')
                                 : 'text-green-600';
                         return (
                             <tr key={m._id} className={isDigital ? 'bg-indigo-50/20' : ''}>
-                                <td className="px-3 py-1.5 font-mono text-[11px] text-gray-400">
-                                    {formatDate(m.fecha, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                <td className="px-3 py-1.5 font-mono text-[10px] text-gray-400 leading-tight">
+                                    {formatDate(m.fecha, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </td>
                                 <td className="px-3 py-1.5"><SubtipoBadge subtipo={m.subtipo} /></td>
                                 <td className="px-3 py-1.5 text-gray-700">
@@ -217,12 +250,42 @@ function SessionTable({ resumen, categoriasGlobal }: { resumen: ResumenCaja | un
 // ─── Historial Tab ───────────────────────────────────────────────────────────
 
 function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategoria[] }) {
-    const { data: sesiones = [], isLoading } = useHistorialCaja();
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
+    const [filterActive, setFilterActive] = useState<boolean>(false);
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
+
+    const { data, isLoading } = useHistorialCaja(
+        filterActive ? startDate : undefined,
+        filterActive ? endDate : undefined,
+        page,
+        pageSize
+    );
+    
+    const sesiones = data?.items || [];
+    const totalRecords = data?.total || 0;
+    const totalPages = Math.ceil(totalRecords / (filterActive ? pageSize : 5));
+
     const [expanded, setExpanded] = useState<string | null>(null);
     const [pdfLoading, setPdfLoading] = useState<string | null>(null);
 
+    function handleBuscar() {
+        if (startDate && endDate) {
+            setFilterActive(true);
+            setPage(1);
+        }
+    }
+
+    function handleLimpiar() {
+        setStartDate('');
+        setEndDate('');
+        setFilterActive(false);
+        setPage(1);
+    }
+
     async function handleExportPDF(e: React.MouseEvent, s: CajaSesionResumen) {
-        e.stopPropagation(); // don't toggle expand
+        e.stopPropagation();
         setPdfLoading(s.id);
         try {
             const resumen = await getResumenCaja(s.id);
@@ -240,44 +303,112 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
         );
     }
 
-    if (sesiones.length === 0) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400">
-                <History size={36} className="opacity-20" />
-                <p className="text-sm">No hay sesiones de caja registradas aún.</p>
-            </div>
-        );
-    }
-
     return (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-            {/* read-only notice + export */}
-            <div className="flex items-center justify-between px-1 mb-2">
-                <div className="flex items-center gap-2 text-[11px] text-gray-400">
+            {/* ── Filter bar ── */}
+            <div className="flex flex-wrap items-center gap-2 px-1 mb-3">
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
                     <ShieldCheck size={13} className="text-indigo-400" />
-                    Historial de solo lectura — los registros no pueden modificarse
+                    {filterActive
+                        ? <span className="text-indigo-600 font-bold">Rango aplicado</span>
+                        : <span>Últimas 5 sesiones</span>
+                    }
                 </div>
-                <button
-                    onClick={() => exportarHistorialCSV(sesiones)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
-                    <Download size={12} /> Exportar CSV
-                </button>
+
+                <div className="flex items-center gap-2 ml-auto flex-wrap">
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-[11px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-indigo-300 outline-none"
+                        placeholder="Desde"
+                    />
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-[11px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-indigo-300 outline-none"
+                        placeholder="Hasta"
+                    />
+                    <button
+                        onClick={handleBuscar}
+                        disabled={!startDate || !endDate}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
+                    >
+                        Buscar
+                    </button>
+                    {filterActive && (
+                        <button
+                            onClick={handleLimpiar}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold transition-all active:scale-95"
+                        >
+                            Ver últimas 5
+                        </button>
+                    )}
+                    <button
+                        onClick={() => exportarHistorialCSV(sesiones)}
+                        disabled={sesiones.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
+                    >
+                        <Download size={12} /> CSV
+                    </button>
+                </div>
             </div>
+
+            {sesiones.length === 0 && !isLoading ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400">
+                    <History size={36} className="opacity-20" />
+                    <p className="text-sm">No se encontraron sesiones en ese rango.</p>
+                </div>
+            ) : (
 
             <div className="flex-1 bg-white rounded-2xl border border-gray-200 overflow-hidden">
                 <table className="w-full text-left text-xs">
                     <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha / Hora</th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Fecha / Hora</th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cajero</th>
                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estado</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Txs</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">QR</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Tarjeta</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Ef. neto</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Gastos</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Total</th>
-                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Saldo caja</th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    Txs <span title="Número total de transacciones registradas"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    QR <span title="Ventas cobradas mediante QR (Dinero digital)"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    Tarjeta <span title="Ventas cobradas mediante Tarjeta/POS (Dinero digital)"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    Ef. neto <span title="Ventas Efectivo + Ingresos Manuales - Vueltos"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    Gastos <span title="Total de egresos registrados por gastos operativos"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    Descuentos <span title="Total de descuentos aplicados en ventas de la sesión"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                    Total <span title="Suma de todas las ventas (Efectivo + QR + Tarjeta)"><Info size={10} className="text-gray-300 cursor-help" /></span>
+                                </div>
+                            </th>
+                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
+                                <div className="flex items-center justify-end gap-1 font-black text-gray-600">
+                                    Saldo caja <span title="Monto Inicial + Ef. Neto - Gastos + Ajustes (Dinero esperado en cajón)"><Info size={10} className="text-indigo-300 cursor-help" /></span>
+                                </div>
+                            </th>
                             <th className="px-2 py-2" />
                             <th className="px-2 py-2" />
                         </tr>
@@ -285,7 +416,7 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                     <tbody className="divide-y divide-gray-100">
                         {sesiones.map((s: CajaSesionResumen) => {
                             const isOpen = expanded === s.id;
-                            const efNeto = s.total_efectivo - s.total_cambio;
+                            const efNeto = s.total_efectivo + (s.total_ingresos_ef || 0) - s.total_cambio;
                             return (
                                 <React.Fragment key={s.id}>
                                     <tr
@@ -308,6 +439,7 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                                         <td className="px-3 py-2.5 text-right font-mono text-purple-700">{fmt(s.total_tarjeta)}</td>
                                         <td className="px-3 py-2.5 text-right font-mono text-green-700">{fmt(efNeto)}</td>
                                         <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmt(s.total_gastos)}</td>
+                                        <td className="px-3 py-2.5 text-right font-mono text-orange-600">{fmt(s.total_descuentos ?? 0)}</td>
                                         <td className="px-3 py-2.5 text-right font-bold font-mono text-indigo-700">{fmt(s.total_ventas)}</td>
                                         <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900">{fmt(s.saldo_calculado)}</td>
                                         <td className="px-2 py-2.5 text-gray-400">
@@ -332,7 +464,37 @@ function HistorialTab({ categoriasGlobal }: { categoriasGlobal: CajaGastoCategor
                         })}
                     </tbody>
                 </table>
+
+                {/* Pagination Footer */}
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                    <div className="text-[11px] text-gray-500 font-medium">
+                        Mostrando <span className="font-bold text-gray-700">{sesiones.length}</span> de <span className="font-bold text-gray-700">{totalRecords}</span> sesiones
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="px-2 py-1 bg-white border border-gray-200 rounded text-[10px] font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-30 transition-all"
+                        >
+                            Anterior
+                        </button>
+                        
+                        <div className="text-[10px] font-bold text-gray-400 px-2">
+                            Página {page} de {totalPages || 1}
+                        </div>
+                        
+                        <button
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page >= totalPages}
+                            className="px-2 py-1 bg-white border border-gray-200 rounded text-[10px] font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-30 transition-all"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
             </div>
+            )}
         </div>
     );
 }
@@ -364,8 +526,9 @@ export default function CajaPage() {
     const [modal, setModal] = useState<ModalType>(null);
     const closeModal = () => setModal(null);
 
-    // abrir caja
+    // apertura
     const [montoInicial, setMontoInicial] = useState('');
+    const [aperturaDetallada, setAperturaDetallada] = useState(true);
 
     // gasto
     const [gastoMonto, setGastoMonto] = useState('');
@@ -379,18 +542,20 @@ export default function CajaPage() {
 
     // cierre
     const [notasCierre, setNotasCierre] = useState('');
-    const [conteoDetallado, setConteoDetallado] = useState(true);
+    const [conteoDetallado, setConteoDetallado] = useState(false);
     const [montoFisicoManual, setMontoFisicoManual] = useState('');
+    const [filterCashOnly, setFilterCashOnly] = useState<boolean>(true);
 
     // Denominaciones (Calculadora de cierre)
     const [billetes, setBilletes] = useState<Record<string, number>>({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
     const [monedas, setMonedas] = useState<Record<string, number>>({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
     
-    // El "Total" final depende de si es detallado o manual
-    const totalFisicoCalculado = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
+    // El "Total" final depende de si es detallado o manual, aproximado a 2 decimales para evitar ruido de punto flotante de JS
+    const totalFisicoCalculadoRaw = Object.entries(billetes).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0) +
         Object.entries(monedas).reduce((acc, [k, v]) => acc + (parseFloat(k) * (v || 0)), 0);
 
-    const totalFisicoFinal = conteoDetallado ? totalFisicoCalculado : (parseFloat(montoFisicoManual) || 0);
+    const totalAperturaFinal = Math.round((aperturaDetallada ? totalFisicoCalculadoRaw : (parseFloat(montoInicial) || 0)) * 100) / 100;
+    const totalFisicoFinal   = Math.round((conteoDetallado ? totalFisicoCalculadoRaw : (parseFloat(montoFisicoManual) || 0)) * 100) / 100;
 
     // nueva categoría
     const [catNombre, setCatNombre] = useState('');
@@ -402,43 +567,63 @@ export default function CajaPage() {
         ? resumen.monto_inicial + resumen.total_efectivo_ventas - resumen.total_cambio - resumen.total_gastos + (resumen.total_ajustes || 0)
         : 0;
 
+    const ventasPuras = (resumen?.movimientos || [])
+        .filter((m: any) => m.subtipo === 'VENTA_EFECTIVO' && m.tipo === 'INGRESO')
+        .reduce((sum: number, m: any) => sum + Number(m.monto), 0);
+        
+    const anulacionesPuras = (resumen?.movimientos || [])
+        .filter((m: any) => m.subtipo === 'VENTA_EFECTIVO' && m.tipo === 'EGRESO')
+        .reduce((sum: number, m: any) => sum + Number(m.monto), 0);
+
     const diferencia = (totalFisicoFinal > 0 || modal === 'cierre')
         ? totalFisicoFinal - (resumen?.saldo_calculado ?? 0)
         : null;
 
-    // ── Handlers ──────────────────────────────────────────────────────────
+    const [isSubmittingLocal, setIsSubmittingLocal] = useState(false);
 
     const handleAbrirCaja = () => {
-        if (!montoInicial) return;
-        abrirMut.mutate({ monto_inicial: parseFloat(montoInicial) }, {
-            onSuccess: () => { setMontoInicial(''); closeModal(); },
+        if (totalAperturaFinal <= 0 || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
+        abrirMut.mutate({ monto_inicial: totalAperturaFinal }, {
+            onSuccess: () => { 
+                setMontoInicial(''); 
+                setBilletes({ '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 });
+                setMonedas({ '5': 0, '2': 0, '1': 0, '0.50': 0, '0.20': 0, '0.10': 0 });
+                closeModal(); 
+            },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleGasto = () => {
-        if (!gastoMonto || !gastoDesc) return;
+        if (!gastoMonto || !gastoDesc || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         gastoMut.mutate({
             monto: parseFloat(gastoMonto),
             descripcion: gastoDesc,
             categoria_id: gastoCategId || undefined,
         }, {
             onSuccess: () => { setGastoMonto(''); setGastoDesc(''); setGastoCategId(''); closeModal(); },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleIngreso = () => {
-        if (!ingresoMonto || !ingresoDesc) return;
+        if (!ingresoMonto || !ingresoDesc || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         ingresoMut.mutate({
             monto: parseFloat(ingresoMonto),
             descripcion: ingresoDesc,
             metodo: ingresoMetodo,
         }, {
             onSuccess: () => { setIngresoMonto(''); setIngresoDesc(''); setIngresoMetodo('EFECTIVO'); closeModal(); },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleCierre = () => {
-        if (!sesion || totalFisicoFinal === 0) return;
+        if (!sesion || totalFisicoFinal === 0 || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         cerrarMut.mutate({
             sesionId: sesion._id,
             data: { monto_fisico_contado: totalFisicoFinal, notas: notasCierre || undefined },
@@ -451,13 +636,16 @@ export default function CajaPage() {
                 closeModal();
                 setTab('historial');
             },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
     const handleCrearCategoria = () => {
-        if (!catNombre) return;
+        if (!catNombre || isSubmittingLocal) return;
+        setIsSubmittingLocal(true);
         catMut.mutate({ nombre: catNombre, descripcion: catDesc || undefined, icono: catIcono }, {
             onSuccess: () => { setCatNombre(''); setCatDesc(''); setCatIcono('receipt'); closeModal(); },
+            onSettled: () => setIsSubmittingLocal(false)
         });
     };
 
@@ -505,6 +693,10 @@ export default function CajaPage() {
                                 {' '}· {sesion.cajero_name}
                             </p>
                         )}
+                    </div>
+
+                    <div className="hidden sm:block">
+                        <BoliviaClock />
                     </div>
                     {tab === 'sesion' && (
                         <div className="flex gap-2 flex-wrap justify-end">
@@ -560,34 +752,95 @@ export default function CajaPage() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="space-y-2 overflow-hidden mb-2 mt-2"
+                        className="space-y-4 overflow-hidden mb-2 mt-2"
                     >
-                        {/* Cash drawer */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <StatCard label="Inicial" value={resumen.monto_inicial} color="border-blue-200 bg-blue-50 text-blue-800" />
-                            <StatCard label="Ef. Recibido (+Ingresos)" value={resumen.total_efectivo_ventas + (resumen.total_ingresos_efectivo || 0)} color="border-green-200 bg-green-50 text-green-800" />
-                            <StatCard label="Cambio" value={resumen.total_cambio} color="border-amber-200 bg-amber-50 text-amber-800" />
-                            <StatCard label="Gastos" value={resumen.total_gastos} color="border-red-200 bg-red-50 text-red-800" />
+                        {/* Bloque Fondo Fijo: Flujo Físico */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-3 shadow-sm">
+                            <h3 className="text-[11px] font-bold text-gray-800 uppercase tracking-wider flex justify-between items-center bg-gray-50/80 p-2 rounded-lg border border-gray-100">
+                                <span>Flujo de Efectivo Físico (Modelo Fondo Fijo)</span>
+                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px]">Saldo Esperado: {fmt(resumen.saldo_calculado)}</span>
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div className="rounded-xl p-2.5 border-l-4 border-blue-400 bg-blue-50 text-blue-900 flex flex-col justify-between">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Monto Inicial<br/><span className="text-[9px] font-normal opacity-70">(Base para mañana)</span></p>
+                                    <p className="text-sm font-black font-mono">{fmt(resumen.monto_inicial)}</p>
+                                </div>
+                                <div className="rounded-xl p-2.5 border border-green-100 bg-green-50 text-green-800 flex flex-col justify-between">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Total Ingresos Efectivo<br/><span className="text-[9px] font-normal opacity-70">(Ventas Puras + Manuales)</span></p>
+                                    <p className="text-sm font-black font-mono">+{fmt(ventasPuras + (resumen.total_ingresos_efectivo || 0))}</p>
+                                </div>
+                                <div className="rounded-xl p-2.5 border border-red-100 bg-red-50 text-red-800 flex flex-col justify-between group relative cursor-help">
+                                    <p className="text-[10px] font-bold opacity-70 mb-1 leading-tight">Salidas y Anulaciones<br/><span className="text-[9px] font-normal opacity-70">(Vueltos + Gast. + Anul.)</span></p>
+                                    <p className="text-sm font-black font-mono">-{fmt(resumen.total_gastos + resumen.total_cambio + Math.abs(anulacionesPuras) - (resumen.total_ajustes || 0))}</p>
+                                    
+                                    {/* Tooltip Hover Explicativo */}
+                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] rounded p-2 z-20 shadow-xl">
+                                        <p className="font-bold border-b border-gray-700 pb-1 mb-1">Desglose de Salidas:</p>
+                                        <div className="flex justify-between"><span>Gastos Físicos:</span><span className="font-mono">{fmt(resumen.total_gastos)}</span></div>
+                                        <div className="flex justify-between"><span>Vueltos/Cambio:</span><span className="font-mono">{fmt(resumen.total_cambio)}</span></div>
+                                        <div className="flex justify-between text-red-300"><span>Ventas Anuladas:</span><span className="font-mono">{fmt(Math.abs(anulacionesPuras))}</span></div>
+                                    </div>
+                                </div>
+                                <div className="rounded-xl p-2.5 border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col justify-between relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-600/5 rounded-full blur-xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+                                     <p className="text-[10px] font-bold text-indigo-800/80 mb-1 leading-tight">Monto A Entregar<br/><span className="text-[9px] font-normal text-indigo-700/80">(Ganancia Neta Física)</span></p>
+                                     <p className="text-sm font-black font-mono text-indigo-900">{fmt(Math.max(0, resumen.saldo_calculado - resumen.monto_inicial))}</p>
+                                </div>
+                            </div>
                         </div>
-                        {/* Digital channels + grand total */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div className="rounded-xl p-2.5 border border-sky-200 bg-sky-50 text-sky-800">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">QR (+Ingresos)</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_qr)}</p>
+
+                        {/* Canales Digitales y Descuentos */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* Canales Digitales */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+                                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between mb-2 px-1">
+                                     <span>Pagos Digitales (Directo a Banco)</span>
+                                     <span className="text-[9px] lowercase opacity-60">Estos ingresos no se contabilizan en el flujo físico</span>
+                                 </h3>
+                                 <div className="grid grid-cols-2 gap-2">
+                                    <div className="rounded-xl p-2 border border-sky-100 bg-sky-50/50 flex justify-between items-center text-sky-800">
+                                        <span className="text-[11px] font-semibold">QR Total</span>
+                                        <span className="text-xs font-bold font-mono text-sky-900">{fmt(resumen.total_qr)}</span>
+                                    </div>
+                                    <div className="rounded-xl p-2 border border-purple-100 bg-purple-50/50 flex justify-between items-center text-purple-800">
+                                        <span className="text-[11px] font-semibold">Tarjeta / POS</span>
+                                        <span className="text-xs font-bold font-mono text-purple-900">{fmt(resumen.total_tarjeta)}</span>
+                                    </div>
+                                 </div>
                             </div>
-                            <div className="rounded-xl p-2.5 border border-purple-200 bg-purple-50 text-purple-800">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Tarjeta (+Ingresos)</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_tarjeta)}</p>
-                            </div>
-                            <div className="rounded-xl p-2.5 border border-gray-200 bg-gray-100 text-gray-600">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Ajustes</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.total_ajustes || 0)}</p>
-                            </div>
-                            <div className="rounded-xl p-2.5 border-2 border-indigo-200 bg-indigo-50 text-indigo-900 border-dashed">
-                                <p className="text-[10px] font-semibold opacity-60 mb-0.5">Calculado {sesion?.estado === 'CERRADA' ? '(Final)' : '(Actual)'}</p>
-                                <p className="text-sm font-black font-mono">{fmt(resumen.saldo_calculado)}</p>
+
+                            {/* Descuentos y Trazabilidad */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+                                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between mb-2 px-1">
+                                     <span>Descuentos y Trazabilidad</span>
+                                     <span className="text-[9px] lowercase opacity-60">Información analítica de rebajas otorgadas</span>
+                                 </h3>
+                                 <div className="rounded-xl p-2 border border-orange-100 bg-orange-50/50 flex justify-between items-center text-orange-850">
+                                     <span className="text-[11px] font-semibold flex items-center gap-1">
+                                         Descuentos Otorgados
+                                         <span title="Total de descuentos aplicados en las ventas de este turno"><Info size={10} className="text-orange-400 cursor-help" /></span>
+                                     </span>
+                                     <span className="text-xs font-bold font-mono text-orange-950">{fmt(resumen.total_descuentos ?? 0)}</span>
+                                 </div>
                             </div>
                         </div>
+
+                        {/* Panel de Auditoría / Insights Automáticos */}
+                        {anulacionesPuras > 0 && (
+                            <motion.div initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} className="bg-red-50/80 rounded-xl border border-red-200 p-3 shadow-sm flex items-start gap-3 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+                                <div className="p-2 bg-red-100 text-red-600 rounded-full shrink-0">
+                                    <AlertTriangle size={16} />
+                                </div>
+                                <div className="z-10 relative">
+                                    <h4 className="text-[11px] font-bold text-red-900 leading-tight flex items-center gap-1.5 uppercase tracking-wide">Modo Auditoría <span className="px-1.5 py-0.5 bg-red-200 text-red-800 rounded bg-opacity-50 text-[9px]">Alerta Detectada</span></h4>
+                                    <p className="text-[11px] text-red-800 mt-1.5 font-medium leading-relaxed">
+                                        Se han detectado ventas anuladas (reversiones en efectivo) equivalentes a <strong className="font-mono text-red-900 bg-white/50 px-1 rounded-sm">{fmt(Math.abs(anulacionesPuras))}</strong> durante este turno de caja. Revisa los movimientos marcados en la bitácora.
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+                        
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -614,7 +867,20 @@ export default function CajaPage() {
                             <h3 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
                                 <Receipt size={14} className="text-gray-400" /> Movimientos del día
                             </h3>
-                            <span className="text-xs text-gray-400">{movimientos.length} registros</span>
+                            <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-gray-700 font-bold bg-white border border-gray-200 px-2 py-1 rounded-md shadow-sm select-none hover:bg-gray-50">
+                                    <input 
+                                       type="checkbox" 
+                                       checked={filterCashOnly} 
+                                       onChange={(e) => setFilterCashOnly(e.target.checked)}
+                                       className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                    />
+                                    <span>Solo Efectivo 💵</span>
+                                </label>
+                                <span className="text-xs text-gray-400">
+                                    {movimientos.filter((m: any) => filterCashOnly ? !['VENTA_QR', 'VENTA_TARJETA', 'INGRESO_QR', 'INGRESO_TARJETA'].includes(m.subtipo) : true).length} registros
+                                </span>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-auto">
                             {loadingMov ? (
@@ -625,7 +891,7 @@ export default function CajaPage() {
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-gray-50 sticky top-0 z-10">
                                         <tr>
-                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hora</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha / Hora</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Descripción</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cajero</th>
@@ -633,7 +899,9 @@ export default function CajaPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {movimientos.map((m) => {
+                                        {movimientos
+                                            .filter((m: any) => filterCashOnly ? !['VENTA_QR', 'VENTA_TARJETA', 'INGRESO_QR', 'INGRESO_TARJETA'].includes(m.subtipo) : true)
+                                            .map((m) => {
                                             const isDigital = m.subtipo === 'VENTA_QR' || m.subtipo === 'VENTA_TARJETA';
                                             const amtColor = m.tipo === 'EGRESO'
                                                 ? 'text-red-500'
@@ -643,8 +911,8 @@ export default function CajaPage() {
                                             return (
                                                 <tr key={m._id} className={`transition-colors ${isDigital ? 'bg-indigo-50/30 hover:bg-indigo-50/60' : 'hover:bg-gray-50'
                                                     }`}>
-                                                    <td className="px-3 py-1.5 font-mono text-[11px] text-gray-400">
-                                                        {formatDate(m.fecha, { hour: '2-digit', minute: '2-digit' })}
+                                                    <td className="px-3 py-1.5 font-mono text-[10px] text-gray-400 leading-tight">
+                                                        {formatDate(m.fecha, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                     </td>
                                                     <td className="px-3 py-1.5">
                                                         <SubtipoBadge subtipo={m.subtipo} />
@@ -700,21 +968,102 @@ export default function CajaPage() {
 
                             {/* ── ABRIR CAJA ── */}
                             {modal === 'abrir' && (
-                                <>
-                                    <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mb-4">
-                                        <Unlock size={22} className="text-green-600" />
+                                <div className="w-full">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
+                                            <Unlock size={22} className="text-green-600" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-black mb-0.5">Apertura de Caja</h2>
+                                            <p className="text-sm text-gray-400">Ingresá el efectivo con el que arranca la caja.</p>
+                                        </div>
                                     </div>
-                                    <h2 className="text-xl font-black mb-1">Apertura de Caja</h2>
-                                    <p className="text-sm text-gray-400 mb-5">Ingresá el efectivo con el que arranca la caja hoy.</p>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto inicial (Bs.)</label>
-                                    <input type="number" step="0.01" autoFocus
-                                        className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-green-400 mb-6 text-gray-900"
-                                        placeholder="0.00" value={montoInicial} onChange={e => setMontoInicial(e.target.value)} />
-                                    <button onClick={handleAbrirCaja} disabled={!montoInicial || abrirMut.isPending}
+
+                                    <div className="flex justify-end mb-4">
+                                        <button 
+                                            onClick={() => setAperturaDetallada(!aperturaDetallada)}
+                                            className="text-[10px] font-black text-green-600 hover:text-green-700 bg-green-50 px-2.5 py-1 rounded-full transition-all"
+                                        >
+                                            {aperturaDetallada ? 'Ingreso Directo' : 'Desglosar Billetes'}
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 relative overflow-hidden mb-6">
+                                        {aperturaDetallada ? (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {/* Billetes */}
+                                                <div>
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase block mb-3 pl-1">Billetes</span>
+                                                    <div className="space-y-2">
+                                                        {Object.entries(billetes).sort((a,b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                            <div key={`ab-b-${val}`} className="flex items-center gap-2 group">
+                                                                <span className="text-[10px] font-bold text-gray-400 w-6">Bs.{val}</span>
+                                                                <input 
+                                                                    type="number" min="0" placeholder="0"
+                                                                    inputMode="numeric"
+                                                                    className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-green-400 outline-none"
+                                                                    value={cant || ''}
+                                                                    onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                    onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
+                                                                    onChange={e => setBilletes(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                {/* Monedas */}
+                                                <div>
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase block mb-3 pl-1">Monedas</span>
+                                                    <div className="space-y-2">
+                                                        {Object.entries(monedas).sort((a,b) => parseFloat(b[0]) - parseFloat(a[0])).map(([val, cant]) => (
+                                                            <div key={`ab-m-${val}`} className="flex items-center gap-2 group">
+                                                                <span className="text-[10px] font-bold text-gray-400 w-7">Bs.{val}</span>
+                                                                <input 
+                                                                    type="number" min="0" placeholder="0"
+                                                                    inputMode="numeric"
+                                                                    className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-green-400 outline-none"
+                                                                    value={cant || ''}
+                                                                    onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                    onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
+                                                                    onChange={e => setMonedas(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="py-2 text-center text-gray-900">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase block mb-2">Monto Inicial (Bs.)</label>
+                                                <div className="relative inline-block w-48">
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
+                                                    <input 
+                                                        type="number" step="0.1" autoFocus
+                                                        inputMode="decimal"
+                                                        className="w-full bg-white border-2 border-green-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-black focus:border-green-500 outline-none transition-all placeholder-green-200"
+                                                        placeholder="0.00"
+                                                        value={montoInicial}
+                                                        onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                        onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
+                                                        onChange={e => setMontoInicial(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
+                                            <span className="text-xs font-black text-gray-900 uppercase">Total Inicial:</span>
+                                            <span className="text-2xl font-black font-mono text-green-600">
+                                                {fmt(totalAperturaFinal)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={handleAbrirCaja} disabled={totalAperturaFinal <= 0 || abrirMut.isPending}
                                         className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-sm disabled:opacity-50 transition-colors">
                                         {abrirMut.isPending ? 'Abriendo...' : 'Confirmar Apertura'}
                                     </button>
-                                </>
+                                </div>
                             )}
 
                             {/* ── GASTO ── */}
@@ -752,7 +1101,7 @@ export default function CajaPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto (Bs.)</label>
-                                            <input type="number" step="0.01"
+                                            <input type="number" step="0.1"
                                                 className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-red-300 text-gray-900"
                                                 placeholder="0.00"
                                                 value={gastoMonto} onChange={e => setGastoMonto(e.target.value)} />
@@ -801,7 +1150,7 @@ export default function CajaPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto (Bs.)</label>
-                                            <input type="number" step="0.01"
+                                            <input type="number" step="0.1"
                                                 className="w-full bg-gray-50 rounded-xl p-4 text-2xl font-bold outline-none focus:ring-2 focus:ring-green-300 text-gray-900"
                                                 placeholder="0.00"
                                                 value={ingresoMonto} onChange={e => setIngresoMonto(e.target.value)} />
@@ -834,36 +1183,52 @@ export default function CajaPage() {
                                         <div className="space-y-4">
                                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-indigo-400 rounded-full" />
-                                                Saldo Esperado (Sistema)
+                                                Flujo Físico Sugerido (Fondo Fijo)
                                             </h3>
                                             
                                             <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-3">
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Fondo Inicial</span>
+                                                    <span className="text-gray-400 font-medium">Fondo Inicial <span className="text-[10px] bg-gray-100 px-1 rounded ml-1">(Fijo)</span></span>
                                                     <span className="font-mono font-bold text-gray-600">{fmt(resumen?.monto_inicial)}</span>
                                                 </div>
+                                                <div className="pt-2 border-t border-gray-50"></div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Ventas en Efectivo</span>
+                                                    <span className="text-gray-400 font-medium">+ Ventas en Efectivo</span>
                                                     <span className="font-mono font-bold text-green-600">+{fmt(resumen?.total_efectivo_ventas)}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center text-sm text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg">
-                                                    <span className="font-medium">Ingresos Manuales</span>
+                                                <div className="flex justify-between items-center text-sm text-indigo-600">
+                                                    <span className="font-medium">+ Ingresos Manuales</span>
                                                     <span className="font-mono font-bold">+{fmt(resumen?.total_ingresos_efectivo)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Cambio Entregado</span>
+                                                    <span className="text-gray-400 font-medium">- Cambio Entregado</span>
                                                     <span className="font-mono font-bold text-amber-600">-{fmt(resumen?.total_cambio)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-gray-400 font-medium">Gastos Registrados</span>
+                                                    <span className="text-gray-400 font-medium">- Gastos Registrados</span>
                                                     <span className="font-mono font-bold text-red-500">-{fmt(resumen?.total_gastos)}</span>
                                                 </div>
+                                                {((resumen?.total_ajustes) || 0) !== 0 && (
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-gray-400 font-medium">Ajustes</span>
+                                                        <span className="font-mono font-bold text-gray-500">{((resumen?.total_ajustes)||0) > 0 ? '+' : ''}{fmt(resumen?.total_ajustes)}</span>
+                                                    </div>
+                                                )}
                                                 
-                                                <div className="pt-4 border-t border-dashed border-gray-100">
-                                                    <div className="flex justify-between items-end">
-                                                        <span className="text-xs font-black text-gray-900 uppercase">Deben haber:</span>
-                                                        <span className="text-3xl font-black font-mono text-gray-900 tracking-tighter">
+                                                <div className="pt-4 border-t border-dashed border-gray-200 mt-2">
+                                                    <div className="flex justify-between items-end mb-1">
+                                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Físico Esperado Total</span>
+                                                        <span className="text-2xl font-black font-mono text-gray-900 tracking-tighter">
                                                             {fmt(resumen?.saldo_calculado)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-end mt-4 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                                        <div>
+                                                            <span className="text-[10px] font-bold text-indigo-800 uppercase block">Ganancia Neta (A Depositar)</span>
+                                                            <span className="text-[9px] text-indigo-500 font-medium">Lo que deberías entregar idealmente</span>
+                                                        </div>
+                                                        <span className="text-xl font-black font-mono text-indigo-600">
+                                                            {fmt((resumen?.saldo_calculado || 0) - (resumen?.monto_inicial || 0))}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -912,8 +1277,11 @@ export default function CajaPage() {
                                                                         <span className="text-[10px] font-bold text-gray-400 w-6">Bs.{val}</span>
                                                                         <input 
                                                                             type="number" min="0" placeholder="0"
+                                                                            inputMode="numeric"
                                                                             className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
                                                                             value={cant || ''}
+                                                                            onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                            onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                             onChange={e => setBilletes(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
                                                                         />
                                                                     </div>
@@ -929,8 +1297,11 @@ export default function CajaPage() {
                                                                         <span className="text-[10px] font-bold text-gray-400 w-7">Bs.{val}</span>
                                                                         <input 
                                                                             type="number" min="0" placeholder="0"
+                                                                            inputMode="numeric"
                                                                             className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-mono text-black focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
                                                                             value={cant || ''}
+                                                                            onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                            onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                             onChange={e => setMonedas(prev => ({...prev, [val]: parseInt(e.target.value) || 0}))}
                                                                         />
                                                                     </div>
@@ -944,10 +1315,13 @@ export default function CajaPage() {
                                                         <div className="relative inline-block w-48">
                                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-xl">Bs.</span>
                                                             <input 
-                                                                type="number" step="0.01" autoFocus
+                                                                type="number" step="0.1" autoFocus
+                                                                inputMode="decimal"
                                                                 className="w-full bg-white border-2 border-indigo-100 rounded-2xl py-6 pl-14 pr-4 font-black text-3xl font-mono text-black focus:border-indigo-500 outline-none transition-all placeholder-indigo-200"
                                                                 placeholder="0.00"
                                                                 value={montoFisicoManual}
+                                                                onWheel={e => (e.target as HTMLInputElement).blur()}
+                                                                onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                 onChange={e => setMontoFisicoManual(e.target.value)}
                                                             />
                                                         </div>
@@ -964,23 +1338,46 @@ export default function CajaPage() {
 
                                             {/* DIFERENCIA Y ANALISIS */}
                                             {totalFisicoFinal > 0 && (
-                                                <motion.div 
-                                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                                    className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-green-50 border-green-100 text-green-800' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-100 text-blue-800' : 'bg-red-50 border-red-100 text-red-800'}`}
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-center gap-2">
-                                                            {Math.abs(diferencia ?? 0) < 0.50 ? <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> : <RefreshCw size={14} className="animate-spin" />}
-                                                            <span className="text-xs font-bold uppercase tracking-tight">Resultado del Arqueo</span>
+                                                <div className="space-y-3">
+                                                    {/* Desglose de Entrega Real */}
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="p-3 bg-green-50 rounded-2xl border border-green-200">
+                                                            <p className="text-[10px] font-black text-green-800 uppercase leading-tight mb-2">Monto a Entregar<br/><span className="text-[9px] font-medium opacity-80">(Efectivo Ganado)</span></p>
+                                                            <p className="text-xl font-black font-mono text-green-700">
+                                                                {fmt(Math.max(0, totalFisicoFinal - (resumen?.monto_inicial || 0)))}
+                                                            </p>
                                                         </div>
-                                                        <span className="text-lg font-black font-mono">
-                                                            {Math.abs(diferencia ?? 0) < 0.50 ? 'OK' : fmt(Math.abs(diferencia ?? 0))}
-                                                        </span>
+                                                        <div className="p-3 bg-yellow-50 rounded-2xl border border-yellow-200">
+                                                            <p className="text-[10px] font-black text-yellow-800 uppercase leading-tight mb-2">Guardar en Caja<br/><span className="text-[9px] font-medium opacity-80">(Para el día sgt.)</span></p>
+                                                            <p className="text-xl font-black font-mono text-yellow-700">
+                                                                {fmt(Math.min(totalFisicoFinal, resumen?.monto_inicial || 0))}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-[10px] opacity-70 mt-1 font-medium">
-                                                        {Math.abs(diferencia ?? 0) < 0.50 ? 'El monto coincide con el sistema (margen 0.50c).' : (diferencia ?? 0) > 0 ? 'Hay más dinero físico de lo que reporta el sistema.' : 'Falta dinero físico respecto al reporte del sistema.'}
-                                                    </p>
-                                                </motion.div>
+                                                    
+                                                    {/* Margen de error reportado */}
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                        className={`p-4 rounded-3xl border ${Math.abs(diferencia ?? 0) < 0.50 ? 'bg-green-50 border-green-200 text-green-800 shadow-sm' : (diferencia ?? 0) > 0 ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-800 shadow-sm'}`}
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-2">
+                                                                {Math.abs(diferencia ?? 0) < 0.50 ? <ShieldCheck size={16} className="text-green-600" /> : <AlertTriangle size={16} />}
+                                                                <span className="text-[11px] font-black uppercase tracking-tight opacity-70">
+                                                                    {Math.abs(diferencia ?? 0) < 0.50 ? 'Estado de Auditoría' : 'Diferencia Detectada'}
+                                                                </span>
+                                                            </div>
+                                                            <span className={`text-lg font-black font-mono tracking-tighter ${Math.abs(diferencia ?? 0) < 0.50 ? 'text-green-700' : ''}`}>
+                                                                {Math.abs(diferencia ?? 0) < 0.50 ? '✔️ CAJA CUADRADA' : (diferencia ?? 0) > 0 ? `🟢 SOBRA ${fmt(Math.abs(diferencia ?? 0))}` : `🔴 FALTA ${fmt(Math.abs(diferencia ?? 0))}`}
+                                                            </span>
+                                                        </div>
+                                                        {Math.abs(diferencia ?? 0) >= 0.50 && (
+                                                            <p className="text-[10px] opacity-70 mt-1.5 font-medium leading-relaxed">
+                                                                {(diferencia ?? 0) > 0 ? 'Estás declarando que hay MÁS EFECTIVO físico de lo que el sistema contabilizó. El excedente se reportará.' : 'Estás declarando un FALTANTE DE DINERO real. Tendrás que justificarlo obligatoriamente.'}
+                                                            </p>
+                                                        )}
+                                                    </motion.div>
+                                                </div>
                                             )}
 
                                             {/* NOTAS Y CONFIRMACIÓN */}
@@ -1006,12 +1403,14 @@ export default function CajaPage() {
                                                         <button 
                                                             onClick={handleCierre} 
                                                             disabled={btnDisabled}
-                                                            className={`w-full mt-4 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2
+                                                            className={`w-full mt-4 py-4 rounded-2xl font-black text-sm transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-2
                                                                 ${requiereJustificacion && !notasAceptables 
-                                                                    ? 'bg-red-400 text-white cursor-not-allowed' 
-                                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
+                                                                    ? 'bg-red-100 text-red-400 cursor-not-allowed opacity-70' 
+                                                                    : (requiereJustificacion && notasAceptables) 
+                                                                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200' 
+                                                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
                                                         >
-                                                            {cerrarMut.isPending ? <RefreshCw className="animate-spin" size={18} /> : (requiereJustificacion && !notasAceptables) ? 'Falta justificación' : 'Confirmar y Cerrar Caja'}
+                                                            {cerrarMut.isPending ? <RefreshCw className="animate-spin" size={18} /> : (requiereJustificacion && !notasAceptables) ? 'BLOQUEADO: Falta Justificación' : requiereJustificacion ? 'Registrar Falta y Cerrar' : 'Confirmar Caja Cuadrada'}
                                                         </button>
                                                     </div>
                                                 );

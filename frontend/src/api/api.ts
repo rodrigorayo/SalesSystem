@@ -2,7 +2,9 @@
  * Centralized API service layer.
  * All backend route strings are defined here — never scattered in components.
  */
+export { client } from './client';
 import { client } from './client';
+
 import type {
     Tenant, TenantCreate, TenantUpdate,
     Product, ProductCreate,
@@ -29,6 +31,8 @@ export const getTenants = () => client<Tenant[]>('/tenants');
 export const createTenant = (data: TenantCreate) => client<Tenant>('/tenants', { body: data });
 export const updateTenant = (id: string, data: TenantUpdate) => client<Tenant>(`/tenants/${id}`, { method: 'PUT', body: data });
 export const deleteTenant = (id: string) => client<{message: string}>(`/tenants/${id}`, { method: 'DELETE' });
+export const getMyFeatures = () => client<{ features: string[]; plan: string; plan_name?: string }>('/tenants/my-features');
+
 export const getTenantStats = () =>
     client<{ total_sales: number; active_products: number; active_employees: number }>('/tenants/stats');
 
@@ -42,6 +46,41 @@ export const getDailyReport = (date: string, sucursal_id?: string) => {
     return client<any>(`/reports/daily-report?${params.toString()}`);
 };
 
+export const getValuedInventory = (date?: string) => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    return client<{total_general_fabrica: number; total_general_publico: number; ganancia_potencial: number; por_sucursal: any[], historical?: boolean, date?: string}>(`/reports/valued-inventory${date ? '?' + params.toString() : ''}`);
+};
+
+export const exportValuedInventory = async (date?: string) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+        
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    const qs = params.toString();
+    
+    const response = await fetch(`${CACHE_URL}/reports/valued-inventory/export${qs ? '?' + qs : ''}`, {
+        method: 'GET',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    
+    if (!response.ok) throw new Error('Error al descargar el reporte valorado');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `inventario_valorado_${date || new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+};
+
+
+
 export const getFinancialReport = (startDate: string, endDate: string, sucursal_id: string = 'all') => {
     const params = new URLSearchParams({ 
         start_date: startDate, 
@@ -51,6 +90,7 @@ export const getFinancialReport = (startDate: string, endDate: string, sucursal_
     return client<any[]>(`/reports/financial-report?${params.toString()}`);
 };
 
+<<<<<<< HEAD
 export const getAnalyticsDashboard = (start_date: string, end_date: string, sucursal_id?: string, time_range?: string, clima_evento?: string) => {
     const params = new URLSearchParams({ start_date, end_date });
     if (sucursal_id) params.append('sucursal_id', sucursal_id);
@@ -113,6 +153,59 @@ export const getDemandPrediction = (predict_days: number = 7, sucursal_id?: stri
 
 export const uploadHistoricalData = (data: { sucursal_id: string, rows: any[] }) => {
     return client<any>('/analytics/import-historical', { method: 'POST', body: data });
+=======
+export const getSalesByHour = (date: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ date });
+    if (sucursal_id) params.append('sucursal_id', sucursal_id);
+    return client<any[]>(`/reports/sales-by-hour?${params.toString()}`);
+};
+
+export const getStaffPerformanceReport = (date?: string, sucursal_id?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (sucursal_id) params.append('sucursal_id', sucursal_id);
+    return client<{
+        cajeros: { 
+            nombre: string; 
+            total_ventas: number; 
+            cantidad_ventas: number;
+            categorias?: { nombre: string; total: number; productos: { nombre: string; cantidad: number; total: number }[] }[];
+        }[];
+        vendedores: { 
+            nombre: string; 
+            total_ventas: number; 
+            cantidad_ventas: number;
+            categorias?: { nombre: string; total: number; productos: { nombre: string; cantidad: number; total: number }[] }[];
+        }[];
+    }>(`/reports/staff-performance?${params.toString()}`);
+};
+
+export const getVentasMatrix = (startDate: string, endDate: string, sucursalId?: string) => {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (sucursalId && sucursalId !== 'all') params.set('sucursal_id', sucursalId);
+    return client<any>(`/reports/sales-matrix?${params.toString()}`);
+};
+
+export const getExpensesReport = (startDate: string, endDate: string, sucursalId?: string, categoriaId?: string) => {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (sucursalId && sucursalId !== 'all') params.set('sucursal_id', sucursalId);
+    if (categoriaId && categoriaId !== 'all') params.set('categoria_id', categoriaId);
+    return client<any>(`/reports/expenses-report?${params.toString()}`);
+};
+
+export const getSalesMatrix = (start_date: string, end_date: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ start_date, end_date });
+    if (sucursal_id && sucursal_id !== 'all') params.append('sucursal_id', sucursal_id);
+    return client<{
+        products: {
+            producto_id: string;
+            descripcion: string;
+            days: Record<string, number>;
+        }[];
+    }>(`/reports/sales-matrix?${params.toString()}`);
+>>>>>>> origin/main
 };
 
 // ─── Sucursales ───────────────────────────────────────────────────────────
@@ -269,10 +362,41 @@ export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: 
 };
 export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>
     client(`/inventario/ajuste?sucursal_id=${sucursal_id}`, { method: 'POST', body: data });
-export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string) => {
+export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
     const params = new URLSearchParams({ sucursal_id });
     if (producto_id) params.set('producto_id', producto_id);
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    if (search) params.set('search', search);
+    if (tipo_movimiento) params.set('tipo_movimiento', tipo_movimiento);
     return client<InventoryLog[]>(`/inventario/movimientos?${params.toString()}`);
+};
+
+export const exportMovimientosInventario = async (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
+    const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
+        ? 'https://sales-system-kappa.vercel.app/api/v1' 
+        : 'http://localhost:8000/api/v1');
+        
+    const params = new URLSearchParams({ sucursal_id });
+    if (producto_id) params.set('producto_id', producto_id);
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    if (search) params.set('search', search);
+    if (tipo_movimiento) params.set('tipo_movimiento', tipo_movimiento);
+    
+    const response = await fetch(`${CACHE_URL}/inventario/movimientos/exportar?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Error al exportar Kardex');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Kardex_${sucursal_id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 };
 
 export const exportInventoryTemplate = async (sucursal_id: string) => {
@@ -403,13 +527,16 @@ export const createEmployee = (data: EmployeeCreate) =>
 
 // ─── Sales ────────────────────────────────────────────────────────────────
 export const createSale = (data: SaleCreate) => client('/sales', { method: 'POST', body: data });
-export const getSales = (sucursal_id?: string, page: number = 1, limit: number = 50, metodo_pago?: string, solo_facturas?: boolean, qr_confirmed?: boolean, estado_pago?: string) => {
+export const getSales = (sucursal_id?: string, page: number = 1, limit: number = 50, metodo_pago?: string, solo_facturas?: boolean, qr_confirmed?: boolean, estado_pago?: string, startDate?: string, endDate?: string, search?: string) => {
     const params = new URLSearchParams();
     if (sucursal_id) params.set('sucursal_id', sucursal_id);
     if (metodo_pago) params.set('metodo_pago', metodo_pago);
     if (solo_facturas) params.set('solo_facturas', 'true');
     if (qr_confirmed !== undefined) params.set('qr_confirmed', String(qr_confirmed));
     if (estado_pago) params.set('estado_pago', estado_pago);
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    if (search) params.set('search', search);
     params.set('page', String(page));
     params.set('limit', String(limit));
     const qs = params.toString();
@@ -419,9 +546,20 @@ export const getSaleStatsToday = (sucursal_id?: string) => {
     const params = new URLSearchParams();
     if (sucursal_id) params.set('sucursal_id', sucursal_id);
     const qs = params.toString();
-    return client<{ today_sales: number; transaction_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
+    return client<{ today_sales: number; transaction_count: number; items_count: number }>(`/sales/stats/today${qs ? '?' + qs : ''}`);
 };
-export const anularSale = (id: string) => client<Sale>(`/sales/${id}/anular`, { method: 'PATCH' });
+export type MotivoAnulacion = 'ERROR_COBRO' | 'DEVOLUCION_CLIENTE' | 'PRODUCTO_DEFECTUOSO' | 'VENTA_DUPLICADA' | 'OTRO';
+export const anularSale = ({ id, motivo, notas, metodo_pago_correcto, afectar_caja = true, caja_sesion_id }: { id: string; motivo: MotivoAnulacion; notas?: string; metodo_pago_correcto?: string; afectar_caja?: boolean; caja_sesion_id?: string }) =>
+    client<Sale>(`/sales/${id}/anular`, { method: 'PATCH', body: { motivo, notas, metodo_pago_correcto, afectar_caja, caja_sesion_id } });
+export const checkPosibleDuplicado = (id: string) =>
+    client<{
+        tiene_duplicado: boolean;
+        candidato_id?: string;
+        candidato_id_corto?: string;
+        candidato_monto?: number;
+        candidato_fecha?: string;
+        candidato_cajero?: string;
+    }>(`/sales/${id}/posible-duplicado`);
 export const toggleFacturaEmitida = (id: string, emitida: boolean) => 
     client<Sale>(`/sales/${id}/factura?emitida=${emitida}`, { method: 'PATCH' });
 export const updateQRInfo = (id: string, qrData: { banco: string; referencia: string; monto_transferido: number }) => 
@@ -434,8 +572,23 @@ export const registrarAbono = (sale_id: string, abono: { metodo: 'EFECTIVO' | 'T
 
 export const getCajaSesionActiva = () =>
     client<CajaSesion | null>('/caja/sesion/activa');
-export const getHistorialCaja = () =>
-    client<CajaSesionResumen[]>('/caja/sesiones');
+export interface PaginatedSesiones {
+    items: CajaSesionResumen[];
+    total: number;
+    page: number;
+    page_size: number;
+}
+
+export const getHistorialCaja = (startDate?: string, endDate?: string, page: number = 1, pageSize: number = 10, sucursalId?: string) => {
+    let url = `/caja/sesiones?page=${page}&page_size=${pageSize}`;
+    if (startDate && endDate) {
+        url += `&start_date=${startDate}&end_date=${endDate}`;
+    }
+    if (sucursalId && sucursalId !== 'all') {
+        url += `&sucursal_id=${sucursalId}`;
+    }
+    return client<PaginatedSesiones>(url);
+};
 export const abrirCaja = (data: AbrirCajaIn) =>
     client<CajaSesion>('/caja/sesion/abrir', { method: 'POST', body: data });
 export const cerrarCaja = (sesionId: string, data: CerrarCajaIn) =>
@@ -451,7 +604,11 @@ export const registrarIngreso = (data: { monto: number; descripcion: string; met
 export const getCategoriasGasto = () =>
     client<CajaGastoCategoria[]>('/caja/categorias-gasto');
 export const createCategoriaGasto = (data: CategoriaGastoIn) =>
-    client<CajaGastoCategoria>('/caja/categorias-gasto', { body: data });
+    client<CajaGastoCategoria>('/caja/categorias-gasto', { method: 'POST', body: data });
+export const updateCategoriaGasto = (id: string, data: CategoriaGastoIn) =>
+    client<CajaGastoCategoria>(`/caja/categorias-gasto/${id}`, { method: 'PUT', body: data });
+export const deleteCategoriaGasto = (id: string) =>
+    client(`/caja/categorias-gasto/${id}`, { method: 'DELETE' });
 
 // ── Descuentos ─────────────────────────────────────────────────────────────
 export const getDescuentos = () =>
@@ -499,6 +656,9 @@ export const deleteCliente = (id: string) =>
     client(`/clientes/${id}`, { method: 'DELETE' });
 
 // ── Listas de Precios ─────────────────────────────────────────────────────
+export const getSesionesCaja = () => client<any[]>(`/caja/sesiones`);
+export const getSesionesAbiertas = () => client<any[]>(`/caja/sesiones/abiertas`);
+export const getSesionActiva = () => client<any>(`/caja/sesion/activa`);
 export const getListasPrecios = () => client<any[]>('/listas-precios');
 export const createListaPrecio = (data: any) => client<any>('/listas-precios', { method: 'POST', body: data });
 export const updateListaPrecio = (id: string, data: any) => client<any>(`/listas-precios/${id}`, { method: 'PUT', body: data });
@@ -508,3 +668,49 @@ export const getListaPreciosItems = (lista_id: string) => client<any[]>(`/listas
 export const addListaPrecioItem = (lista_id: string, data: any) => client<any>(`/listas-precios/${lista_id}/items`, { method: 'POST', body: data });
 export const updateListaPrecioItem = (lista_id: string, item_id: string, data: any) => client<any>(`/listas-precios/${lista_id}/items/${item_id}`, { method: 'PUT', body: data });
 export const deleteListaPrecioItem = (lista_id: string, item_id: string) => client(`/listas-precios/${lista_id}/items/${item_id}`, { method: 'DELETE' });
+
+// ── Gestión de Créditos ───────────────────────────────────────────────────
+export const getCuentasCredito = (q?: string, estado?: string, page: number = 1, limit: number = 50) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (q) params.set('q', q);
+    if (estado) params.set('estado', estado);
+    const qs = params.toString();
+    return client<any>(`/creditos${qs ? '?' + qs : ''}`);
+};
+
+export const getDeudasPorCuenta = (cuenta_id: string, estado?: string) => {
+    const params = new URLSearchParams();
+    if (estado) params.set('estado', estado);
+    const qs = params.toString();
+    return client<any[]>(`/creditos/${cuenta_id}/deudas${qs ? '?' + qs : ''}`);
+};
+
+export const getTransaccionesCuenta = (cuenta_id: string) => {
+    return client<any[]>(`/creditos/${cuenta_id}/transacciones`);
+};
+
+export const registrarAbonosMultiple = (cuenta_id: string, data: { pagos: any[], deuda_id?: string, notas?: string }) => {
+    return client<any>(`/creditos/${cuenta_id}/abonos`, { method: 'POST', body: data });
+};
+
+export const anularAbono = (cuenta_id: string, transaccion_id: string, motivo: string) => {
+    const params = new URLSearchParams({ motivo });
+    return client<any>(`/creditos/${cuenta_id}/transacciones/${transaccion_id}/anular?${params.toString()}`, { method: 'POST' });
+};
+
+// ── Logística B2B y Mermas ────────────────────────────────────────────────
+export const crearMermaReclamo = (sucursal_id: string, supermercado_id: string, data: { items: any[], notas?: string }) => {
+    const params = new URLSearchParams({ sucursal_id, supermercado_id });
+    return client<any>(`/b2b/mermas?${params.toString()}`, { method: 'POST', body: data });
+};
+
+export const getMermasReclamos = (page: number = 1, limit: number = 50, estado?: string, sucursal_id?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (estado) params.set('estado', estado);
+    if (sucursal_id) params.set('sucursal_id', sucursal_id);
+    return client<any>(`/b2b/mermas?${params.toString()}`);
+};
+
+export const compensarMermaReclamo = (merma_id: string) => {
+    return client<any>(`/b2b/mermas/${merma_id}/compensar`, { method: 'POST' });
+};

@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getFinancialReport, getSucursales } from '../api/api';
 import { 
     Loader2, Calendar, Store, TrendingUp, DollarSign, 
-    Download
+    FileDown
 } from 'lucide-react';
+import { getBoliviaTodayISO } from '../utils/dateUtils';
+import { descargarPDFFinanzas } from '../utils/reportPDF';
 
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -14,8 +16,12 @@ import {
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function FinancialDetailView() {
-    const today = new Date().toISOString().split('T')[0];
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = getBoliviaTodayISO();
+    const sevenDaysAgo = (() => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().split('T')[0];
+    })();
     
     const [startDate, setStartDate] = useState(sevenDaysAgo);
     const [endDate, setEndDate] = useState(today);
@@ -32,7 +38,7 @@ export default function FinancialDetailView() {
         enabled: !!startDate && !!endDate
     });
 
-    const totals = report?.reduce((acc, curr) => ({
+    const totals = report?.reduce((acc: any, curr: any) => ({
         total_publico: acc.total_publico + curr.total_publico,
         total_fabrica: acc.total_fabrica + curr.total_fabrica,
         margen_distribuidor: acc.margen_distribuidor + curr.margen_distribuidor,
@@ -82,7 +88,7 @@ export default function FinancialDetailView() {
                             className="w-full bg-gray-50 border border-gray-100 rounded-xl py-2 pl-10 pr-4 text-sm font-bold text-gray-700 outline-none appearance-none focus:ring-2 focus:ring-indigo-500/20"
                         >
                             <option value="all">Todas las Sucursales</option>
-                            {sucursales?.map(s => (
+                            {sucursales?.map((s: any) => (
                                 <option key={s._id} value={s._id}>{s.nombre}</option>
                             ))}
                         </select>
@@ -90,10 +96,16 @@ export default function FinancialDetailView() {
                 </div>
 
                 <button 
-                    onClick={() => window.print()}
-                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                    onClick={() => {
+                        if (report && totals) {
+                            const sucNombre = selectedSucursal === 'all' ? 'Todas las Sucursales' : (sucursales?.find((s: any) => s._id === selectedSucursal)?.nombre || selectedSucursal);
+                            descargarPDFFinanzas(report, totals, startDate, endDate, sucNombre);
+                        }
+                    }}
+                    disabled={!report}
+                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50"
                 >
-                    <Download size={18} /> Exportar PDF
+                    <FileDown size={18} /> Descargar PDF
                 </button>
             </div>
 
@@ -210,7 +222,7 @@ export default function FinancialDetailView() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {report?.map((row, i) => (
+                                    {report?.map((row: any, i: number) => (
                                         <tr key={i} className="hover:bg-indigo-50/30 transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-2">
@@ -237,12 +249,12 @@ export default function FinancialDetailView() {
                                 {report && report.length > 0 && (
                                     <tfoot>
                                         <tr className="bg-gray-900 text-white font-black uppercase tracking-tighter shadow-inner">
-                                            <td colSpan={2} className="px-6 py-5 rounded-bl-3xl">TOTALES DEL PERIODO</td>
+                                            <td colSpan={2} className="px-6 py-5 rounded-bl-[32px]">TOTALES DEL PERIODO</td>
                                             <td className="px-6 py-5 text-right">{formatBs(totals?.total_publico)}</td>
                                             <td className="px-6 py-5 text-right text-gray-400 font-bold">{formatBs(totals?.total_fabrica)}</td>
                                             <td className="px-6 py-5 text-right text-emerald-400">{formatBs(totals?.margen_distribuidor)}</td>
                                             <td className="px-6 py-5 text-right text-blue-400">{formatBs(totals?.margen_retail)}</td>
-                                            <td className="px-6 py-5 text-right text-indigo-400 rounded-br-3xl">{formatBs(totals?.margen_total)}</td>
+                                            <td className="px-6 py-5 text-right text-indigo-400 rounded-br-[32px]">{formatBs(totals?.margen_total)}</td>
                                         </tr>
                                     </tfoot>
                                 )}
@@ -253,7 +265,7 @@ export default function FinancialDetailView() {
                     {/* ── Footer / Printing Disclaimer ──────────────────────── */}
                     <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 flex items-center gap-4 text-indigo-700 text-sm italic font-medium">
                         <div className="p-2 bg-white rounded-full"><DollarSign size={20} /></div>
-                        El Margen Retail se calcula como: [Venta Público] - ([Costo Fábrica] * 1.15). El Margen Distribuidor es el 15% retenido sobre el precio de fábrica. El Margen Total es la utilidad bruta proyectada del periodo.
+                        El Margen Retail se calcula como: [Venta Público] - [Costo Fábrica]. El Margen Distribuidor (Utilidad 15%) es el 15% sobre el precio de fábrica. El Margen Total es la suma de ambos márgenes.
                     </div>
                 </div>
             )}

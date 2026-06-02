@@ -63,6 +63,8 @@ export interface ResumenCaja {
     total_ingresos_efectivo: number;
     total_ingresos_qr: number;
     total_ingresos_tarjeta: number;
+    // discounts
+    total_descuentos?: number;
     // grand total
     total_ventas_general: number;
     num_transacciones: number;
@@ -78,12 +80,14 @@ export interface CajaSesionResumen {
     monto_inicial: number;
     saldo_calculado: number;
     total_efectivo: number;
+    total_ingresos_ef?: number;
     total_cambio: number;
     total_gastos: number;
     total_ajustes?: number;
     total_qr: number;
     total_tarjeta: number;
     total_ventas: number;
+    total_descuentos?: number;
     num_transacciones: number;
     monto_cierre_fisico?: number;
     diferencia?: number;
@@ -207,9 +211,9 @@ export function useCrearCategoriaGasto() {
     });
 }
 
-export function useHistorialCaja() {
+export function useHistorialCaja(startDate?: string, endDate?: string, page: number = 1, pageSize: number = 10) {
     return useQuery({
-        queryKey: ['caja-historial'],
-        queryFn: getHistorialCaja,
+        queryKey: ['caja-historial', startDate, endDate, page, pageSize],
+        queryFn: () => getHistorialCaja(startDate, endDate, page, pageSize),
     });
 }

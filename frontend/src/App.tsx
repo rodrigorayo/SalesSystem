@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
@@ -8,6 +8,7 @@ import TenantDashboard from './pages/TenantDashboard';
 import SucursalesPage from './pages/SucursalesPage';
 import CatalogoPage from './pages/CatalogoPage';
 import InventarioPage from './pages/InventarioPage';
+import InventarioTrasladosPage from './pages/InventarioTrasladosPage';
 import PedidosPage from './pages/PedidosPage';
 import POSPage from './pages/POSPage';
 import CajaPage from './pages/CajaPage';
@@ -20,24 +21,77 @@ import ControlQRPage from './pages/ControlQRPage';
 import PriceRequestsPage from './pages/PriceRequestsPage';
 import ReportsPage from './pages/ReportsPage';
 import CreditosPage from './pages/CreditosPage';
+<<<<<<< HEAD
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
+=======
+import ClientesPage from './pages/ClientesPage';
+import ReclamosFabrica from './pages/b2b/ReclamosFabrica';
+import ComunidadPage from './pages/ComunidadPage';
+>>>>>>> origin/main
 import { useAuthStore } from './store/authStore';
+import { getMyFeatures } from './api/api';
 import { Toaster } from 'sonner';
+<<<<<<< HEAD
 import ChatbotAnalitico from './components/ChatbotAnalitico';
+=======
+import { ErrorModalProvider, useErrorModal } from './components/ErrorModal';
+>>>>>>> origin/main
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
-// ─── Route Guard ─────────────────────────────────────────────────────────────
+/**
+ * Bridges the imperative window CustomEvent from client.ts
+ * into the React ErrorModal context — keeping concerns separated.
+ */
+function ErrorEventBridge() {
+  const { showError } = useErrorModal();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { message, statusCode, retryFn } = (e as CustomEvent).detail;
+      showError(message, { statusCode, retryFn });
+    };
+    window.addEventListener('api:critical-error', handler);
+    return () => window.removeEventListener('api:critical-error', handler);
+  }, [showError]);
+  return null;
+}
+
+/**
+ * Carga los feature flags del tenant al iniciar la app (si hay sesión activa).
+ * Se ejecuta una sola vez por sesión, persistido en el store.
+ */
+function FeaturesFetcher() {
+  const { isAuthenticated, setFeatures, features } = useAuthStore();
+
+  useEffect(() => {
+    // Solo cargar si está autenticado y aún no tiene features cargados
+    if (!isAuthenticated()) return;
+    if (features.length > 0) return;
+
+    getMyFeatures()
+      .then(res => setFeatures(res.features, res.plan_name))
+      .catch(() => {
+        // Error de red → ignorar, el fallback en hasFeature() retorna true
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated()]);
+
+  return null;
+}
+
+// ─── Route Guard (autenticación + rol) ───────────────────────────────────────
 const ProtectedRoute = ({
   children,
   allowedRoles,
+  requiredFeature,
 }: {
   children: React.ReactNode;
   allowedRoles?: string[];
+  requiredFeature?: string;
 }) => {
-  const { isAuthenticated, role } = useAuthStore();
+  const { isAuthenticated, role, hasFeature } = useAuthStore();
 
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
 
@@ -46,7 +100,13 @@ const ProtectedRoute = ({
     if (['ADMIN_MATRIZ', 'ADMIN'].includes(role)) return <Navigate to="/inteligencia" replace />;
     if (role === 'ADMIN_SUCURSAL') return <Navigate to="/dashboard-sucursal" replace />;
     if (['SUPERVISOR', 'VENDEDOR'].includes(role)) return <Navigate to="/inventario" replace />;
+    if (role === 'FACTURADOR') return <Navigate to="/ventas" replace />;
     return <Navigate to="/pos" replace />;
+  }
+
+  // Verificar feature flag si se especificó
+  if (requiredFeature && !hasFeature(requiredFeature)) {
+    return <Navigate to="/" replace />;
   }
 
   return children;
@@ -59,6 +119,7 @@ const DashboardDispatch = () => {
   if (['ADMIN_MATRIZ', 'ADMIN'].includes(role ?? '')) return <Navigate to="/inteligencia" replace />;
   if (role === 'ADMIN_SUCURSAL') return <Navigate to="/dashboard-sucursal" replace />;
   if (['SUPERVISOR', 'VENDEDOR'].includes(role ?? '')) return <Navigate to="/inventario" replace />;
+  if (role === 'FACTURADOR') return <Navigate to="/ventas" replace />;
   return <Navigate to="/pos" replace />;
 };
 
@@ -70,8 +131,11 @@ const ALL_STAFF = ['ADMIN_MATRIZ', 'ADMIN_SUCURSAL', 'CAJERO', 'ADMIN', 'USER', 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" richColors theme="light" />
+      <ErrorModalProvider>
+        <ErrorEventBridge />
+        <Toaster position="top-right" richColors theme="light" />
       <BrowserRouter>
+        <FeaturesFetcher />
         <Routes>
           {/* 1. Ruta de Login fuera del Layout */}
           <Route path="/login" element={<LoginPage />} />
@@ -95,7 +159,7 @@ function App() {
                 } />
 
                 <Route path="/reportes" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={BRANCH_ROLES} requiredFeature="REPORTES_AVANZADOS">
                     <ReportsPage />
                   </ProtectedRoute>
                 } />
@@ -107,7 +171,7 @@ function App() {
                 } />
 
                 <Route path="/sucursales" element={
-                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES} requiredFeature="MULTI_SUCURSAL">
                     <SucursalesPage />
                   </ProtectedRoute>
                 } />
@@ -119,59 +183,111 @@ function App() {
                 } />
 
                 <Route path="/catalogo" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="INVENTARIO">
                     <CatalogoPage />
                   </ProtectedRoute>
                 } />
 
                 <Route path="/inventario" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="INVENTARIO">
                     <InventarioPage />
                   </ProtectedRoute>
                 } />
 
+<<<<<<< HEAD
+=======
+                {/* Traslados de Inventario */}
+                <Route path="/traslados" element={
+                  <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES} requiredFeature="INVENTARIO">
+                    <InventarioTrasladosPage />
+                  </ProtectedRoute>
+                } />
+
+                {/* B2B Orders */}
+>>>>>>> origin/main
                 <Route path="/pedidos" element={
-                  <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES}>
+                  <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES} requiredFeature="PEDIDOS_INTERNOS">
                     <PedidosPage />
                   </ProtectedRoute>
                 } />
 
+<<<<<<< HEAD
+=======
+                {/* Historial de Ventas */}
+>>>>>>> origin/main
                 <Route path="/ventas" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={[...ALL_STAFF, 'FACTURADOR']} requiredFeature="VENTAS">
                     <VentasPage />
                   </ProtectedRoute>
                 } />
 
                 <Route path="/qr-control" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CONTROL_QR">
                     <ControlQRPage />
                   </ProtectedRoute>
                 } />
 
+<<<<<<< HEAD
+=======
+                {/* Créditos */}
+>>>>>>> origin/main
                 <Route path="/creditos" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CREDITOS">
                     <CreditosPage />
                   </ProtectedRoute>
                 } />
 
+<<<<<<< HEAD
+=======
+                {/* Clientes */}
+                <Route path="/clientes" element={
+                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                    <ClientesPage />
+                  </ProtectedRoute>
+                } />
+
+                {/* B2B / Reclamos Fábrica */}
+                <Route path="/b2b/mermas" element={
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                    <ReclamosFabrica />
+                  </ProtectedRoute>
+                } />
+
+                {/* Comunidad FEXCO */}
+                <Route path="/comunidad" element={
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                    <ComunidadPage />
+                  </ProtectedRoute>
+                } />
+
+                {/* Descuentos */}
+>>>>>>> origin/main
                 <Route path="/descuentos" element={
-                  <ProtectedRoute allowedRoles={BRANCH_ROLES}>
+                  <ProtectedRoute allowedRoles={BRANCH_ROLES} requiredFeature="DESCUENTOS_AVANZADOS">
                     <DescuentosPage />
                   </ProtectedRoute>
                 } />
 
                 <Route path="/solicitudes-precio" element={
-                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES} requiredFeature="LISTAS_PRECIOS">
                     <PriceRequestsPage />
                   </ProtectedRoute>
                 } />
 
+<<<<<<< HEAD
+=======
+                {/* Categories (parte de INVENTARIO) */}
+>>>>>>> origin/main
                 <Route path="/categories" element={
-                  <ProtectedRoute allowedRoles={MATRIZ_ROLES}>
+                  <ProtectedRoute allowedRoles={MATRIZ_ROLES} requiredFeature="INVENTARIO">
                     <CategoriesPage />
                   </ProtectedRoute>
                 } />
 
+<<<<<<< HEAD
+=======
+                {/* Users */}
+>>>>>>> origin/main
                 <Route path="/usuarios" element={
                   <ProtectedRoute allowedRoles={MOBILE_MANAGEMENT_ROLES}>
                     <UsersPage />
@@ -179,13 +295,13 @@ function App() {
                 } />
 
                 <Route path="/caja" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CAJA">
                     <CajaPage />
                   </ProtectedRoute>
                 } />
 
                 <Route path="/pos" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="VENTAS">
                     <POSPage />
                   </ProtectedRoute>
                 } />
@@ -196,6 +312,7 @@ function App() {
         {/* Chatbot siempre visible pero fuera del sistema de rutas */}
         <ChatbotAnalitico />
       </BrowserRouter>
+      </ErrorModalProvider>
     </QueryClientProvider>
   );
 }

@@ -19,3 +19,5 @@ requests-cache
 retry-requests
 langchain-google-genai
 langchain-experimental
+slowapi
+httpx

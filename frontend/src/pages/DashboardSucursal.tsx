@@ -55,7 +55,12 @@ export default function DashboardSucursal() {
                     </div>
                     <div>
                         <p className="text-sm font-medium text-gray-500">Transacciones</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{stats?.transaction_count || 0}</h3>
+                        <h3 className="text-2xl font-bold text-gray-900">
+                            {stats?.transaction_count || 0}
+                            <span className="text-xs font-medium text-gray-400 ml-2 font-sans tracking-normal">
+                                ({stats?.items_count || 0} ítems)
+                            </span>
+                        </h3>
                     </div>
                 </div>
 

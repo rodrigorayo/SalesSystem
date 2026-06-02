@@ -1,4 +1,4 @@
-export type UserRole = 'SUPERADMIN' | 'ADMIN_MATRIZ' | 'ADMIN' | 'USER' | 'ADMIN_SUCURSAL' | 'CAJERO' | 'SUPERVISOR' | 'VENDEDOR';
+export type UserRole = 'SUPERADMIN' | 'ADMIN_MATRIZ' | 'ADMIN' | 'USER' | 'ADMIN_SUCURSAL' | 'CAJERO' | 'SUPERVISOR' | 'VENDEDOR' | 'FACTURADOR';
 
 export interface User {
     _id: string;
@@ -7,26 +7,27 @@ export interface User {
     full_name?: string;
     tenant_id?: string;
     sucursal_id?: string;
+    is_active?: boolean;
 }
 
 export interface Tenant {
     _id: string;
     name: string;
-    plan: 'BASIC' | 'PRO';
+    plan: string;
     is_active: boolean;
     created_at: string;
 }
 
 export interface TenantCreate {
     name: string;
-    plan: 'BASIC' | 'PRO';
+    plan: string;
     admin_username: string;
     admin_password: string;
 }
 
 export interface TenantUpdate {
     name?: string;
-    plan?: 'BASIC' | 'PRO';
+    plan?: string;
     is_active?: boolean;
 }
 
@@ -59,6 +60,7 @@ export interface Product {
     codigo_sistema?: string;
     codigo_largo?: string;
     codigo_corto?: string;
+    proveedor?: string;
     descripcion: string;          // product name
     categoria_id: string;
     categoria_nombre?: string;    // resolved at query time
@@ -76,6 +78,7 @@ export interface ProductCreate {
     costo_producto?: number;
     codigo_largo?: string;
     codigo_corto?: string;
+    proveedor?: string;
     image_url?: string;
     precios_sucursales?: Record<string, number>;
 }
@@ -111,6 +114,8 @@ export interface InventoryLog {
     stock_resultante: number;
     usuario_nombre: string;
     notas: string;
+    costo_unitario_momento?: number;
+    precio_venta_momento?: number;
     created_at: string;
 }
 
@@ -118,6 +123,7 @@ export interface PedidoItem {
     producto_id: string;
     producto_nombre: string;
     descripcion?: string;
+    nombre?: string;
     cantidad: number;
     precio_mayorista: number;
 }
@@ -217,7 +223,7 @@ export interface EmployeeCreate {
     email: string;
     password: string;
     full_name: string;
-    role?: 'CAJERO' | 'SUPERVISOR' | 'VENDEDOR';
+    role?: 'CAJERO' | 'SUPERVISOR' | 'VENDEDOR' | 'FACTURADOR';
 }
 
 export interface CartItem {
@@ -231,6 +237,16 @@ export interface SaleCreate {
     payment_method: 'EFECTIVO' | 'TARJETA' | 'QR' | 'CREDITO';
     cashier_name: string;
     sucursal_id?: string;
+    cliente_id?: string;
+    cliente?: {
+        nit?: string;
+        razon_social?: string;
+        email?: string;
+        telefono?: string;
+        es_factura: boolean;
+    };
+    vendedor_id?: string;
+    vendedor_name?: string;
 }
 
 export interface PagoItem {
@@ -302,6 +318,8 @@ export interface Sale {
     qr_info?: QRInfo;
     cashier_id: string;
     cashier_name: string;
+    vendedor_id?: string;
+    vendedor_name?: string;
     anulada: boolean;
     estado_pago?: 'PAGADO' | 'PENDIENTE' | 'PARCIAL';
     factura_emitida?: boolean;

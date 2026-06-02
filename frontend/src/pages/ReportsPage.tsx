@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getGeneralReports } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     BarChart3, Loader2, DollarSign, Package, TrendingUp, Calendar, 
-    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText
+    AlertTriangle, ShoppingBag, Store, Layers, Building2, FileText, Clock, Users, Scale, Wallet
 } from 'lucide-react';
 import DailyReportView from '../components/DailyReportView';
 import FinancialDetailView from '../components/FinancialDetailView';
+import ValuedInventoryView from '../components/ValuedInventoryView';
+import HourlySalesView from '../components/HourlySalesView';
+import StaffPerformanceView from '../components/StaffPerformanceView';
+import SalesMatrixView from '../components/SalesMatrixView';
+import InventoryReconciliationView from '../components/InventoryReconciliationView';
+import ExpensesReportView from '../components/ExpensesReportView';
+import CashSalesSummaryView from '../components/CashSalesSummaryView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, BarChart, Bar, Legend
@@ -21,15 +28,19 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado' | 'matrix' | 'conciliacion' | 'gastos' | 'caja_ventas';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
-    const [days, setDays] = useState(30);
-    const [activeTab, setActiveTab] = useState<TabType>(
-        role === 'ADMIN_SUCURSAL' ? 'daily' : 'general'
-    );
-    const [selectedSucursal, setSelectedSucursal] = useState<string>('all');
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    const days = parseInt(searchParams.get('days') || '30', 10);
+    const activeTab = (searchParams.get('tab') as TabType) || (role === 'ADMIN_SUCURSAL' ? 'daily' : 'general');
+    const selectedSucursal = searchParams.get('sucursal') || 'all';
+
+    const setDays = (val: number) => { const p = new URLSearchParams(searchParams); p.set('days', val.toString()); setSearchParams(p); };
+    const setActiveTab = (val: TabType) => { const p = new URLSearchParams(searchParams); p.set('tab', val); setSearchParams(p); };
+    const setSelectedSucursal = (val: string) => { const p = new URLSearchParams(searchParams); p.set('sucursal', val); setSearchParams(p); };
 
     const { data: reporte, isLoading, isError } = useQuery({
         queryKey: ['reports', days],
@@ -90,7 +101,14 @@ export default function ReportsPage() {
                     { id: 'general', label: 'Visión General', icon: <TrendingUp size={16} />, hidden: !esMatriz },
                     { id: 'sucursales', label: 'Rendimiento Sucursales', icon: <Store size={16} />, hidden: !esMatriz },
                     { id: 'finanzas', label: 'Finanzas y Márgenes', icon: <DollarSign size={16} />, hidden: !esMatriz },
+                    { id: 'conciliacion', label: 'Auditoría', icon: <Scale size={16} />, hidden: !esMatriz },
                     { id: 'daily', label: 'Reporte de Jornada', icon: <FileText size={16} /> },
+                    { id: 'hourly', label: 'Ventas por Hora', icon: <Clock size={16} /> },
+                    { id: 'staff', label: 'Desempeño Staff', icon: <Users size={16} /> },
+                    { id: 'matrix', label: 'Matriz de Ventas', icon: <BarChart3 size={16} /> },
+                    { id: 'caja_ventas', label: 'Ventas por Caja', icon: <Wallet size={16} /> },
+                    { id: 'inventario_valorado', label: 'Inventario Valorado', icon: <Package size={16} /> },
+                    { id: 'gastos', label: 'Gastos', icon: <DollarSign size={16} /> },
                 ].filter(t => !t.hidden).map((tab) => (
                     <button
                         key={tab.id}
@@ -111,6 +129,20 @@ export default function ReportsPage() {
                 <DailyReportView />
             ) : activeTab === 'finanzas' ? (
                 <FinancialDetailView />
+            ) : activeTab === 'inventario_valorado' ? (
+                <ValuedInventoryView />
+            ) : activeTab === 'hourly' ? (
+                <HourlySalesView />
+            ) : activeTab === 'staff' ? (
+                <StaffPerformanceView />
+            ) : activeTab === 'matrix' ? (
+                <SalesMatrixView />
+            ) : activeTab === 'conciliacion' ? (
+                <InventoryReconciliationView />
+            ) : activeTab === 'gastos' ? (
+                <ExpensesReportView />
+            ) : activeTab === 'caja_ventas' ? (
+                <CashSalesSummaryView />
             ) : (
                 <>
                     {isLoading ? (

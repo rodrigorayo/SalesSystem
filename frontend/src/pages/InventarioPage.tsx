@@ -1,17 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories } from '../api/api';
+import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet, Printer } from 'lucide-react';
+import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 
-const formatDate = (dateStr: string) => {
-    const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
-    return new Date(isoStr).toLocaleString();
-};
+import { formatFullDate as formatDate } from '../utils/dateUtils';
+
 
 export default function InventarioPage() {
     const { user } = useAuthStore();
@@ -26,6 +24,12 @@ export default function InventarioPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [categorySearch, setCategorySearch] = useState('');
     const [stockBajoOnly, setStockBajoOnly] = useState<boolean>(false);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [tipoMovimiento, setTipoMovimiento] = useState('');
+    const [kardexProductoId, setKardexProductoId] = useState<string | undefined>(undefined);
+    const [kardexProductoNombre, setKardexProductoNombre] = useState<string | null>(null);
+
 
     const { data: sucursales = [] } = useQuery({
         queryKey: ['sucursales'],
@@ -67,8 +71,8 @@ export default function InventarioPage() {
     const totalItemsStock = invData?.total || 0;
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
-        queryKey: ['movimientos', selectedSucursal],
-        queryFn: () => getMovimientosInventario(selectedSucursal),
+        queryKey: ['movimientos', selectedSucursal, startDate, endDate, debouncedSearch, kardexProductoId, tipoMovimiento],
+        queryFn: () => getMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined),
         enabled: tab === 'kardex',
     });
 
@@ -83,9 +87,9 @@ export default function InventarioPage() {
     }, [searchTerm, selectedSucursal, tab, selectedCategory, stockBajoOnly]);
 
     const filteredMovs = useMemo(() => {
-        if (!debouncedSearch) return movimientos;
-        return movimientos.filter(m => m.producto_nombre?.toLowerCase().includes(debouncedSearch.toLowerCase()));
-    }, [movimientos, debouncedSearch]);
+        // El filtrado ya se hace principalmente en el backend ahora, pero mantenemos esto por si acaso o para refinamiento extra
+        return movimientos;
+    }, [movimientos]);
 
     const paginatedMovs = useMemo(() => {
         const startIndex = (currentPageKardex - 1) * ITEMS_PER_PAGE;
@@ -157,7 +161,66 @@ export default function InventarioPage() {
                                 ⚠️ <span className="hidden sm:inline">Solo Stock Bajo</span>
                             </button>
                         )}
+                        {tab === 'kardex' && (
+                            <div className="flex flex-wrap items-center bg-gray-50 rounded-xl border border-gray-100 p-1 shadow-inner gap-1">
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
+                                    title="Fecha Inicio"
+                                />
+                                <span className="text-gray-400 text-[10px] my-auto px-1">a</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-700 outline-none w-[115px]"
+                                    title="Fecha Fin"
+                                />
+                                {(startDate || endDate || kardexProductoId || tipoMovimiento) && (
+                                    <button 
+                                        onClick={() => { setStartDate(''); setEndDate(''); setKardexProductoId(undefined); setKardexProductoNombre(null); setSearchTerm(''); setTipoMovimiento(''); }}
+                                        className="ml-1 p-1 text-red-500 hover:bg-red-50 rounded-md"
+                                        title="Limpiar Filtros"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {tab === 'kardex' && (
+                            <div className="w-36">
+                                <select
+                                    value={tipoMovimiento}
+                                    onChange={e => setTipoMovimiento(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-xl px-2 py-2.5 outline-none transition-all text-[11px] font-bold text-gray-700 shadow-inner"
+                                >
+                                    <option value="">Todos los Movimientos</option>
+                                    <option value="VENTA">Solo Ventas</option>
+                                    <option value="ENTRADA_MANUAL">Entradas</option>
+                                    <option value="SALIDA_MANUAL">Salidas / Mermas</option>
+                                    <option value="TRASLADO">Traslados</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
+
+                    {tab === 'kardex' && kardexProductoNombre && (
+                        <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <History size={16} className="text-indigo-600" />
+                                <span className="text-xs font-bold text-indigo-900">Mostrando historial de: <span className="uppercase">{kardexProductoNombre}</span></span>
+                            </div>
+                            <button 
+                                onClick={() => { setKardexProductoId(undefined); setKardexProductoNombre(null); }}
+                                className="text-xs font-bold text-indigo-600 hover:underline"
+                            >
+                                Ver todos los productos
+                            </button>
+                        </div>
+                    )}
+
 
                     {/* Tabs e Importar */}
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -185,6 +248,26 @@ export default function InventarioPage() {
                                 <FileSpreadsheet size={16} />
                                 Importar Excel
                             </button>
+                        )}
+                        {tab === 'kardex' && (
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => exportMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined)}
+                                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap"
+                                    title="Exportar a Excel"
+                                >
+                                    <FileSpreadsheet size={16} />
+                                    <span>Excel</span>
+                                </button>
+                                <button 
+                                    onClick={() => window.print()}
+                                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap"
+                                    title="Imprimir PDF"
+                                >
+                                    <Printer size={16} />
+                                    <span>PDF</span>
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -321,6 +404,19 @@ export default function InventarioPage() {
                                                                     <Tag size={12} />
                                                                 </button>
                                                             )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setKardexProductoId(item.producto_id);
+                                                                    setKardexProductoNombre(item.producto_nombre);
+                                                                    setTab('kardex');
+                                                                    setStartDate('');
+                                                                    setEndDate('');
+                                                                }}
+                                                                className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 text-[10px] font-bold uppercase rounded-md transition-colors border border-gray-200"
+                                                                title="Ver Historial (Kárdex)"
+                                                            >
+                                                                <History size={12} />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 )}
@@ -354,6 +450,8 @@ export default function InventarioPage() {
                                     <th className="px-3 py-2">Tipo Mov.</th>
                                     <th className="px-3 py-2 text-right">Cantidad</th>
                                     <th className="px-3 py-2 text-right">Stock Final</th>
+                                    <th className="px-3 py-2 text-right">P/C Unit.</th>
+                                    <th className="px-3 py-2 text-right">Valor Total Mov.</th>
                                     <th className="px-3 py-2">Usuario / Notas</th>
                                 </tr>
                             </thead>
@@ -399,10 +497,20 @@ export default function InventarioPage() {
                                                 <td className="px-3 py-2 text-right font-black font-mono text-gray-900">
                                                     {mov.stock_resultante}
                                                 </td>
-                                                <td className="px-3 py-2">
-                                                    <div className="text-gray-900 font-semibold">{mov.usuario_nombre}</div>
-                                                    {mov.notas && <div className="text-[10px] text-gray-500 mt-0.5 max-w-[200px] truncate" title={mov.notas}>{mov.notas}</div>}
+                                                <td className="px-3 py-2 text-right font-mono text-gray-600">
+                                                    {mov.tipo_movimiento.includes('VENTA') ? 
+                                                        <span title="Precio Venta">Bs. {mov.precio_venta_momento?.toFixed(2) || '0.00'}</span> : 
+                                                        <span title="Costo Unitario">Bs. {mov.costo_unitario_momento?.toFixed(2) || '0.00'}</span>
+                                                    }
                                                 </td>
+                                                <td className={`px-3 py-2 text-right font-black font-mono ${isPos ? 'text-green-600' : isNeg ? 'text-red-500' : 'text-gray-900'}`}>
+                                                    {isPos ? '+' : ''} Bs. {(Math.abs(mov.cantidad_movida) * (mov.tipo_movimiento.includes('VENTA') ? (mov.precio_venta_momento || 0) : (mov.costo_unitario_momento || 0))).toFixed(2)}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <div className="text-gray-900 font-semibold text-[11px]">{mov.usuario_nombre}</div>
+                                                    {mov.notas && <div className="text-[9px] text-gray-500 mt-0.5 max-w-[200px] truncate" title={mov.notas}>{mov.notas}</div>}
+                                                </td>
+
                                             </tr>
                                         )
                                     })

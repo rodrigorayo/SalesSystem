@@ -1,12 +1,17 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from bson import ObjectId
+from typing import Annotated
+from pydantic import BeforeValidator
 
-from app.models.cliente import Cliente
-from app.models.user import User
-from app.auth import get_current_active_user
+# Helper to capture ObjectId and convert to string for the API response
+PyObjectId = Annotated[str, BeforeValidator(str)]
+
+from app.domain.models.cliente import Cliente
+from app.domain.models.user import User
+from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -30,7 +35,7 @@ class ClienteUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class ClienteResponse(BaseModel):
-    id: str = Field(..., alias="_id")
+    id: PyObjectId = Field(..., alias="_id")
     tenant_id: str
     nombre: str
     telefono: Optional[str] = None
@@ -45,9 +50,7 @@ class ClienteResponse(BaseModel):
     is_active: bool
     created_at: datetime
     
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str, datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(populate_by_name=True)
 
 
 @router.get("/clientes", response_model=List[ClienteResponse])
@@ -60,27 +63,24 @@ async def listar_clientes(
     tenant_id = current_user.tenant_id or "default"
     filters = [Cliente.tenant_id == tenant_id, Cliente.is_active == True]
     
-    # Or query equivalent done with beanie:
-    if q:
+    if q and q.strip():
         import re
-        pattern = re.compile(q, re.IGNORECASE)
-        # Beanie motor raw query fallback for $or regex
-        query = {
-            "tenant_id": tenant_id,
-            "is_active": True,
-            "$or": [
-                {"nombre": {"$regex": pattern}},
-                {"nit_ci": {"$regex": pattern}},
-                {"telefono": {"$regex": pattern}}
-            ]
-        }
-        clientes_cursor = Cliente.find(query)
-    else:
-        clientes_cursor = Cliente.find(*filters)
+        from beanie.operators import Or, RegEx
         
-    clientes = await clientes_cursor.skip(skip).limit(limit).sort("-created_at").to_list()
+        # Escapar caracteres especiales para evitar errores de regex y permitir búsqueda literal
+        safe_q = re.escape(q.strip())
+        
+        # Filtro de búsqueda por nombre, nit o teléfono
+        search_filter = Or(
+            RegEx(Cliente.nombre, safe_q, options="i"),
+            RegEx(Cliente.nit_ci, safe_q, options="i"),
+            RegEx(Cliente.telefono, safe_q, options="i")
+        )
+        filters.append(search_filter)
+        
+    clientes = await Cliente.find(*filters).skip(skip).limit(limit).sort("-created_at").to_list()
     
-    return [c.model_dump(by_alias=True) for c in clientes]
+    return clientes
 
 
 @router.post("/clientes", response_model=ClienteResponse)
@@ -107,7 +107,7 @@ async def crear_cliente(
         lista_precio_id=data.lista_precio_id
     )
     await cliente.create()
-    return cliente.model_dump(by_alias=True)
+    return cliente
 
 
 @router.get("/clientes/{cliente_id}", response_model=ClienteResponse)
@@ -118,7 +118,7 @@ async def obtener_cliente(
     cliente = await Cliente.get(cliente_id)
     if not cliente or cliente.tenant_id != (current_user.tenant_id or "default"):
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    return cliente.model_dump(by_alias=True)
+    return cliente
 
 
 @router.put("/clientes/{cliente_id}", response_model=ClienteResponse)
@@ -143,7 +143,7 @@ async def actualizar_cliente(
         setattr(cliente, field, value)
         
     await cliente.save()
-    return cliente.model_dump(by_alias=True)
+    return cliente
 
 
 @router.delete("/clientes/{cliente_id}")

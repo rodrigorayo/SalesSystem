@@ -4,8 +4,11 @@ import { getDailyReport, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { 
     Calendar, Loader2, TrendingUp, Wallet, 
-    ShoppingBag, Ban, ArrowDownCircle, Printer, Package
+    ShoppingBag, Ban, ArrowDownCircle, Printer, Package, FileDown, Tag, Coins
 } from 'lucide-react';
+import { getBoliviaTodayISO, formatFullDate } from '../utils/dateUtils';
+import { descargarPDFJornada } from '../utils/reportPDF';
+
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -13,7 +16,8 @@ export default function DailyReportView() {
     const { user, role } = useAuthStore();
     const esMatriz = ['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '');
     
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(getBoliviaTodayISO());
+
     const [selectedSucursal, setSelectedSucursal] = useState(user?.sucursal_id || 'CENTRAL');
 
     const { data: sucursales = [] } = useQuery({
@@ -28,6 +32,11 @@ export default function DailyReportView() {
     });
 
     const handlePrint = () => window.print();
+    const handleDownloadPDF = () => {
+        if (!report) return;
+        const sucNombre = sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal;
+        descargarPDFJornada(report, selectedDate, sucNombre);
+    };
 
     if (isLoading) return (
         <div className="flex flex-col items-center justify-center py-20">
@@ -64,18 +73,27 @@ export default function DailyReportView() {
                         <select 
                             value={selectedSucursal}
                             onChange={(e) => setSelectedSucursal(e.target.value)}
-                            className="bg-gray-50 border-transparent focus:ring-2 focus:ring-indigo-200 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-all"
+                            className="bg-gray-50 text-gray-900 border-transparent focus:ring-2 focus:ring-indigo-200 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-all"
                         >
                             {sucursales.map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
                         </select>
                     )}
                 </div>
-                <button 
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200"
-                >
-                    <Printer size={18} /> Imprimir Reporte
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                    >
+                        <Printer size={16} /> Imprimir
+                    </button>
+                    <button 
+                        onClick={handleDownloadPDF}
+                        disabled={!report}
+                        className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200 disabled:opacity-50"
+                    >
+                        <FileDown size={16} /> Descargar PDF
+                    </button>
+                </div>
             </div>
 
             {/* Print Header (Only visible when printing) */}
@@ -84,8 +102,9 @@ export default function DailyReportView() {
                 <p className="text-lg font-bold text-gray-700">Sucursal: {sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal}</p>
                 <div className="flex justify-center gap-8 mt-4 text-sm font-bold">
                     <span>Fecha: {selectedDate}</span>
-                    <span>Generado: {new Date().toLocaleString()}</span>
+                    <span>Generado: {formatFullDate(new Date())}</span>
                 </div>
+
             </div>
 
             {/* KPIs Grid */}
@@ -155,6 +174,18 @@ export default function DailyReportView() {
                         <div className="pt-4 border-t border-dashed border-gray-200 flex justify-between">
                             <span className="font-bold text-red-500 text-sm flex items-center gap-1.5"><Ban size={14}/> Ventas Anuladas</span>
                             <span className="font-black text-red-600">{formatBs(resumen_ventas.anuladas.monto)} ({resumen_ventas.anuladas.cantidad})</span>
+                        </div>
+                        <div className="pt-2 flex justify-between">
+                            <span className="font-bold text-orange-500 text-sm flex items-center gap-1.5"><Tag size={14}/> Descuentos Otorgados</span>
+                            <span className="font-black text-orange-600">{formatBs(resumen_ventas.total_descuentos)}</span>
+                        </div>
+                        <div className="pt-2 flex justify-between border-t border-gray-100 mt-2">
+                            <span className="font-bold text-gray-500 text-sm flex items-center gap-1.5"><Coins size={14}/> Vueltos Entregados (Cambio)</span>
+                            <span className="font-black text-gray-700">{formatBs(resumen_ventas.total_cambio || 0)}</span>
+                        </div>
+                        <div className="pt-2 flex justify-between border-t border-gray-100 mt-2">
+                            <span className="font-bold text-purple-600 text-sm flex items-center gap-1.5" title="Crédito otorgado a clientes, no ingresa a caja física hoy"><Coins size={14}/> Créditos Otorgados (no afecta efectivo)</span>
+                            <span className="font-black text-purple-700">{formatBs(resumen_ventas.total_creditos || 0)}</span>
                         </div>
                     </div>
                 </div>

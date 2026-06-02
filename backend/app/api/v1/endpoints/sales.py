@@ -1,304 +1,49 @@
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timedelta
+from app.utils.date_utils import get_now_bolivia
+
+from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.models.sale import Sale, ClienteInfo, PagoItem, SaleItem
-from app.models.sale_item import SaleItem as SaleItemAnalytics
-from app.models.product import Product
-from app.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
-from app.models.user import User, UserRole
-from app.auth import get_current_active_user
+from app.domain.models.sale import Sale, ClienteInfo, PagoItem, SaleItem
+from app.domain.models.sale_item import SaleItem as SaleItemAnalytics
+from app.domain.models.product import Product
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
+from app.domain.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
+from app.domain.models.user import User, UserRole
+from app.infrastructure.auth import get_current_active_user
 from pymongo import ReturnDocument
 
 router = APIRouter()
 
 
-from app.schemas.sale import SaleCreate, SalesPaginated
-# ─── POST /ventas ─────────────────────────────────────────────────────────────
+from app.domain.schemas.sale import SaleCreate, SalesPaginated
+from app.application.services.sales_service import SalesService
+
+
+# ─── Schema: Anulación ──────────────────────────────────────────────────────────────────
+
+class AnularRequest(BaseModel):
+    motivo: Literal[
+        "ERROR_COBRO",
+        "DEVOLUCION_CLIENTE",
+        "PRODUCTO_DEFECTUOSO",
+        "VENTA_DUPLICADA",
+        "OTRO"
+    ]
+    notas: Optional[str] = None  # Obligatorio en frontend si motivo == "OTRO"
+    # Solo requerido cuando motivo == "ERROR_COBRO"
+    metodo_pago_correcto: Optional[Literal["EFECTIVO", "QR", "TARJETA", "TRANSFERENCIA"]] = None
+    afectar_caja: bool = True
+    caja_sesion_id: Optional[str] = None
+
 
 @router.post("/ventas", response_model=Sale)
-@router.post("/sales", response_model=Sale)   # legacy alias
+@router.post("/sales", response_model=Sale)
 async def create_sale_endpoint(
     sale_in: SaleCreate,
     current_user: User = Depends(get_current_active_user)
 ):
-    try:
-        return await _create_sale_internal(sale_in, current_user)
-    except HTTPException:
-        raise
-    except Exception as e:
-        import logging
-        import traceback
-        logging.error(f"[create_sale] Unexpected error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error interno al procesar la venta: {str(e)}")
-
-async def _create_sale_internal(sale_in: SaleCreate, current_user: User):
-    """
-    POS creates a sale:
-    - Validates & deducts stock from the branch's Inventario.
-    - Supports split payments (multiple methods in one transaction).
-    - Optionally stores invoice/client data.
-    - Auto-registers a CajaMovimiento (INGRESO) for each payment method.
-    """
-    tenant_id = current_user.tenant_id or "default"
-    sucursal_id = current_user.sucursal_id or sale_in.sucursal_id or "CENTRAL"
-
-    # ── 1. Validate payments cover the total (optional server-side guard) ─────
-    # We allow mismatch here and let the frontend enforce it, but we still
-    # persist whatever comes in (the POS store already validates client-side).
-
-    # ── 2. Build sale items & deduct inventory ─────────────────────────────────
-    sale_items: List[SaleItem] = []
-    computed_total = 0.0
-
-    for item in sale_in.items:
-        product = await Product.get(item.producto_id)
-        if not product or product.tenant_id != tenant_id:
-            raise HTTPException(status_code=404, detail=f"Producto {item.producto_id} no encontrado")
-
-        from pymongo import ReturnDocument
-        from app.models.inventario import InventoryLog, TipoMovimiento
-
-        # Atomic update to avoid race conditions:
-        # We only decrement if current cantidad is >= item.cantidad
-        updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
-            {
-                "tenant_id": tenant_id,
-                "sucursal_id": sucursal_id,
-                "producto_id": item.producto_id,
-                "cantidad": {"$gte": item.cantidad}
-            },
-            {
-                "$inc": {"cantidad": -item.cantidad}
-            },
-            return_document=ReturnDocument.AFTER
-        )
-
-        if not updated_inv:
-            # If nothing was modified, it means either the product isn't in this branch,
-            # or the stock is insufficient. We do a quick check to provide a good error message.
-            inv_check = await Inventario.find_one(
-                Inventario.tenant_id == tenant_id,
-                Inventario.sucursal_id == sucursal_id,
-                Inventario.producto_id == item.producto_id,
-            )
-            available = inv_check.cantidad if inv_check else 0
-            raise HTTPException(
-                status_code=400,
-                detail=f"Stock insuficiente para '{product.descripcion}'. Disponible: {available}, solicitado: {item.cantidad}",
-            )
-
-        from app.utils.pricing import resolver_precio
-        unit_price_base = item.precio_unitario
-        if unit_price_base == 0:
-            if updated_inv and updated_inv.get("precio_sucursal") is not None:
-                unit_price_base = updated_inv["precio_sucursal"]
-            else:
-                unit_price_base = product.precio_venta
-
-        # D-08: Resolve price based on customer lists
-        unit_price = await resolver_precio(
-            producto_id=str(product.id),
-            precio_base=unit_price_base,
-            cliente_id=sale_in.cliente_id,
-            cantidad=item.cantidad,
-            tenant_id=tenant_id
-        )
-
-        # Apply line discount (manual override)
-        final_unit_price = max(0.0, unit_price - item.descuento_unitario)
-        subtotal = final_unit_price * item.cantidad
-        computed_total += subtotal
-
-        sale_items.append(SaleItem(
-            producto_id=str(product.id),
-            descripcion=product.descripcion,
-            cantidad=item.cantidad,
-            precio_unitario=unit_price,
-            costo_unitario=product.costo_producto,
-            descuento_unitario=item.descuento_unitario,
-            subtotal=subtotal,
-        ))
-
-        # Record moving in Kardex (P-03)
-        await InventoryLog(
-            tenant_id=tenant_id,
-            sucursal_id=sucursal_id,
-            producto_id=item.producto_id,
-            descripcion=product.descripcion,
-            tipo_movimiento=TipoMovimiento.VENTA,
-            cantidad_movida=-item.cantidad,
-            stock_resultante=updated_inv["cantidad"],
-            costo_unitario_momento=product.costo_producto,
-            precio_venta_momento=unit_price,
-            usuario_id=str(current_user.id),
-            usuario_nombre=current_user.full_name or current_user.username,
-            notas="Salida por Venta POS",
-            referencia_id="PENDING" # Will update if needed, but for now PENDING is fine or link after sale.create()
-        ).create()
-
-        # Record for Analytics (Phase 2)
-        await SaleItemAnalytics(
-            tenant_id=tenant_id,
-            sucursal_id=sucursal_id,
-            sale_id="PENDING", # Will update after sale.create()
-            sale_date=datetime.utcnow(),
-            producto_id=str(product.id),
-            descripcion=product.descripcion,
-            cantidad=item.cantidad,
-            precio_unitario=unit_price,
-            costo_unitario=product.costo_producto,
-            descuento_unitario=item.descuento_unitario, # New field
-            subtotal=subtotal
-        ).create()
-
-    # Apply discount to total if any
-    if sale_in.descuento:
-        val = sale_in.descuento.valor
-        if sale_in.descuento.tipo == 'MONTO':
-            computed_total -= val
-        elif sale_in.descuento.tipo == 'PORCENTAJE':
-            computed_total -= (computed_total * val / 100)
-        computed_total = max(0.0, computed_total)
-        
-    # Manual commercial rounding (Handling physical coins)
-    import math
-    int_part = math.floor(computed_total)
-    frac = computed_total - int_part
-    frac_fixed = round(frac, 2)
-
-    if frac_fixed < 0.5:
-        computed_total = float(int_part)
-    elif frac_fixed > 0.5:
-        computed_total = float(int_part + 1)
-    else:
-        computed_total = float(int_part) + 0.5
-        
-    has_credit = any(p.metodo == "CREDITO" for p in sale_in.pagos)
-    if has_credit and not sale_in.cliente_id and not (sale_in.cliente and sale_in.cliente.razon_social):
-        raise HTTPException(status_code=400, detail="Ventas a crédito requieren un cliente registrado")
-
-    actual_pagos = [PagoItem(metodo=p.metodo, monto=p.monto) for p in sale_in.pagos if p.metodo != "CREDITO"]
-    total_pagado = sum(p.monto for p in actual_pagos)
-    from app.models.sale import EstadoPago
-    
-    if has_credit:
-        if total_pagado <= 0:
-            estado_pago = EstadoPago.PENDIENTE
-        elif total_pagado < computed_total:
-            estado_pago = EstadoPago.PARCIAL
-        else:
-            estado_pago = EstadoPago.PAGADO
-    else:
-        estado_pago = EstadoPago.PAGADO
-        
-    cliente_snap = ClienteInfo(**sale_in.cliente.model_dump()) if sale_in.cliente else None
-
-    # Initialize empty QR Info if QR was used as payment method
-    has_qr = any(p.metodo == "QR" for p in actual_pagos)
-    from app.models.sale import QRInfo
-    qr_init = QRInfo() if has_qr else None
-
-    sale = Sale(
-        tenant_id=tenant_id,
-        sucursal_id=sucursal_id,
-        items=sale_items,
-        total=computed_total,
-        pagos=actual_pagos,
-        estado_pago=estado_pago,
-        descuento=sale_in.descuento,
-        cliente_id=sale_in.cliente_id,
-        cliente=cliente_snap,
-        qr_info=qr_init,
-        cashier_id=str(current_user.id),
-        cashier_name=current_user.full_name or current_user.username,
-    )
-    await sale.create()
-
-    # Update the analytics and kardex records with the real sale ID
-    await SaleItemAnalytics.find(
-        SaleItemAnalytics.tenant_id == tenant_id,
-        SaleItemAnalytics.sale_id == "PENDING"
-    ).update({"$set": {"sale_id": str(sale.id)}})
-
-    await InventoryLog.find(
-        InventoryLog.tenant_id == tenant_id,
-        InventoryLog.referencia_id == "PENDING"
-    ).update({"$set": {"referencia_id": str(sale.id)}})
-
-    # D-07: Update customer totals
-    if sale.cliente_id:
-        from app.models.cliente import Cliente
-        from beanie.operators import Inc, Set
-        await Cliente.get(sale.cliente_id).update(
-            Inc({Cliente.total_compras: sale.total}),
-            Inc({Cliente.cantidad_compras: 1}),
-            Set({Cliente.ultima_compra_at: sale.created_at})
-        )
-
-    # ── 4. Auto-register CajaMovimientos (all payment methods) ────────────────
-    from app.models.caja import CajaSesion, CajaMovimiento, EstadoSesion, SubtipoMovimiento
-
-    # Subtipo map: method name → SubtipoMovimiento
-    _SUBTIPO_MAP = {
-        "EFECTIVO": SubtipoMovimiento.VENTA_EFECTIVO,
-        "QR":       SubtipoMovimiento.VENTA_QR,
-        "TARJETA":  SubtipoMovimiento.VENTA_TARJETA,
-    }
-
-    # Find the active cash session for this branch (may not exist — that's OK)
-    sesion = await CajaSesion.find_one(
-        CajaSesion.tenant_id   == tenant_id,
-        CajaSesion.sucursal_id == sucursal_id,
-        CajaSesion.estado      == EstadoSesion.ABIERTA,
-    )
-
-    cajero_id   = str(current_user.id)
-    cajero_name = current_user.full_name or current_user.username
-    sale_id_str = str(sale.id)
-
-    if sesion:
-        total_pagado = 0.0
-
-        for pago in actual_pagos:
-            metodo  = str(pago.metodo).upper()
-            monto_p = float(pago.monto)
-            total_pagado += monto_p
-            subtipo = _SUBTIPO_MAP.get(metodo, SubtipoMovimiento.VENTA_EFECTIVO)
-
-            label = {"EFECTIVO": "Efectivo", "QR": "QR", "TARJETA": "Tarjeta"}.get(metodo, metodo)
-            await CajaMovimiento(
-                tenant_id   = tenant_id,
-                sucursal_id = sucursal_id,
-                sesion_id   = str(sesion.id),
-                cajero_id   = cajero_id,
-                cajero_name = cajero_name,
-                subtipo     = subtipo,
-                tipo        = "INGRESO",
-                monto       = monto_p,
-                descripcion = f"Venta #{sale_id_str[-6:]} — {label}",
-                sale_id     = sale_id_str,
-            ).create()
-
-        # Cambio = total pagado (todos los métodos) - total venta
-        # Change is ALWAYS given back in cash, regardless of payment mix.
-        cambio = round(total_pagado - computed_total, 2)
-        if cambio > 0.005:
-            await CajaMovimiento(
-                tenant_id   = tenant_id,
-                sucursal_id = sucursal_id,
-                sesion_id   = str(sesion.id),
-                cajero_id   = cajero_id,
-                cajero_name = cajero_name,
-                subtipo     = SubtipoMovimiento.CAMBIO,
-                tipo        = "EGRESO",
-                monto       = cambio,
-                descripcion = f"Venta #{sale_id_str[-6:]} — Cambio entregado",
-                sale_id     = sale_id_str,
-            ).create()
-
-        return sale
+    return await SalesService.create_sale(sale_in, current_user)
 
 # ─── GET /sales/stats/today ───────────────────────────────────────────────────
 
@@ -308,7 +53,8 @@ async def get_today_stats(
     current_user: User = Depends(get_current_active_user)
 ):
     """Today's total sales and transaction count for the current tenant."""
-    today = datetime.utcnow().date()
+    today = get_now_bolivia().date()
+
     tenant_id = current_user.tenant_id or ""
     
     filters = [Sale.tenant_id == tenant_id]
@@ -322,6 +68,7 @@ async def get_today_stats(
     return {
         "today_sales": sum(s.total for s in today_sales),
         "transaction_count": len(today_sales),
+        "items_count": sum(sum(i.cantidad for i in s.items) for s in today_sales),
     }
 
 
@@ -332,13 +79,19 @@ async def get_sales(
     sucursal_id: Optional[str] = None,
     metodo_pago: Optional[str] = None,
     estado_pago: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     solo_facturas: bool = False,
     qr_confirmed: Optional[bool] = None,
+    search: Optional[str] = None,
     page: int = 1,
     limit: int = 50,
     current_user: User = Depends(get_current_active_user)
 ):
     """List all sales for the tenant, optionally filtered by sucursal, payment method or invoice status with pagination."""
+    if current_user.role == UserRole.FACTURADOR:
+        solo_facturas = True
+
     filters = []
     
     # Superadmins bypass primary tenant filter to see everything
@@ -348,6 +101,24 @@ async def get_sales(
         
     if sucursal_id:
         filters.append(Sale.sucursal_id == sucursal_id)
+
+    if search and search.strip():
+        import re
+        safe_q = re.escape(search.strip())
+        filters.append({
+            "$or": [
+                { "$expr": { "$regexMatch": { "input": { "$toString": "$_id" }, "regex": safe_q, "options": "i" } } },
+                { "cashier_name": {"$regex": safe_q, "$options": "i"} },
+                { "cliente.razon_social": {"$regex": safe_q, "$options": "i"} },
+                { "cliente.nit": {"$regex": safe_q, "$options": "i"} }
+            ]
+        })
+
+    if start_date and end_date:
+        from app.utils.date_utils import get_range_bolivia
+        start_dt, end_dt = get_range_bolivia(start_date, end_date)
+        filters.append(Sale.created_at >= start_dt)
+        filters.append(Sale.created_at <= end_dt)
 
     if metodo_pago:
         # Filter sales where at least one payment method matches
@@ -401,85 +172,59 @@ async def get_sales(
 @router.patch("/sales/{sale_id}/anular", response_model=Sale)
 async def anular_sale(
     sale_id: str,
+    body: AnularRequest,
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Voids a sale:
-    - Sets anulada = True
-    - Restores inventory stock and logs to Kardex
-    - Auto-registers an EGRESO in the active cash register session to cancel the income.
-    """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="No tienes permiso para anular ventas")
-
-    sale = await Sale.get(sale_id)
-    if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
-        raise HTTPException(status_code=404, detail="Sale not found")
-        
-    if sale.anulada:
-        raise HTTPException(status_code=400, detail="La venta ya está anulada")
-
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="Solo puedes anular ventas de tu propia sucursal")
-
-    tenant_id = sale.tenant_id
-    sucursal_id = sale.sucursal_id
-
-    # 1. Restore Inventory
-    for item in sale.items:
-        # Restore stock using atomic increment
-        updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
-            {
-                "tenant_id": tenant_id,
-                "sucursal_id": sucursal_id,
-                "producto_id": item.producto_id,
-            },
-            {
-                "$inc": {"cantidad": item.cantidad}
-            },
-            return_document=ReturnDocument.AFTER
-        )
-        if updated_inv:
-            await InventoryLog(
-                tenant_id=tenant_id,
-                sucursal_id=sucursal_id,
-                producto_id=item.producto_id,
-                tipo_movimiento=TipoMovimiento.ENTRADA_MANUAL,
-                cantidad_movida=item.cantidad,
-                stock_resultante=updated_inv["cantidad"],
-                usuario_id=str(current_user.id),
-                usuario_nombre=current_user.full_name or current_user.username,
-                notas=f"Anulación de Venta #{str(sale.id)[-6:]}",
-                referencia_id=str(sale.id)
-            ).create()
-
-    # 2. Add an Egreso to the active session to cancel the monetary ingress 
-    # (assuming all was mapped correctly, we just do a generic refund movement)
-    sesion = await CajaSesion.find_one(
-        CajaSesion.tenant_id   == tenant_id,
-        CajaSesion.sucursal_id == sucursal_id,
-        CajaSesion.estado      == EstadoSesion.ABIERTA,
+    return await SalesService.anular_sale(
+        sale_id, current_user,
+        motivo=body.motivo,
+        notas=body.notas,
+        metodo_pago_correcto=body.metodo_pago_correcto,
+        afectar_caja=body.afectar_caja,
+        caja_sesion_id=body.caja_sesion_id
     )
-    if sesion:
-        await CajaMovimiento(
-            tenant_id   = tenant_id,
-            sucursal_id = sucursal_id,
-            sesion_id   = str(sesion.id),
-            cajero_id   = str(current_user.id),
-            cajero_name = current_user.full_name or current_user.username,
-            subtipo     = SubtipoMovimiento.AJUSTE,
-            tipo        = "EGRESO",
-            monto       = sale.total,
-            descripcion = f"Anulación de Venta #{str(sale.id)[-6:]} (Reembolso)",
-            sale_id     = str(sale.id),
-        ).create()
-        
-    # 3. Mark as anulada
-    sale.anulada = True
-    await sale.save()
-    
-    return sale
 
+
+# ─── GET /sales/{sale_id}/posible-duplicado ────────────────────────────────────────
+
+@router.get("/sales/{sale_id}/posible-duplicado")
+async def check_posible_duplicado(
+    sale_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Detect if another sale from the same cashier with same total exists within 2 minutes."""
+    tenant_id = current_user.tenant_id or "default"
+    sale = await Sale.get(sale_id)
+    if not sale or sale.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    window_start = sale.created_at - timedelta(minutes=2)
+    window_end   = sale.created_at + timedelta(minutes=2)
+
+    # Find other non-annulled sales from same cashier with same total in the time window
+    candidatos = await Sale.find(
+        Sale.tenant_id   == tenant_id,
+        Sale.cashier_id  == sale.cashier_id,
+        Sale.total       == sale.total,
+        Sale.anulada     == False,
+        Sale.created_at  >= window_start,
+        Sale.created_at  <= window_end,
+    ).to_list()
+
+    # Exclude the sale itself
+    candidatos = [s for s in candidatos if str(s.id) != sale_id]
+
+    if candidatos:
+        c = candidatos[0]
+        return {
+            "tiene_duplicado": True,
+            "candidato_id": str(c.id),
+            "candidato_id_corto": str(c.id)[-6:].upper(),
+            "candidato_monto": float(c.total),
+            "candidato_fecha": c.created_at.isoformat(),
+            "candidato_cajero": c.cashier_name,
+        }
+    return {"tiene_duplicado": False}
 
 # ─── PATCH /sales/{sale_id}/factura ───────────────────────────────────────────
 
@@ -527,9 +272,8 @@ async def update_qr_info(
         
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes confirmar pagos de tu propia sucursal")
-        
     if not sale.qr_info:
-        from app.models.sale import QRInfo
+        from app.domain.models.sale import QRInfo
         sale.qr_info = QRInfo()
         
     sale.qr_info.banco = qr_data.banco
@@ -541,39 +285,4 @@ async def update_qr_info(
     
     await sale.save()
     
-    return sale
-
-from app.schemas.sale import AbonoCreate
-from app.models.sale import EstadoPago
-
-@router.post("/sales/{sale_id}/abono", response_model=Sale)
-async def registrar_abono(sale_id: str, abono: AbonoCreate, current_user: User = Depends(get_current_active_user)):
-    """
-    Registers a partial layout (amortization) to an active debt in a sale.
-    """
-    sale = await Sale.get(sale_id)
-    if not sale or sale.tenant_id != (current_user.tenant_id or "default"):
-        raise HTTPException(status_code=404, detail="Sale not found")
-        
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
-        raise HTTPException(status_code=403, detail="No puedes abonar a ventas de otras sucursales")
-        
-    if sale.estado_pago == EstadoPago.PAGADO:
-        raise HTTPException(status_code=400, detail="Esta venta ya está completamente pagada.")
-        
-    # Append the payment
-    nuevo_pago = PagoItem(metodo=abono.metodo, monto=abono.monto)
-    if not sale.pagos:
-        sale.pagos = []
-    sale.pagos.append(nuevo_pago)
-    
-    # Recalculate state
-    # Due to floating point math, check against a small epsilon
-    total_pagado = sum(p.monto for p in sale.pagos)
-    if total_pagado >= sale.total - 0.01:
-        sale.estado_pago = EstadoPago.PAGADO
-    else:
-        sale.estado_pago = EstadoPago.PARCIAL
-        
-    await sale.save()
     return sale

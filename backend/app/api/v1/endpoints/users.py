@@ -2,9 +2,9 @@ from typing import List, Optional
 import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr, field_validator
-from app.models.user import User, UserRole
-from app.models.sucursal import Sucursal, TipoSucursal
-from app.auth import get_current_active_user, get_password_hash
+from app.domain.models.user import User, UserRole
+from app.domain.models.sucursal import Sucursal, TipoSucursal
+from app.infrastructure.auth import get_current_active_user, get_password_hash
 
 router = APIRouter()
 
@@ -40,26 +40,31 @@ async def get_users(current_user: User = Depends(get_current_active_user)):
     """
     Returns users scoped to the current user's context:
     - ADMIN_MATRIZ: all employees of the tenant
-    - ADMIN_SUCURSAL: only cajeros in their own sucursal
+    - ADMIN_SUCURSAL / CAJERO / etc: only staff in their own sucursal (including Vendedores)
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN, UserRole.CAJERO]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     if current_user.role == UserRole.SUPERADMIN:
         return await User.find(User.role == UserRole.CAJERO).to_list()
 
-    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
-        # Strict isolation: only sees cajeros of their own sucursal
+    # Define roles that are considered "Staff" for sale assignment or branch view
+    staff_roles = [UserRole.CAJERO, UserRole.VENDEDOR, UserRole.ADMIN_SUCURSAL, UserRole.FACTURADOR]
+
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.CAJERO]:
+        # Scoped view: staff of their own sucursal
+        from beanie.operators import In
         return await User.find(
             User.tenant_id == current_user.tenant_id,
             User.sucursal_id == current_user.sucursal_id,
-            User.role == UserRole.CAJERO,
+            In(User.role, staff_roles),
         ).to_list()
 
     # ADMIN_MATRIZ: all employees of the tenant
+    from beanie.operators import In
     return await User.find(
         User.tenant_id == current_user.tenant_id,
-        User.role == UserRole.CAJERO,
+        In(User.role, staff_roles),
     ).to_list()
 
 
@@ -92,20 +97,25 @@ async def create_cajero(
     # Strict injection from JWT — client cannot override this
     sucursal_id = current_user.sucursal_id  # None if ADMIN_MATRIZ (matrix-level)
 
-    # BIZ RULE: If SUPERVISOR creates a VENDEDOR, that Vendedor needs their own inventory (Virtual Branch).
-    if current_user.role == UserRole.SUPERVISOR and data.role == 'VENDEDOR':
-        # Create a new VENDEDOR virtual branch
-        vendedor_branch = Sucursal(
+    # BIZ RULE: If creating a VENDEDOR/SUPERVISOR from Matrix level, they need their own inventory (Virtual Branch).
+    # If created from a Branch context, they stay in that branch.
+    if data.role in [UserRole.SUPERVISOR, UserRole.VENDEDOR] and not sucursal_id:
+        tipo_sucursal = TipoSucursal.SUPERVISOR if data.role == UserRole.SUPERVISOR else TipoSucursal.VENDEDOR
+        nombre_prefix = "Supervisor:" if data.role == UserRole.SUPERVISOR else "Vendedor:"
+        
+        # Create a new independent virtual branch for the mobile worker
+        virtual_branch = Sucursal(
             tenant_id=current_user.tenant_id,
-            nombre=f"Vendedor: {data.full_name}",
+            nombre=f"{nombre_prefix} {data.full_name}",
             ciudad="Móvil",
             direccion="Móvil",
-            tipo=TipoSucursal.VENDEDOR
+            tipo=tipo_sucursal
         )
-        await vendedor_branch.create()
-        sucursal_id = str(vendedor_branch.id)
+        await virtual_branch.create()
+        sucursal_id = str(virtual_branch.id)
+    # else: already inherits current_user.sucursal_id or None
     else:
-        # Otherwise they inherit the creator's branch
+        # Otherwise (e.g. CAJERO) they inherit the creator's physical branch
         sucursal_id = current_user.sucursal_id
 
     hashed = get_password_hash(data.password)

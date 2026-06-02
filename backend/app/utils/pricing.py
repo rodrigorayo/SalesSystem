@@ -1,6 +1,6 @@
 from typing import Optional
-from app.models.cliente import Cliente
-from app.models.price_list import ListaPrecio, ListaPrecioItem, TipoListaPrecio
+from app.domain.models.cliente import Cliente
+from app.domain.models.price_list import ListaPrecio, ListaPrecioItem, TipoListaPrecio
 
 async def resolver_precio(
     producto_id: str,
