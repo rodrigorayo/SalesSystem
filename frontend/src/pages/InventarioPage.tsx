@@ -201,6 +201,7 @@ export default function InventarioPage() {
                                     <option value="ENTRADA_MANUAL">Entradas</option>
                                     <option value="SALIDA_MANUAL">Salidas / Mermas</option>
                                     <option value="TRASLADO">Traslados</option>
+                                    <option value="AJUSTE_FISICO">Ajustes Físicos</option>
                                 </select>
                             </div>
                         )}

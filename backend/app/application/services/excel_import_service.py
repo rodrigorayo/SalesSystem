@@ -371,6 +371,7 @@ class ExcelImportService:
                             tenant_id=tenant_id,
                             sucursal_id=suc_val,
                             producto_id=product_id,
+                            descripcion=descripcion,
                             tipo_movimiento=TipoMovimiento.AJUSTE_FISICO,
                             cantidad_movida=int(diff),
                             stock_resultante=int(cantidad_fisica),

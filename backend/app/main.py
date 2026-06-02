@@ -13,7 +13,7 @@ async def lifespan(app: FastAPI):
     import os
     env_keys = list(os.environ.keys())
     
-    if "localhost" in settings.MONGODB_URL or "127.0.0.1" in settings.MONGODB_URL:
+    if settings.ENVIRONMENT == "production" and ("localhost" in settings.MONGODB_URL or "127.0.0.1" in settings.MONGODB_URL):
         print(f"FATAL: MONGODB_URL IS LOCALHOST. ENV VARS IN VERCEL: {env_keys}")
         raise ValueError(f"Missing MONGODB_URL in Vercel Environment Variables! Re-check your Vercel Project Settings. Env keys found: {env_keys}")
         

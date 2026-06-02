@@ -184,16 +184,27 @@ async def ajustar_inventario(
 
     # Guardar en Kárdex (Log Inmutable)
     if cantidad_cambio != 0:
+        mismatch_note = ""
+        if ajuste.tipo == "AJUSTE":
+            mismatch_note = f"[Ajuste Físico: Sistema tenía {stock_anterior} u., físico {nuevo_stock} u. Discrepancia: {'+' if cantidad_cambio > 0 else ''}{cantidad_cambio} u.]"
+        elif ajuste.tipo == "ENTRADA":
+            mismatch_note = f"[Entrada Manual: {stock_anterior} u. -> {nuevo_stock} u. (+{ajuste.cantidad} u.)]"
+        elif ajuste.tipo == "SALIDA":
+            mismatch_note = f"[Salida Manual: {stock_anterior} u. -> {nuevo_stock} u. (-{ajuste.cantidad} u.)]"
+            
+        final_notes = f"{mismatch_note} - {ajuste.notas}" if ajuste.notas else mismatch_note
+
         log = InventoryLog(
             tenant_id=tenant_id,
             sucursal_id=sucursal_id,
             producto_id=ajuste.producto_id,
+            descripcion=product.descripcion,
             tipo_movimiento=tipo_mov,
             cantidad_movida=cantidad_cambio,
             stock_resultante=nuevo_stock,
             usuario_id=str(current_user.id),
             usuario_nombre=current_user.username,
-            notas=ajuste.notas
+            notas=final_notes
         )
         await log.create()
 

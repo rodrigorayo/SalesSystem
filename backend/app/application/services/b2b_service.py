@@ -7,7 +7,7 @@ from app.domain.models.b2b import (
     NotaTraspaso, EstadoTraspaso, InventarioMovil, InventarioMovilItem
 )
 from app.domain.models.product import Product
-from app.domain.models.inventario import Inventario, InventoryLog
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.domain.models.cliente import Cliente
 from app.domain.models.user import User
 from app.domain.models.base import DecimalMoney
@@ -77,14 +77,16 @@ class B2BService:
                     tenant_id=tenant_id,
                     sucursal_id=sucursal_id,
                     producto_id=str(producto.id),
-                    tipo="SALIDA",
-                    motivo="MERMA_REPOSICION",
-                    cantidad=input_item.cantidad,
-                    stock_previo=inv.cantidad + input_item.cantidad,
-                    stock_nuevo=inv.cantidad,
-                    referencia_id="PENDING", # Fixed below
-                    user_id=str(registrado_por.id),
-                    user_name=registrado_por.full_name or registrado_por.username
+                    descripcion=producto.descripcion,
+                    tipo_movimiento=TipoMovimiento.SALIDA_MANUAL,
+                    cantidad_movida=-input_item.cantidad,
+                    stock_resultante=inv.cantidad,
+                    costo_unitario_momento=DecimalMoney(str(costo)),
+                    precio_venta_momento=DecimalMoney(str(precio)),
+                    usuario_id=str(registrado_por.id),
+                    usuario_nombre=registrado_por.full_name or registrado_por.username,
+                    notas=f"Devolución/Merma Supermercado: {notas or ''}",
+                    referencia_id="PENDING"
                 ).insert()
                 
         if not items_registrados:
