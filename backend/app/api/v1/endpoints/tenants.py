@@ -388,7 +388,7 @@ async def list_plans(current_user: User = Depends(get_current_active_user)):
     if current_user.role != UserRole.SUPERADMIN:
         raise HTTPException(status_code=403, detail="Not authorized")
     plans = await Plan.find_all().to_list()
-    return [{"id": str(p.id), "code": p.code, "name": p.name, "is_public": p.is_public, "precio_mensual": float(p.precio_mensual.to_decimal()), "features": [f.value for f in p.features]} for p in plans]
+    return [{"id": str(p.id), "code": p.code, "name": p.name, "is_public": p.is_public, "precio_mensual": float(p.precio_mensual), "features": [f.value for f in p.features]} for p in plans]
 
 @router.post("/tenants/admin/plans")
 async def create_custom_plan(plan_data: PlanCreate, current_user: User = Depends(get_current_active_user)):
