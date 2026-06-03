@@ -45,6 +45,11 @@ class TenantUpdate(BaseModel):
     plan: PlanType | None = None
     is_active: bool | None = None
 
+class PlanCreate(BaseModel):
+    name: str
+    features: List[PlanFeature]
+    precio_mensual: float = 0.0
+
 # Endpoints
 @router.get("/tenants/my-features")
 async def get_my_features(current_user: User = Depends(get_current_active_user)):
@@ -383,5 +388,46 @@ async def list_plans(current_user: User = Depends(get_current_active_user)):
     if current_user.role != UserRole.SUPERADMIN:
         raise HTTPException(status_code=403, detail="Not authorized")
     plans = await Plan.find_all().to_list()
-    return [{"code": p.code, "name": p.name, "is_public": p.is_public, "features": [f.value for f in p.features]} for p in plans]
+    return [{"id": str(p.id), "code": p.code, "name": p.name, "is_public": p.is_public, "precio_mensual": float(p.precio_mensual.to_decimal()), "features": [f.value for f in p.features]} for p in plans]
+
+@router.post("/tenants/admin/plans")
+async def create_custom_plan(plan_data: PlanCreate, current_user: User = Depends(get_current_active_user)):
+    """[SUPERADMIN] Crea un plan personalizado atómico."""
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    code = f"CUSTOM_{plan_data.name.upper().replace(' ', '_')}"
+    new_plan = Plan(
+        code=code,
+        name=plan_data.name,
+        max_sucursales=-1,
+        max_usuarios=-1,
+        features=plan_data.features,
+        precio_mensual=plan_data.precio_mensual,
+        is_active=True,
+        is_public=True
+    )
+    await new_plan.save()
+    return {"message": "Plan creado con éxito", "plan_id": str(new_plan.id)}
+
+@router.delete("/tenants/admin/plans/{plan_id}")
+async def delete_custom_plan(plan_id: str, current_user: User = Depends(get_current_active_user)):
+    """[SUPERADMIN] Elimina un plan personalizado."""
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    plan = await Plan.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+        
+    if not plan.code.startswith("CUSTOM_"):
+        raise HTTPException(status_code=400, detail="No puedes eliminar los planes del sistema")
+        
+    # Validar que ningún tenant lo esté usando
+    in_use = await Tenant.find({"plan_id": plan_id}).count()
+    if in_use > 0:
+        raise HTTPException(status_code=400, detail="El plan está en uso por uno o más tenants")
+        
+    await plan.delete()
+    return {"message": "Plan eliminado correctamente"}
 

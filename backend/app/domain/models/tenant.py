@@ -19,6 +19,7 @@ class PlanType(str, Enum):
     PRO        = "PRO"
     ENTERPRISE = "ENTERPRISE"
     ILIMITADO  = "ILIMITADO"  # Plan interno, no se vende — clientes especiales
+    PERSONALIZADO = "PERSONALIZADO" # Planes atómicos creados dinámicamente
     # Legacy
     BASIC      = "BASICO"
 

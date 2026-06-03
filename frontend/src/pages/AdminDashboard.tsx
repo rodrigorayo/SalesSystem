@@ -7,6 +7,7 @@ import type { Tenant, TenantCreate, TenantUpdate } from '../api/types';
 import { toast } from 'sonner';
 import PasswordField from '../components/PasswordField';
 import Pagination from '../components/Pagination';
+import PlanBuilder from '../components/admin/PlanBuilder';
 
 interface Plan {
     code: string;
@@ -23,7 +24,12 @@ const PlanBadge = ({ plan }: { plan: string }) => {
         'ILIMITADO':  { label: 'Ilimitado',  icon: Star,        color: 'text-amber-600',  bg: 'bg-amber-50',   border: 'border-amber-200' },
     };
 
-    const s = config[plan] || { label: plan, icon: ShieldAlert, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-100' };
+    let s = config[plan];
+    if (!s && plan.startsWith('CUSTOM_')) {
+        const cleanName = plan.replace('CUSTOM_', '').replace(/_/g, ' ');
+        s = { label: cleanName, icon: Settings, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' };
+    }
+    s = s || { label: plan, icon: ShieldAlert, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-100' };
     const Icon = s.icon;
 
     return (
@@ -335,6 +341,9 @@ export default function AdminDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Constructor Atómico de Planes */}
+            <PlanBuilder existingPlans={plansList} />
 
             {/* Modal: Crear Empresa */}
             {isModalOpen && (
