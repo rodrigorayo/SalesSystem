@@ -19,7 +19,7 @@ ALL_FEATURES: List[str] = [f.value for f in PlanFeature]
 # Schemas
 class TenantCreate(BaseModel):
     name: str
-    plan: PlanType
+    plan: str
     admin_username: EmailStr
     admin_password: str = Field(
         ...,
@@ -42,7 +42,7 @@ class TenantCreate(BaseModel):
 
 class TenantUpdate(BaseModel):
     name: str | None = None
-    plan: PlanType | None = None
+    plan: str | None = None
     is_active: bool | None = None
 
 class PlanCreate(BaseModel):
@@ -111,8 +111,18 @@ async def create_tenant(tenant_in: TenantCreate, current_user: User = Depends(ge
     if await User.find_one({"username": re.compile(f"^{admin_username_lower}$", re.IGNORECASE)}):
         raise HTTPException(status_code=400, detail="Admin username already exists")
 
+    # Determine the PlanType and plan_id
+    plan_code = tenant_in.plan
+    try:
+        plan_enum = PlanType(plan_code)
+    except ValueError:
+        plan_enum = PlanType.PERSONALIZADO
+        
+    plan_doc = await Plan.find_one(Plan.code == plan_code)
+    plan_id = str(plan_doc.id) if plan_doc else None
+
     # Create Tenant
-    tenant = Tenant(name=tenant_in.name, plan=tenant_in.plan)
+    tenant = Tenant(name=tenant_in.name, plan=plan_enum, plan_id=plan_id)
     await tenant.create()
 
     # Create Admin User for Tenant
@@ -168,7 +178,15 @@ async def update_tenant(tenant_id: str, tenant_in: TenantUpdate, current_user: U
         tenant.name = tenant_in.name
         
     if tenant_in.plan is not None:
-        tenant.plan = tenant_in.plan
+        plan_code = tenant_in.plan
+        try:
+            plan_enum = PlanType(plan_code)
+        except ValueError:
+            plan_enum = PlanType.PERSONALIZADO
+            
+        plan_doc = await Plan.find_one(Plan.code == plan_code)
+        tenant.plan_id = str(plan_doc.id) if plan_doc else None
+        tenant.plan = plan_enum
         
     if tenant_in.is_active is not None:
         tenant.is_active = tenant_in.is_active
