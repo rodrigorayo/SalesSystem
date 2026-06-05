@@ -29,9 +29,11 @@ interface AuthState {
     features: string[];
     /** Nombre del plan activo (informativo) */
     planName: string;
+    planExpiresAt: string | null;
     login: (token: string, user: User) => void;
     logout: () => void;
     setFeatures: (features: string[], planName?: string) => void;
+    setPlanExpiresAt: (date: string | null) => void;
     tenantSettings: TenantSettings | null;
     setTenantSettings: (settings: TenantSettings) => void;
     isAuthenticated: () => boolean;
@@ -55,6 +57,7 @@ export const useAuthStore = create<AuthState>()(
             sucursal_id: null,
             features: [],
             planName: '',
+            planExpiresAt: null,
             tenantSettings: null,
             login: (token, user) => set({
                 token,
@@ -62,8 +65,9 @@ export const useAuthStore = create<AuthState>()(
                 user,
                 sucursal_id: user.sucursal_id ?? null,
             }),
-            logout: () => set({ token: null, user: null, role: null, sucursal_id: null, features: [], planName: '', tenantSettings: null }),
+            logout: () => set({ token: null, user: null, role: null, sucursal_id: null, features: [], planName: '', planExpiresAt: null, tenantSettings: null }),
             setFeatures: (features, planName = '') => set({ features, planName }),
+            setPlanExpiresAt: (date) => set({ planExpiresAt: date }),
             setTenantSettings: (settings) => set({ tenantSettings: settings }),
             isAuthenticated: () => !!get().token,
             hasFeature: (flag: string) => {

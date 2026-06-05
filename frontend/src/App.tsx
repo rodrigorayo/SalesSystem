@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Lock } from 'lucide-react';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import TenantsAdminPage from './pages/TenantsAdminPage';
@@ -58,7 +59,7 @@ function ErrorEventBridge() {
  * Se ejecuta una sola vez por sesión, persistido en el store.
  */
 function FeaturesFetcher() {
-  const { isAuthenticated, setFeatures, features, setTenantSettings } = useAuthStore();
+  const { isAuthenticated, setFeatures, features, setTenantSettings, setPlanExpiresAt } = useAuthStore();
 
   useEffect(() => {
     if (!isAuthenticated()) return;
@@ -75,6 +76,9 @@ function FeaturesFetcher() {
           if (tenant.settings) {
               setTenantSettings(tenant.settings);
           }
+          if (tenant.plan_expires_at !== undefined) {
+              setPlanExpiresAt(tenant.plan_expires_at);
+          }
       })
       .catch(() => {});
 
@@ -82,6 +86,32 @@ function FeaturesFetcher() {
   }, [isAuthenticated()]);
 
   return null;
+}
+
+function SoftLockBlocker() {
+    const { isAuthenticated, planExpiresAt, role, logout } = useAuthStore();
+    if (!isAuthenticated() || role === 'SUPERADMIN' || !planExpiresAt) return null;
+
+    // Check if expired
+    const today = new Date();
+    // planExpiresAt is full ISO from backend
+    const expiry = new Date(planExpiresAt);
+    if (today <= expiry) return null;
+
+    return (
+        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+            <div className="bg-white rounded-[32px] p-10 max-w-md w-full shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200">
+                <div className="w-24 h-24 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-6 border-8 border-red-100/50">
+                    <Lock size={40} />
+                </div>
+                <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Acceso Bloqueado</h1>
+                <p className="text-gray-500 mb-8 font-medium leading-relaxed">Tu suscripción ha finalizado el <strong className="text-gray-900">{expiry.toLocaleDateString()}</strong>. Por favor, contacta con tu proveedor para renovar tu plan y recuperar el acceso a tu información.</p>
+                <button onClick={() => { logout(); window.location.href = '/login'; }} className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition-colors shadow-lg shadow-black/10">
+                    Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    );
 }
 
 // ─── Route Guard (autenticación + rol) ───────────────────────────────────────
@@ -136,9 +166,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ErrorModalProvider>
         <ErrorEventBridge />
+        <FeaturesFetcher />
+        <SoftLockBlocker />
         <Toaster position="top-right" richColors theme="light" />
       <BrowserRouter>
-        <FeaturesFetcher />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 

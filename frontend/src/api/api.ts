@@ -24,6 +24,7 @@ import type {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
 export const getMe = () => client<User>('/users/me');
+export const impersonateTenant = (tenant_id: string) => client<{access_token: string, token_type: string, role: string}>(`/impersonate/${tenant_id}`, { method: 'POST' });
 
 // ─── Tenants ──────────────────────────────────────────────────────────────
 export const getTenants = () => client<Tenant[]>('/tenants');

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTenants, createTenant, updateTenant, deleteTenant, client } from '../api/api';
-import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, KeyRound, AlertTriangle, Copy, Zap, Star, ShieldCheck, Crown, Gem, Settings } from 'lucide-react';
+import { getTenants, createTenant, updateTenant, deleteTenant, impersonateTenant, getMe, client } from '../api/api';
+import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, KeyRound, AlertTriangle, Copy, Zap, Star, ShieldCheck, Crown, Gem, Settings, LogIn } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import type { Tenant, TenantCreate, TenantUpdate } from '../api/types';
 import { toast } from 'sonner';
@@ -137,6 +137,22 @@ export default function TenantsAdminPage() {
     });
     */
 
+
+    const impersonateMutation = useMutation({
+        mutationFn: async (tenantId: string) => {
+            const { access_token } = await impersonateTenant(tenantId);
+            useAuthStore.setState({ token: access_token });
+            const user = await getMe();
+            useAuthStore.getState().login(access_token, user);
+            return access_token;
+        },
+        onSuccess: () => {
+            window.location.href = '/dashboard';
+        },
+        onError: (err: any) => {
+            toast.error(err.message || 'Error al iniciar sesión como cliente');
+        }
+    });
 
     // Fallback de planes por si el API aún no cargó o está fallando
     const plansList = useMemo(() => {
@@ -357,6 +373,14 @@ export default function TenantsAdminPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    <button 
+                                        onClick={() => impersonateMutation.mutate(tenant._id)} 
+                                        disabled={impersonateMutation.isPending}
+                                        title="Entrar como Cliente"
+                                        className="w-12 h-12 flex items-center justify-center text-blue-500 hover:text-white hover:bg-blue-500 hover:shadow-md rounded-2xl transition-all border border-blue-100 disabled:opacity-50"
+                                    >
+                                        <LogIn size={20} />
+                                    </button>
                                     <button onClick={() => handleEditClick(tenant)} className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-black hover:bg-white hover:shadow-md rounded-2xl transition-all border border-transparent hover:border-gray-200">
                                         <Edit2 size={20} />
                                     </button>
