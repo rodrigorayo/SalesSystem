@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from '../../api/api';
 import { toast } from 'sonner';
-import { Plus, Check, Loader2, Trash2, Calculator, Layers } from 'lucide-react';
+import { Plus, Check, Loader2, Trash2, Calculator, Layers, Edit2, Save } from 'lucide-react';
 
 const FEATURE_PRICES: Record<string, { label: string; price: number; type: 'core' | 'pro' | 'enterprise' }> = {
     'VENTAS': { label: 'Ventas y POS', price: 15, type: 'core' },
@@ -35,6 +35,16 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
     const [manualPrice, setManualPrice] = useState<string>('');
     const [maxSucursales, setMaxSucursales] = useState<string>('1');
     const [maxUsuariosPorSucursal, setMaxUsuariosPorSucursal] = useState<string>('5');
+    const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+
+    const resetForm = () => {
+        setEditingPlanId(null);
+        setName('');
+        setSelectedFeatures([]);
+        setManualPrice('');
+        setMaxSucursales('1');
+        setMaxUsuariosPorSucursal('5');
+    };
 
     // Calculadora Automática
     const recommendedPrice = useMemo(() => {
@@ -73,11 +83,34 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
         onSuccess: () => {
             toast.success("Plan Atómico creado exitosamente");
             queryClient.invalidateQueries({ queryKey: ['admin-plans'] });
-            setName('');
-            setSelectedFeatures([]);
-            setManualPrice('');
-            setMaxSucursales('1');
-            setMaxUsuariosPorSucursal('5');
+            resetForm();
+        },
+        onError: (err: any) => {
+            toast.error(err.message || "Error al crear el plan");
+        }
+    });
+
+    const updatePlanMutation = useMutation({
+        mutationFn: async () => {
+            if (!name.trim()) throw new Error('El plan necesita un nombre');
+            if (selectedFeatures.length === 0) throw new Error('Debes seleccionar al menos 1 módulo');
+            if (!editingPlanId) throw new Error('No hay plan en edición');
+            
+            return client(`/tenants/admin/plans/${editingPlanId}`, {
+                method: 'PUT',
+                body: {
+                    name: name.trim(),
+                    max_sucursales: parseInt(maxSucursales, 10),
+                    max_usuarios_por_sucursal: parseInt(maxUsuariosPorSucursal, 10),
+                    features: selectedFeatures,
+                    precio_mensual: finalPrice
+                }
+            });
+        },
+        onSuccess: () => {
+            toast.success("Plan actualizado exitosamente");
+            queryClient.invalidateQueries({ queryKey: ['admin-plans'] });
+            resetForm();
         },
         onError: (err: any) => {
             toast.error(err.message || "Error al crear el plan");
@@ -94,6 +127,16 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
     });
 
     const customPlans = existingPlans.filter(p => p.code.startsWith('CUSTOM_'));
+
+    const handleEdit = (plan: any) => {
+        setEditingPlanId(plan.id);
+        setName(plan.name);
+        setSelectedFeatures(plan.features);
+        setManualPrice(plan.precio_mensual?.toString() || '');
+        setMaxSucursales(plan.max_sucursales?.toString() || '-1');
+        setMaxUsuariosPorSucursal(plan.max_usuarios_por_sucursal?.toString() || '-1');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     return (
         <div className="bg-white rounded-[40px] p-8 shadow-sm border border-gray-100 mt-6">
@@ -217,14 +260,33 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
                         </div>
                     </div>
 
-                    <button 
-                        onClick={() => createPlanMutation.mutate()}
-                        disabled={createPlanMutation.isPending || selectedFeatures.length === 0}
-                        className="mt-6 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black uppercase tracking-wider text-sm transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {createPlanMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
-                        Guardar y Crear Plan
-                    </button>
+                    {editingPlanId ? (
+                        <div className="mt-6 flex flex-col gap-2">
+                            <button 
+                                onClick={() => updatePlanMutation.mutate()}
+                                disabled={updatePlanMutation.isPending || selectedFeatures.length === 0}
+                                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black uppercase tracking-wider text-sm transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {updatePlanMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                                Guardar Cambios
+                            </button>
+                            <button 
+                                onClick={resetForm}
+                                className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-2xl font-bold uppercase tracking-wider text-xs transition-all disabled:opacity-50"
+                            >
+                                Cancelar Edición
+                            </button>
+                        </div>
+                    ) : (
+                        <button 
+                            onClick={() => createPlanMutation.mutate()}
+                            disabled={createPlanMutation.isPending || selectedFeatures.length === 0}
+                            className="mt-6 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black uppercase tracking-wider text-sm transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {createPlanMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
+                            Guardar y Crear Plan
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -254,13 +316,21 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
                                         {plan.features.length > 5 && <span className="text-[9px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded uppercase">+{plan.features.length - 5}</span>}
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={() => deletePlanMutation.mutate(plan.id)}
-                                    disabled={deletePlanMutation.isPending}
-                                    className="self-end flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors"
-                                >
-                                    <Trash2 size={12} /> Eliminar
-                                </button>
+                                <div className="flex items-center gap-2 self-end mt-4">
+                                    <button 
+                                        onClick={() => handleEdit(plan)}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        <Edit2 size={12} /> Editar
+                                    </button>
+                                    <button 
+                                        onClick={() => deletePlanMutation.mutate(plan.id)}
+                                        disabled={deletePlanMutation.isPending}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={12} /> Eliminar
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
