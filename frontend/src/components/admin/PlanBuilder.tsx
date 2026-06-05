@@ -336,7 +336,7 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
                                         {plan.features.length > 5 && <span className="text-[9px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded uppercase">+{plan.features.length - 5}</span>}
                                     </div>
                                 </div>
-                                {!plan.is_public && plan.code !== 'ILIMITADO' && (
+                                {plan.code !== 'ILIMITADO' && (
                                     <div className="flex items-center gap-2 self-end mt-4">
                                         <button 
                                             onClick={() => handleEdit(plan)}
@@ -344,13 +344,15 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
                                         >
                                             <Edit2 size={12} /> Editar
                                         </button>
-                                        <button 
-                                            onClick={() => deletePlanMutation.mutate(plan.id)}
-                                            disabled={deletePlanMutation.isPending}
-                                            className="flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 size={12} /> Eliminar
-                                        </button>
+                                        {plan.code.startsWith('CUSTOM_') && (
+                                            <button 
+                                                onClick={() => deletePlanMutation.mutate(plan.id)}
+                                                disabled={deletePlanMutation.isPending}
+                                                className="flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 size={12} /> Eliminar
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
