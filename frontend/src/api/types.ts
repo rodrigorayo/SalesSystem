@@ -23,6 +23,7 @@ export interface Tenant {
     name: string;
     plan: string;
     is_active: boolean;
+    plan_expires_at?: string;
     settings?: TenantSettings;
     created_at: string;
 }
@@ -38,6 +39,7 @@ export interface TenantUpdate {
     name?: string;
     plan?: string;
     is_active?: boolean;
+    plan_expires_at?: string;
 }
 
 export interface Sucursal {

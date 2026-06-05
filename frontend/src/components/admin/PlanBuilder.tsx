@@ -128,7 +128,7 @@ export default function PlanBuilder({ existingPlans }: PlanBuilderProps) {
         onError: (err: any) => toast.error(err.message || "Error al eliminar (Puede estar en uso)")
     });
 
-    const customPlans = existingPlans.filter(p => p.code.startsWith('CUSTOM_'));
+
 
     const handleEdit = (plan: any) => {
         setEditingPlanId(plan.id);

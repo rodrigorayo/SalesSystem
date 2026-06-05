@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getTenants, client } from '../api/api';
 import { useAuthStore } from '../store/authStore';
-import { Building, Layers, AlertCircle, BarChart3, TrendingUp, Users } from 'lucide-react';
+import { Building, Layers, AlertCircle, TrendingUp } from 'lucide-react';
 import type { Tenant } from '../api/types';
 
 export default function AdminDashboardPage() {
@@ -13,7 +13,7 @@ export default function AdminDashboardPage() {
         queryFn: getTenants,
     });
 
-    const { data: dbPlans, isLoading: isLoadingPlans } = useQuery({
+    const { isLoading: isLoadingPlans } = useQuery({
         queryKey: ['admin-plans'],
         queryFn: () => client<any[]>('/tenants/admin/plans'),
     });
