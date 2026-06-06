@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUsers, createEmployee } from '../api/api';
-import { Users, Plus, Loader2, X, KeyRound, AlertTriangle, Copy, Check } from 'lucide-react';
+import { getUsers, createEmployee, updateEmployee, toggleEmployeeStatus } from '../api/api';
+import { Users, Plus, Loader2, X, KeyRound, AlertTriangle, Copy, Check, Edit2, Lock, Unlock } from 'lucide-react';
 import type { EmployeeCreate } from '../api/types';
 import PasswordField from '../components/PasswordField';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ export default function UsersPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [credentials, setCredentials] = useState<NewCredentials | null>(null);
     const [copied, setCopied] = useState(false);
+    const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
     
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 12;
@@ -58,6 +59,29 @@ export default function UsersPage() {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string, data: any }) => updateEmployee(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            setEditingEmployee(null);
+            toast.success('Empleado actualizado exitosamente');
+        },
+        onError: (err: any) => {
+            toast.error(err.message || 'Error al actualizar');
+        }
+    });
+
+    const toggleStatusMutation = useMutation({
+        mutationFn: ({ id, isActive }: { id: string, isActive: boolean }) => toggleEmployeeStatus(id, isActive),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            toast.success(`Empleado ${data.is_active ? 'desbloqueado' : 'bloqueado'}`);
+        },
+        onError: (err: any) => {
+            toast.error(err.message || 'Error al cambiar estado');
+        }
+    });
+
     return (
         <div className="max-w-7xl mx-auto px-3 py-4 md:p-4 space-y-4 pb-20 md:pb-4">
             {/* Header */}
@@ -84,24 +108,41 @@ export default function UsersPage() {
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {paginatedEmployees.map(emp => (
-                            <div key={emp._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex items-start">
-                            <div className="flex items-center gap-3 mr-auto">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emp.role === 'SUPERVISOR' ? 'bg-purple-50 text-purple-600' : emp.role === 'VENDEDOR' ? 'bg-amber-50 text-amber-600' : emp.role === 'FACTURADOR' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
-                                    <Users size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900">{emp.full_name ?? emp.username}</h3>
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-sm text-gray-500">@{emp.username}</p>
-                                        <span className={`text-[10px] font-bold px-1.5 rounded uppercase ${emp.role === 'VENDEDOR' ? 'bg-amber-100 text-amber-700' : emp.role === 'SUPERVISOR' ? 'bg-purple-100 text-purple-700' : emp.role === 'FACTURADOR' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
-                                            {emp.role}
-                                        </span>
+                            <div key={emp._id} className={`bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow flex flex-col gap-4 ${emp.is_active === false ? 'opacity-60 grayscale' : ''}`}>
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${emp.role === 'SUPERVISOR' ? 'bg-purple-50 text-purple-600' : emp.role === 'VENDEDOR' ? 'bg-amber-50 text-amber-600' : emp.role === 'FACTURADOR' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                                            <Users size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900">{emp.full_name ?? emp.username}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm text-gray-500">@{emp.username}</p>
+                                                <span className={`text-[10px] font-bold px-1.5 rounded uppercase ${emp.role === 'VENDEDOR' ? 'bg-amber-100 text-amber-700' : emp.role === 'SUPERVISOR' ? 'bg-purple-100 text-purple-700' : emp.role === 'FACTURADOR' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    {emp.role}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase shrink-0 ${emp.is_active === false ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                        {emp.is_active === false ? 'Inactivo' : 'Activo'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-gray-50">
+                                    <button 
+                                        onClick={() => { setEditingEmployee(emp); setForm({ ...emp, password: '' }); setConfirmPassword(''); }} 
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors">
+                                        <Edit2 size={14} /> Editar
+                                    </button>
+                                    <button 
+                                        onClick={() => toggleStatusMutation.mutate({ id: emp._id, isActive: emp.is_active === false ? true : false })}
+                                        disabled={toggleStatusMutation.isPending}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 ${emp.is_active === false ? 'text-green-600 bg-green-50 hover:bg-green-100' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}>
+                                        {emp.is_active === false ? <><Unlock size={14} /> Desbloquear</> : <><Lock size={14} /> Bloquear</>}
+                                    </button>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-lg uppercase self-center shrink-0">Activo</span>
-                        </div>
-                    ))}
+                        ))}
                     </div>
                     
                     {employees && employees.length > ITEMS_PER_PAGE && (
@@ -216,6 +257,63 @@ export default function UsersPage() {
                             <button type="submit" disabled={createMutation.isPending || !canSubmit}
                                 className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 text-sm mt-2">
                                 {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar Cuenta'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Edit Modal ────────────────────────────────────────────────── */}
+            {editingEmployee && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-5">
+                            <h2 className="text-lg font-bold text-gray-900">Editar Empleado</h2>
+                            <button onClick={() => { setEditingEmployee(null); setConfirmPassword(''); setForm(BLANK); }} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"><X size={18} /></button>
+                        </div>
+                        <form onSubmit={e => {
+                            e.preventDefault();
+                            if (form.password && !canSubmit) return;
+                            const payload: any = { full_name: form.full_name, role: form.role };
+                            if (form.password) payload.password = form.password;
+                            updateMutation.mutate({ id: editingEmployee._id, data: payload });
+                        }} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre Completo</label>
+                                <input type="text" placeholder="Ej: Juan Pérez" required
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm text-gray-900 placeholder-gray-400"
+                                    value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">Rol / Puesto</label>
+                                <select 
+                                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm text-gray-900"
+                                    value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })}>
+                                    <option value="CAJERO">Cajero (Punto de Venta Fijo)</option>
+                                    <option value="SUPERVISOR">Supervisor de Ventas (Móvil)</option>
+                                    <option value="VENDEDOR">Vendedor Preventista (Móvil)</option>
+                                    <option value="FACTURADOR">Facturador (Gestión de Facturas)</option>
+                                </select>
+                            </div>
+                            <div className="pt-4 border-t border-gray-100">
+                                <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5"><KeyRound size={14} className="text-amber-500"/> Cambiar Contraseña (Opcional)</label>
+                                <PasswordField
+                                    value={form.password}
+                                    onChange={v => setForm({ ...form, password: v })}
+                                    confirmValue={confirmPassword}
+                                    onConfirmChange={setConfirmPassword}
+                                />
+                            </div>
+
+                            {updateMutation.isError && (
+                                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                                    {((updateMutation.error as any)?.detail as string) ?? 'Error al actualizar'}
+                                </p>
+                            )}
+
+                            <button type="submit" disabled={updateMutation.isPending || (form.password.length > 0 && !canSubmit)}
+                                className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 text-sm mt-2">
+                                {updateMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar Cambios'}
                             </button>
                         </form>
                     </div>

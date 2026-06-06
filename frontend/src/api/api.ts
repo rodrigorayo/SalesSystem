@@ -461,6 +461,10 @@ export const createCategory = (data: CategoryCreate) =>
 export const getUsers = () => client<User[]>('/users');
 export const createEmployee = (data: EmployeeCreate) =>
     client<User>('/users/employee', { body: data });
+export const updateEmployee = (id: string, data: any) =>
+    client<User>(`/users/${id}`, { method: 'PUT', body: data });
+export const toggleEmployeeStatus = (id: string, is_active: boolean) =>
+    client<{message: string, is_active: boolean}>(`/users/${id}/status?is_active=${is_active}`, { method: 'PATCH' });
 
 // ─── Sales ────────────────────────────────────────────────────────────────
 export const createSale = (data: SaleCreate) => client('/sales', { method: 'POST', body: data });

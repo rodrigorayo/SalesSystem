@@ -34,6 +34,29 @@ class CajeroCreate(BaseModel):
             raise ValueError("Password must contain at least one special character (@$!%*?&#)")
         return v
 
+class EmployeeUpdate(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    password: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
+        if not re.search(r"[@$!%*?&#]", v):
+            raise ValueError("Password must contain at least one special character (@$!%*?&#)")
+        return v
+
+
 
 @router.get("/users", response_model=List[User])
 async def get_users(current_user: User = Depends(get_current_active_user)):
@@ -141,3 +164,59 @@ async def get_employees(current_user: User = Depends(get_current_active_user)):
 @router.post("/employees", response_model=User)
 async def create_employee(data: CajeroCreate, current_user: User = Depends(get_current_active_user)):
     return await create_cajero(data, current_user)
+
+@router.put("/users/{user_id}", response_model=User)
+async def update_employee(
+    user_id: str,
+    data: EmployeeUpdate,
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    from beanie import PydanticObjectId
+    target_user = await User.get(PydanticObjectId(user_id))
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    if current_user.role != UserRole.SUPERADMIN and target_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    if current_user.role == UserRole.ADMIN_SUCURSAL and target_user.sucursal_id != current_user.sucursal_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if data.full_name is not None:
+        target_user.full_name = data.full_name
+    if data.role is not None:
+        target_user.role = data.role
+    if data.password:
+        target_user.hashed_password = get_password_hash(data.password)
+        
+    await target_user.save()
+    return target_user
+
+@router.patch("/users/{user_id}/status")
+async def toggle_employee_status(
+    user_id: str,
+    is_active: bool,
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    from beanie import PydanticObjectId
+    from datetime import datetime
+    target_user = await User.get(PydanticObjectId(user_id))
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    if current_user.role != UserRole.SUPERADMIN and target_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    if str(target_user.id) == str(current_user.id):
+        raise HTTPException(status_code=400, detail="No puedes desactivar tu propio usuario")
+        
+    target_user.is_active = is_active
+    target_user.deleted_at = None if is_active else datetime.utcnow()
+    await target_user.save()
+    return {"message": "Estado actualizado", "is_active": is_active}
