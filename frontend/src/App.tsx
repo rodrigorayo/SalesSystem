@@ -28,6 +28,7 @@ import ClientesPage from './pages/ClientesPage';
 import ReclamosFabrica from './pages/b2b/ReclamosFabrica';
 import ComunidadPage from './pages/ComunidadPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import { useAuthStore } from './store/authStore';
 import { getMyFeatures, getMyTenant } from './api/api';
 import { Toaster } from 'sonner';
@@ -75,6 +76,9 @@ function FeaturesFetcher() {
       .then(tenant => {
           if (tenant.settings) {
               setTenantSettings(tenant.settings);
+              if (tenant.settings.brand_color) {
+                  document.documentElement.style.setProperty('--brand-color', tenant.settings.brand_color);
+              }
           }
           if (tenant.plan_expires_at !== undefined) {
               setPlanExpiresAt(tenant.plan_expires_at);

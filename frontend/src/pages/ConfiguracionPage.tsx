@@ -18,7 +18,8 @@ export default function ConfiguracionPage() {
         report_watermark: '',
         logo_base64: '',
         direccion: '',
-        telefono: ''
+        telefono: '',
+        brand_color: '#4f46e5'
     });
     const [isUploading, setIsUploading] = useState(false);
 
@@ -29,10 +30,20 @@ export default function ConfiguracionPage() {
                 report_watermark: tenant.settings.report_watermark || '',
                 logo_base64: tenant.settings.logo_base64 || '',
                 direccion: tenant.settings.direccion || '',
-                telefono: tenant.settings.telefono || ''
+                telefono: tenant.settings.telefono || '',
+                brand_color: tenant.settings.brand_color || '#4f46e5'
             });
+            if (tenant.settings.brand_color) {
+                document.documentElement.style.setProperty('--brand-color', tenant.settings.brand_color);
+            }
         }
     }, [tenant]);
+
+    const handleBrandColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const color = e.target.value;
+        setSettings(s => ({ ...s, brand_color: color }));
+        document.documentElement.style.setProperty('--brand-color', color);
+    };
 
     const mut = useMutation({
         mutationFn: (newSettings: TenantSettings) => updateMyTenantSettings(newSettings),
@@ -108,6 +119,25 @@ export default function ConfiguracionPage() {
                                     <button type="button" onClick={() => setSettings(s => ({ ...s, logo_base64: '' }))} className="text-red-500 text-sm font-bold hover:underline">Remover Logo</button>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Selector de Color */}
+                        <div className="flex-1 w-full flex flex-col justify-center border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-8">
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-4">Color Principal de la Marca</label>
+                            <div className="flex items-center gap-4">
+                                <div className="relative overflow-hidden w-16 h-16 rounded-full border-4 border-white shadow-md ring-2 ring-gray-100 shrink-0">
+                                    <input 
+                                        type="color" 
+                                        value={settings.brand_color} 
+                                        onChange={handleBrandColorChange}
+                                        className="absolute -inset-4 w-24 h-24 cursor-pointer"
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-900">Tema Dinámico</p>
+                                    <p className="text-xs text-gray-500">Selecciona tu color corporativo. Botones e indicadores cambiarán automáticamente.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

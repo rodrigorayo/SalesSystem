@@ -16,6 +16,7 @@ export interface TenantSettings {
     logo_base64?: string;
     direccion?: string;
     telefono?: string;
+    brand_color?: string;
 }
 
 export interface Tenant {

@@ -154,6 +154,8 @@ async def create_cajero(
         sucursal_id=sucursal_id,  # dynamically assigned
     )
     await cajero.create()
+    from app.infrastructure.core.audit import log_audit
+    await log_audit(current_user.tenant_id or "default", str(current_user.id), current_user.username, "CREATE_USER", "USER", str(cajero.id), {"role": cajero.role})
     return cajero
 
 
@@ -210,6 +212,8 @@ async def update_employee(
         target_user.hashed_password = get_password_hash(data.password)
         
     await target_user.save()
+    from app.infrastructure.core.audit import log_audit
+    await log_audit(current_user.tenant_id or "default", str(current_user.id), current_user.username, "UPDATE_USER", "USER", str(target_user.id), {"role": target_user.role})
     return target_user
 
 @router.patch("/users/{user_id}/status")
@@ -236,4 +240,7 @@ async def toggle_employee_status(
     target_user.is_active = is_active
     target_user.deleted_at = None if is_active else datetime.utcnow()
     await target_user.save()
+    from app.infrastructure.core.audit import log_audit
+    action = "ACTIVATE_USER" if is_active else "DEACTIVATE_USER"
+    await log_audit(current_user.tenant_id or "default", str(current_user.id), current_user.username, action, "USER", str(target_user.id), {})
     return {"message": "Estado actualizado", "is_active": is_active}

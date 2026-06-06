@@ -35,6 +35,14 @@ export const getMyFeatures = () => client<{ features: string[]; plan: string; pl
 export const getMyTenant = () => client<Tenant>('/tenants/me');
 export const updateMyTenantSettings = (data: Partial<TenantSettings>) => client<Tenant>('/tenants/me/settings', { method: 'PUT', body: data });
 
+export const getAuditLogs = (limit: number = 100, skip: number = 0, action?: string, entity?: string, username?: string) => {
+    const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
+    if (action) params.append('action', action);
+    if (entity) params.append('entity', entity);
+    if (username) params.append('username', username);
+    return client<any[]>(`/audit-logs?${params.toString()}`);
+};
+
 export const uploadImage = async (file: File): Promise<{url: string}> => {
     const formData = new FormData();
     formData.append('file', file);

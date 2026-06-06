@@ -11,6 +11,7 @@ class TenantSettings(BaseModel):
     logo_base64: Optional[str] = None
     direccion: Optional[str] = None
     telefono: Optional[str] = None
+    brand_color: Optional[str] = "#4f46e5"
 from .base import SoftDeleteMixin
 
 

@@ -48,6 +48,8 @@ class ProductService:
             **data.model_dump(exclude={"precios_sucursales"}),
         )
         await product.create()
+        from app.infrastructure.core.audit import log_audit
+        await log_audit(tenant_id, str(current_user.id), current_user.username, "CREATE_PRODUCT", "PRODUCT", str(product.id), {"codigo": product.codigo_corto})
         
         if data.precios_sucursales:
             from pymongo import UpdateOne
@@ -158,5 +160,7 @@ class ProductService:
             raise HTTPException(status_code=404, detail="Product not found")
         product.is_active = False
         await product.save()
+        from app.infrastructure.core.audit import log_audit
+        await log_audit(product.tenant_id or "default", str(current_user.id), current_user.username, "DEACTIVATE_PRODUCT", "PRODUCT", str(product.id), {})
         return {"message": "Product deactivated"}
     
