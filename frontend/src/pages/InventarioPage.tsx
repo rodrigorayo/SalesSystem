@@ -5,8 +5,8 @@ import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Searc
 import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
-import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
+import BulkAjusteView from '../components/BulkAjusteView';
 
 import { formatFullDate as formatDate } from '../utils/dateUtils';
 
@@ -19,7 +19,7 @@ export default function InventarioPage() {
     const esMatriz = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN';
     const esAdminSucursal = esMatriz || user?.role === 'ADMIN_SUCURSAL';
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? 'CENTRAL' : (user?.sucursal_id || 'CENTRAL'));
-    const [tab, setTab] = useLocalStorage<'stock' | 'kardex'>('inventario-tab', 'stock');
+    const [tab, setTab] = useLocalStorage<'stock' | 'kardex' | 'masivo'>('inventario-tab', 'stock');
     const [searchTerm, setSearchTerm] = useLocalStorage('inventario-search', '');
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [categorySearch, setCategorySearch] = useState('');
@@ -240,6 +240,15 @@ export default function InventarioPage() {
                                 <History size={16} className={tab === 'kardex' ? 'text-indigo-600' : 'text-gray-400'} />
                                 <span>Kárdex</span>
                             </button>
+                            {esAdminSucursal && (
+                                <button
+                                    onClick={() => setTab('masivo')}
+                                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'masivo' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-gray-900/5' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    <Scale size={16} className={tab === 'masivo' ? 'text-indigo-600' : 'text-gray-400'} />
+                                    <span>Ajuste Rápido</span>
+                                </button>
+                            )}
                         </div>
                         {tab === 'stock' && esAdminSucursal && (
                             <button 
@@ -438,6 +447,17 @@ export default function InventarioPage() {
                         )}
                     </div>
                 </div>
+            )}
+
+            {tab === 'masivo' && (
+                <BulkAjusteView 
+                    sucursalId={selectedSucursal} 
+                    onSuccess={() => {
+                        queryClient.invalidateQueries({ queryKey: ['inventario', selectedSucursal] });
+                        queryClient.invalidateQueries({ queryKey: ['movimientos', selectedSucursal] });
+                        setTab('stock');
+                    }}
+                />
             )}
 
             {tab === 'kardex' && (

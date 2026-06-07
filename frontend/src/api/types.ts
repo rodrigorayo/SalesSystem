@@ -115,6 +115,18 @@ export interface AjusteInventario {
     notas?: string;
 }
 
+export interface AjusteInventarioMasivoItem {
+    producto_id: string;
+    tipo: 'ENTRADA' | 'SALIDA' | 'AJUSTE';
+    cantidad: number;
+}
+
+export interface AjusteInventarioMasivoRequest {
+    sucursal_id: string;
+    notas_generales?: string;
+    ajustes: AjusteInventarioMasivoItem[];
+}
+
 export interface InventoryLog {
     _id: string;
     tenant_id: string;

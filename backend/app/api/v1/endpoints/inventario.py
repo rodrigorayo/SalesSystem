@@ -10,7 +10,7 @@ from app.domain.models.inventario import Inventario
 from app.domain.models.product import Product
 from app.domain.models.user import User, UserRole
 from app.infrastructure.auth import get_current_active_user
-from app.domain.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated
+from app.domain.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated, AjusteInventarioMasivoRequest
 from app.utils.date_utils import get_day_range_bolivia
 
 router = APIRouter()
@@ -211,7 +211,100 @@ async def ajustar_inventario(
     return {"sucursal_id": sucursal_id, "producto_id": ajuste.producto_id, "cantidad": entry.cantidad, "movimiento": cantidad_cambio}
 
 
-@router.get("/inventario/movimientos")
+@router.post("/inventario/ajuste-masivo")
+async def ajustar_inventario_masivo(
+    req: AjusteInventarioMasivoRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Manually adjust inventory for multiple products at once.
+    """
+    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    tenant_id = current_user.tenant_id or ""
+    sucursal_id = req.sucursal_id
+
+    from app.domain.models.inventario import TipoMovimiento, InventoryLog
+    
+    resultados = []
+    
+    for ajuste in req.ajustes:
+        if ajuste.cantidad < 0:
+            continue
+            
+        product = await Product.get(ajuste.producto_id)
+        if not product or (current_user.role != UserRole.SUPERADMIN and product.tenant_id != tenant_id):
+            continue
+
+        entry = await Inventario.find_one(
+            Inventario.tenant_id == tenant_id,
+            Inventario.sucursal_id == sucursal_id,
+            Inventario.producto_id == ajuste.producto_id,
+        )
+
+        stock_anterior = entry.cantidad if entry else 0
+        cantidad_cambio = 0
+        
+        if ajuste.tipo == "ENTRADA":
+            nuevo_stock = stock_anterior + ajuste.cantidad
+            cantidad_cambio = ajuste.cantidad
+            tipo_mov = TipoMovimiento.ENTRADA_MANUAL
+        elif ajuste.tipo == "SALIDA":
+            nuevo_stock = max(0, stock_anterior - ajuste.cantidad)
+            cantidad_cambio = nuevo_stock - stock_anterior
+            tipo_mov = TipoMovimiento.SALIDA_MANUAL
+        elif ajuste.tipo == "AJUSTE":
+            nuevo_stock = ajuste.cantidad
+            cantidad_cambio = nuevo_stock - stock_anterior
+            tipo_mov = TipoMovimiento.AJUSTE_FISICO
+        else:
+            continue
+
+        if entry:
+            entry.cantidad = nuevo_stock
+            await entry.save()
+        else:
+            entry = Inventario(
+                tenant_id=tenant_id,
+                sucursal_id=sucursal_id,
+                producto_id=ajuste.producto_id,
+                cantidad=nuevo_stock,
+            )
+            await entry.create()
+
+        if cantidad_cambio != 0:
+            mismatch_note = ""
+            if ajuste.tipo == "AJUSTE":
+                mismatch_note = f"[Ajuste Físico Masivo: Sistema tenía {stock_anterior} u., físico {nuevo_stock} u. Discrepancia: {'+' if cantidad_cambio > 0 else ''}{cantidad_cambio} u.]"
+            elif ajuste.tipo == "ENTRADA":
+                mismatch_note = f"[Entrada Masiva: {stock_anterior} u. -> {nuevo_stock} u. (+{ajuste.cantidad} u.)]"
+            elif ajuste.tipo == "SALIDA":
+                mismatch_note = f"[Salida Masiva: {stock_anterior} u. -> {nuevo_stock} u. (-{ajuste.cantidad} u.)]"
+                
+            final_notes = f"{mismatch_note} - {req.notas_generales}" if req.notas_generales else mismatch_note
+
+            log = InventoryLog(
+                tenant_id=tenant_id,
+                sucursal_id=sucursal_id,
+                producto_id=ajuste.producto_id,
+                descripcion=product.descripcion,
+                tipo_movimiento=tipo_mov,
+                cantidad_movida=cantidad_cambio,
+                stock_resultante=nuevo_stock,
+                usuario_id=str(current_user.id),
+                usuario_nombre=current_user.username,
+                notas=final_notes
+            )
+            await log.create()
+            
+        resultados.append({
+            "producto_id": ajuste.producto_id,
+            "cantidad": entry.cantidad,
+            "movimiento": cantidad_cambio
+        })
+
+    return {"message": "Ajuste masivo procesado exitosamente", "procesados": len(resultados)}
 async def get_movimientos(
     producto_id: str = None,
     sucursal_id: str = "CENTRAL",

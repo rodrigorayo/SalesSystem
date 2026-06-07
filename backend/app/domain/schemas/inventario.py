@@ -27,6 +27,16 @@ class AjusteInventario(BaseModel):
     cantidad: int   # Must be a positive absolute value
     notas: str = ""
 
+class AjusteInventarioMasivoItem(BaseModel):
+    producto_id: str
+    tipo: str
+    cantidad: int
+
+class AjusteInventarioMasivoRequest(BaseModel):
+    sucursal_id: str
+    notas_generales: str = ""
+    ajustes: list[AjusteInventarioMasivoItem]
+
 class InventarioPaginated(BaseModel):
     items: list[InventarioItem]
     total: int

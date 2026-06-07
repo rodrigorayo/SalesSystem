@@ -335,7 +335,16 @@ export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: 
     return client<{ items: InventarioItem[], total: number, page: number, pages: number }>(`/inventario?${params.toString()}`);
 };
 export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>
-    client(`/inventario/ajuste?sucursal_id=${sucursal_id}`, { method: 'POST', body: data });
+    client<{ cantidad: number, movimiento: number }>(`/inventario/ajuste?sucursal_id=${sucursal_id}`, {
+        method: 'POST',
+        body: data,
+    });
+
+export const ajustarInventarioMasivo = (data: AjusteInventarioMasivoRequest) =>
+    client<{ message: string, procesados: number }>('/inventario/ajuste-masivo', {
+        method: 'POST',
+        body: data,
+    });
 export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
     const params = new URLSearchParams({ sucursal_id });
     if (producto_id) params.set('producto_id', producto_id);
