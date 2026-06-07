@@ -500,6 +500,69 @@ async def get_financial_report(
 
 from app.domain.models.inventario import Inventario, InventoryLog
 
+@router.get("/anulaciones")
+async def get_anulaciones_report(
+    start_date: str, # YYYY-MM-DD
+    end_date: str,   # YYYY-MM-DD
+    sucursal_id: Optional[str] = "all",
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Returns a detailed report of all cancelled (anulada) sales.
+    """
+    tenant_id = current_user.tenant_id or "default"
+    
+    target_sucursal = sucursal_id
+    if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR]:
+        target_sucursal = current_user.sucursal_id
+
+    try:
+        start_dt, _ = get_day_range_bolivia(start_date)
+        _, end_dt = get_day_range_bolivia(end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    match_filter = {
+        "tenant_id": tenant_id,
+        "anulada": True,
+        "created_at": {"$gte": start_dt, "$lte": end_dt}
+    }
+    
+    if target_sucursal and target_sucursal != "all":
+        match_filter["sucursal_id"] = target_sucursal
+
+    pipeline = [
+        {"$match": match_filter},
+        {"$sort": {"created_at": -1}}
+    ]
+
+    cursor = Sale.get_pymongo_collection().aggregate(pipeline)
+    raw_results = await cursor.to_list(length=2000)
+    
+    # Resolve sucursal names
+    todas_sucursales = await Sucursal.find(Sucursal.tenant_id == tenant_id).to_list()
+    map_sucursales = {str(s.id): s.nombre for s in todas_sucursales}
+    map_sucursales["CENTRAL"] = "Almacén Central (Matriz)"
+
+    results = []
+    for r in raw_results:
+        norm = normalize_bson(r)
+        sid = norm.get("sucursal_id")
+        
+        results.append({
+            "_id": norm["_id"],
+            "created_at": norm["created_at"],
+            "total": float(str(norm.get("total", 0))),
+            "sucursal_nombre": map_sucursales.get(str(sid), str(sid)),
+            "cashier_name": norm.get("cashier_name", "Desconocido"),
+            "anulada_por_nombre": norm.get("anulada_por_nombre", "N/A"),
+            "motivo_anulacion": norm.get("motivo_anulacion", "Sin motivo especificado"),
+            "notas_anulacion": norm.get("notas_anulacion", ""),
+            "cliente": norm.get("cliente", {})
+        })
+
+    return results
+
 @router.get("/valued-inventory")
 async def get_valued_inventory(
     date: Optional[str] = None, # YYYY-MM-DD

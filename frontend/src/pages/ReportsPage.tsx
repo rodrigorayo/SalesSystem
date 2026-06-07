@@ -15,6 +15,7 @@ import SalesMatrixView from '../components/SalesMatrixView';
 import InventoryReconciliationView from '../components/InventoryReconciliationView';
 import ExpensesReportView from '../components/ExpensesReportView';
 import CashSalesSummaryView from '../components/CashSalesSummaryView';
+import AnulacionesReportView from '../components/AnulacionesReportView';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, BarChart, Bar, Legend
@@ -28,7 +29,7 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado' | 'matrix' | 'conciliacion' | 'gastos' | 'caja_ventas';
+type TabType = 'general' | 'sucursales' | 'finanzas' | 'canales' | 'fuerza_ventas' | 'daily' | 'hourly' | 'staff' | 'inventario_valorado' | 'matrix' | 'conciliacion' | 'gastos' | 'caja_ventas' | 'anulaciones';
 
 export default function ReportsPage() {
     const { role } = useAuthStore();
@@ -109,6 +110,7 @@ export default function ReportsPage() {
                     { id: 'caja_ventas', label: 'Ventas por Caja', icon: <Wallet size={16} /> },
                     { id: 'inventario_valorado', label: 'Inventario Valorado', icon: <Package size={16} /> },
                     { id: 'gastos', label: 'Gastos', icon: <DollarSign size={16} /> },
+                    { id: 'anulaciones', label: 'Anulaciones', icon: <Ban size={16} /> },
                 ].filter(t => !t.hidden).map((tab) => (
                     <button
                         key={tab.id}
@@ -143,6 +145,8 @@ export default function ReportsPage() {
                 <ExpensesReportView />
             ) : activeTab === 'caja_ventas' ? (
                 <CashSalesSummaryView />
+            ) : activeTab === 'anulaciones' ? (
+                <AnulacionesReportView />
             ) : (
                 <>
                     {isLoading ? (

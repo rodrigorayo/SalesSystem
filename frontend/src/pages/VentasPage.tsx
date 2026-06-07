@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSales, anularSale, getSucursales, toggleFacturaEmitida, checkPosibleDuplicado, getSesionesAbiertas, type MotivoAnulacion } from '../api/api';
 import { useAuthStore } from '../store/authStore';
@@ -333,17 +334,19 @@ function AnularModal({
 
 export default function VentasPage() {
     const qc = useQueryClient();
+    const [searchParams] = useSearchParams();
     const { user, role, tenantSettings } = useAuthStore();
     const esMatriz = ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN', 'FACTURADOR'].includes(role || '');
 
     // Filtros
+    const searchId = searchParams.get('search') || '';
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? '' : (user?.sucursal_id || ''));
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(searchId);
     const [soloFacturas, setSoloFacturas] = useState(role === 'FACTURADOR');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [metodoPago, setMetodoPago] = useState('');
-    const [expanded, setExpanded] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState<string | null>(searchId ? searchId : null);
     const [printSale, setPrintSale] = useState<Sale | null>(null);
     const [page, setPage] = useState(1);
     const limit = role === 'FACTURADOR' ? 10 : 50;

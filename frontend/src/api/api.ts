@@ -151,6 +151,12 @@ export const getStaffPerformanceReport = (date?: string, sucursal_id?: string, s
     }>(`/reports/staff-performance?${params.toString()}`);
 };
 
+export const getAnulacionesReport = (startDate: string, endDate: string, sucursalId?: string) => {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (sucursalId && sucursalId !== 'all') params.append('sucursal_id', sucursalId);
+    return client<any[]>(`/reports/anulaciones?${params.toString()}`);
+};
+
 export const getVentasMatrix = (startDate: string, endDate: string, sucursalId?: string) => {
     const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
     if (sucursalId && sucursalId !== 'all') params.set('sucursal_id', sucursalId);
