@@ -113,7 +113,7 @@ export default function BulkAjusteView({ sucursalId, onSuccess }: Props) {
                             placeholder="Ej. Coca Cola 2L..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 rounded-xl outline-none transition-all text-sm font-medium"
+                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 rounded-xl outline-none transition-all text-sm font-medium text-gray-900"
                         />
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         {searching && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin" size={16} />}
@@ -215,7 +215,7 @@ export default function BulkAjusteView({ sucursalId, onSuccess }: Props) {
                                                         type="number"
                                                         value={item.delta || ''}
                                                         onChange={(e) => updateDelta(item.producto_id, parseInt(e.target.value) || 0)}
-                                                        className="w-14 text-center bg-transparent outline-none text-sm font-black font-mono"
+                                                        className="w-14 text-center bg-transparent outline-none text-sm font-black font-mono text-gray-900"
                                                         placeholder="0"
                                                     />
                                                     <button 
