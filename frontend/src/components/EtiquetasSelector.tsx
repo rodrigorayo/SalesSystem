@@ -13,7 +13,7 @@ interface Props {
 export default function EtiquetasSelector({ pedidoId, etiquetasIds }: Props) {
     const qc = useQueryClient();
     const [isOpen, setIsOpen] = useState(false);
-    const ref = useRef(null);
+    const ref = useRef<HTMLDivElement>(null);
     useOnClickOutside(ref, () => setIsOpen(false));
 
     const { data: etiquetas = [] } = useQuery({
