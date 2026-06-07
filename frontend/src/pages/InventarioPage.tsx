@@ -5,6 +5,7 @@ import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Searc
 import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
+import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 import BulkAjusteView from '../components/BulkAjusteView';
 

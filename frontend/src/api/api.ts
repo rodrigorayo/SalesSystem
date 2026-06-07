@@ -13,7 +13,7 @@ import type {
     User, EmployeeCreate,
     SaleCreate, Sale, SalesPaginated,
     Sucursal, SucursalCreate,
-    InventarioItem, AjusteInventario, InventoryLog,
+    InventarioItem, AjusteInventario, InventoryLog, AjusteInventarioMasivoRequest,
     PedidoInterno, PedidoCreate,
     PriceChangeRequest, PriceRequestCreate, ReportStats
 } from './types';
