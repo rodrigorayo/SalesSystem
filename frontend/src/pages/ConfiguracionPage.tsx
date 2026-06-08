@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMyTenant, updateMyTenantSettings, uploadImage } from '../api/api';
 import type { TenantSettings } from '../api/types';
-import { Loader2, Save, Image as ImageIcon, Store, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Image as ImageIcon, Store, AlertCircle, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ConfiguracionPage() {
@@ -19,7 +19,14 @@ export default function ConfiguracionPage() {
         logo_base64: '',
         direccion: '',
         telefono: '',
-        brand_color: '#4f46e5'
+        brand_color: '#4f46e5',
+        whatsapp: {
+            enabled: false,
+            provider: 'GREENAPI',
+            instance_id: '',
+            api_token: '',
+            default_message: 'Hola {cliente}, adjuntamos el comprobante de tu compra por Bs. {total}. ¡Gracias por tu preferencia!'
+        }
     });
     const [isUploading, setIsUploading] = useState(false);
 
@@ -31,7 +38,14 @@ export default function ConfiguracionPage() {
                 logo_base64: tenant.settings.logo_base64 || '',
                 direccion: tenant.settings.direccion || '',
                 telefono: tenant.settings.telefono || '',
-                brand_color: tenant.settings.brand_color || '#4f46e5'
+                brand_color: tenant.settings.brand_color || '#4f46e5',
+                whatsapp: {
+                    enabled: tenant.settings.whatsapp?.enabled || false,
+                    provider: tenant.settings.whatsapp?.provider || 'GREENAPI',
+                    instance_id: tenant.settings.whatsapp?.instance_id || '',
+                    api_token: tenant.settings.whatsapp?.api_token || '',
+                    default_message: tenant.settings.whatsapp?.default_message || 'Hola {cliente}, adjuntamos el comprobante de tu compra por Bs. {total}. ¡Gracias por tu preferencia!'
+                }
             });
             if (tenant.settings.brand_color) {
                 document.documentElement.style.setProperty('--brand-color', tenant.settings.brand_color);
@@ -193,6 +207,73 @@ export default function ConfiguracionPage() {
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* WHATSAPP INTEGRATION */}
+                <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                            <MessageCircle className="text-green-500" /> Integración de WhatsApp
+                        </h2>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only peer"
+                                checked={settings.whatsapp?.enabled}
+                                onChange={e => setSettings(s => ({ ...s, whatsapp: { ...s.whatsapp!, enabled: e.target.checked } }))}
+                            />
+                            <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500"></div>
+                        </label>
+                    </div>
+
+                    {settings.whatsapp?.enabled && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-4 duration-300">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Proveedor</label>
+                                <select
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 font-bold"
+                                    value={settings.whatsapp?.provider}
+                                    onChange={e => setSettings(s => ({ ...s, whatsapp: { ...s.whatsapp!, provider: e.target.value } }))}
+                                >
+                                    <option value="GREENAPI">Green-API (Recomendado)</option>
+                                    <option value="ULTRAMSG">UltraMsg</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Instance ID</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 font-bold"
+                                    placeholder="Ej. 7103891238"
+                                    value={settings.whatsapp?.instance_id}
+                                    onChange={e => setSettings(s => ({ ...s, whatsapp: { ...s.whatsapp!, instance_id: e.target.value } }))}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">API Token</label>
+                                <input 
+                                    type="password" 
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 font-bold"
+                                    placeholder="••••••••••••••••"
+                                    value={settings.whatsapp?.api_token}
+                                    onChange={e => setSettings(s => ({ ...s, whatsapp: { ...s.whatsapp!, api_token: e.target.value } }))}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Mensaje por Defecto</label>
+                                <p className="text-xs text-gray-500 mb-2">Variables disponibles: <code className="bg-gray-100 px-1 rounded">{'{cliente}'}</code>, <code className="bg-gray-100 px-1 rounded">{'{total}'}</code></p>
+                                <textarea 
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 font-bold resize-none h-24"
+                                    placeholder="Hola {cliente}, adjuntamos tu ticket por Bs. {total}"
+                                    value={settings.whatsapp?.default_message}
+                                    onChange={e => setSettings(s => ({ ...s, whatsapp: { ...s.whatsapp!, default_message: e.target.value } }))}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex justify-end pt-4">

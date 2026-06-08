@@ -61,7 +61,8 @@ export default function POSPage() {
         descuento, setDescuento,
         total, totalCubierto, restante, cambio, canFinalize,
         reset,
-        parkedTickets, parkTicket, restoreTicket, removeParkedTicket
+        parkedTickets, parkTicket, restoreTicket, removeParkedTicket,
+        sendWhatsApp, setSendWhatsApp
     } = usePosStore();
 
     const [search, setSearch] = useLocalStorage('pos-search', '');
@@ -200,6 +201,7 @@ export default function POSPage() {
                 } : undefined,
                 vendedor_id: vendedor.vendedor_id || undefined,
                 vendedor_name: vendedor.vendedor_name || undefined,
+                send_whatsapp: sendWhatsApp && (!!cliente.telefono || !!cliente.cliente_id),
             },
         }),
         onSuccess: (data) => {
@@ -600,6 +602,18 @@ export default function POSPage() {
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
+
+                                {/* Toggle WhatsApp */}
+                                {tenantSettings?.whatsapp?.enabled && (
+                                    <div className="flex items-center justify-between mt-1">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input type="checkbox" checked={sendWhatsApp}
+                                                onChange={e => setSendWhatsApp(e.target.checked)}
+                                                className="w-3.5 h-3.5 rounded border-gray-300 text-green-600 shrink-0" />
+                                            <span className="text-[11px] text-gray-600 font-medium">Enviar comprobante por WhatsApp</span>
+                                        </label>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Vendedor */}

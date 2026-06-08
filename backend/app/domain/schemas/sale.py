@@ -50,6 +50,7 @@ class SaleCreate(BaseModel):
     cliente: Optional[ClienteIn] = None
     vendedor_id: Optional[str] = None
     vendedor_name: Optional[str] = None
+    send_whatsapp: bool = False
 
 
 class SalesPaginated(BaseModel):

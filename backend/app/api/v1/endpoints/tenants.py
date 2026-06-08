@@ -274,12 +274,20 @@ async def delete_tenant(tenant_id: str, current_user: User = Depends(get_current
     return {"message": "Tenant and all associated data deleted successfully"}
 
 
+class WhatsAppSettingsUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    provider: Optional[str] = None
+    instance_id: Optional[str] = None
+    api_token: Optional[str] = None
+    default_message: Optional[str] = None
+
 class TenantSettingsUpdate(BaseModel):
     ticket_footer: Optional[str] = None
     report_watermark: Optional[str] = None
     logo_base64: Optional[str] = None
     direccion: Optional[str] = None
     telefono: Optional[str] = None
+    whatsapp: Optional[WhatsAppSettingsUpdate] = None
 
 @router.get("/tenants/me", response_model=Tenant)
 async def get_my_tenant(current_user: User = Depends(get_current_active_user)):
@@ -319,6 +327,17 @@ async def update_my_tenant_settings(
         tenant.settings.direccion = settings_in.direccion
     if settings_in.telefono is not None:
         tenant.settings.telefono = settings_in.telefono
+    if settings_in.whatsapp is not None:
+        if settings_in.whatsapp.enabled is not None:
+            tenant.settings.whatsapp.enabled = settings_in.whatsapp.enabled
+        if settings_in.whatsapp.provider is not None:
+            tenant.settings.whatsapp.provider = settings_in.whatsapp.provider
+        if settings_in.whatsapp.instance_id is not None:
+            tenant.settings.whatsapp.instance_id = settings_in.whatsapp.instance_id
+        if settings_in.whatsapp.api_token is not None:
+            tenant.settings.whatsapp.api_token = settings_in.whatsapp.api_token
+        if settings_in.whatsapp.default_message is not None:
+            tenant.settings.whatsapp.default_message = settings_in.whatsapp.default_message
         
     await tenant.save()
     return tenant

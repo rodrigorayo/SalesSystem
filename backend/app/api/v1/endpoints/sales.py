@@ -18,6 +18,9 @@ router = APIRouter()
 
 from app.domain.schemas.sale import SaleCreate, SalesPaginated
 from app.application.services.sales_service import SalesService
+from fastapi import BackgroundTasks
+from app.domain.models.tenant import Tenant
+from app.application.services.whatsapp_service import WhatsAppService
 
 
 # ─── Schema: Anulación ──────────────────────────────────────────────────────────────────
@@ -41,9 +44,34 @@ class AnularRequest(BaseModel):
 @router.post("/sales", response_model=Sale)
 async def create_sale_endpoint(
     sale_in: SaleCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user)
 ):
-    return await SalesService.create_sale(sale_in, current_user)
+    sale = await SalesService.create_sale(sale_in, current_user)
+    
+    if sale_in.send_whatsapp:
+        celular = sale_in.cliente.telefono if sale_in.cliente else None
+        if not celular and sale.cliente:
+            celular = sale.cliente.telefono
+            
+        if celular:
+            tenant = await Tenant.get(sale.tenant_id)
+            if tenant and tenant.settings.whatsapp.enabled:
+                cliente_nombre = sale.cliente.razon_social if sale.cliente and sale.cliente.razon_social else "Cliente"
+                msg = tenant.settings.whatsapp.default_message.format(
+                    cliente=cliente_nombre,
+                    total=str(sale.total)
+                )
+                
+                background_tasks.add_task(
+                    WhatsAppService.send_message,
+                    phone=celular,
+                    message=msg,
+                    settings=tenant.settings.whatsapp,
+                    pdf_url=None
+                )
+                
+    return sale
 
 # ─── GET /sales/stats/today ───────────────────────────────────────────────────
 

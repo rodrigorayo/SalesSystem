@@ -5,7 +5,15 @@ from pydantic import Field
 from datetime import datetime
 from pydantic import Field, BaseModel
 
+class WhatsAppSettings(BaseModel):
+    enabled: bool = False
+    provider: str = "GREENAPI"
+    instance_id: Optional[str] = None
+    api_token: Optional[str] = None
+    default_message: str = "Hola {cliente}, adjuntamos el comprobante de tu compra por Bs. {total}. ¡Gracias por tu preferencia!"
+
 class TenantSettings(BaseModel):
+    whatsapp: WhatsAppSettings = Field(default_factory=WhatsAppSettings)
     ticket_footer: Optional[str] = "¡Gracias por su preferencia!"
     report_watermark: Optional[str] = "Sales System • Confidencial"
     logo_base64: Optional[str] = None

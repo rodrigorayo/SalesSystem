@@ -15,8 +15,11 @@ class CategoryCreate(BaseModel):
 async def get_categories(current_user: User = Depends(get_current_active_user)):
     # Superadmin sees all? Or just tenants? Let's stick to tenant isolation.
     if current_user.role == UserRole.SUPERADMIN:
-        return await Category.find_all().to_list()
-    return await Category.find(Category.tenant_id == current_user.tenant_id).to_list()
+        return await Category.find(Category.is_active == True).to_list()
+    return await Category.find(
+        Category.tenant_id == current_user.tenant_id,
+        Category.is_active == True
+    ).to_list()
 
 @router.post("/categories", response_model=Category)
 async def create_category(category_in: CategoryCreate, current_user: User = Depends(get_current_active_user)):
@@ -35,6 +38,20 @@ async def create_category(category_in: CategoryCreate, current_user: User = Depe
     await category.create()
     return category
 
+@router.patch("/categories/{category_id}", response_model=Category)
+async def update_category(category_id: str, category_in: CategoryCreate, current_user: User = Depends(get_current_active_user)):
+    if current_user.role not in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    category = await Category.get(category_id)
+    if not category or category.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="Category not found")
+        
+    category.name = category_in.name
+    category.description = category_in.description
+    await category.save()
+    return category
+
 @router.delete("/categories/{category_id}")
 async def delete_category(category_id: str, current_user: User = Depends(get_current_active_user)):
     if current_user.role not in [UserRole.ADMIN, UserRole.SUPERADMIN]:
@@ -44,5 +61,6 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
     if not category or category.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Category not found")
         
-    await category.delete()
-    return {"message": "Category deleted"}
+    category.is_active = False
+    await category.save()
+    return {"message": "Category soft-deleted"}

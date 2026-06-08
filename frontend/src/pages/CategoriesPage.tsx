@@ -7,6 +7,7 @@ import type { Category, CategoryCreate } from '../api/types';
 export default function CategoriesPage() {
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<CategoryCreate>({ name: '', description: '' });
 
     // Fetch Categories
@@ -21,6 +22,17 @@ export default function CategoriesPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
             setIsModalOpen(false);
+            setEditingId(null);
+            setFormData({ name: '', description: '' });
+        }
+    });
+
+    const updateCategoryMutation = useMutation({
+        mutationFn: (data: { id: string, category: CategoryCreate }) => client<Category>(`/categories/${data.id}`, { method: 'PATCH', body: data.category }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            setIsModalOpen(false);
+            setEditingId(null);
             setFormData({ name: '', description: '' });
         }
     });
@@ -34,7 +46,11 @@ export default function CategoriesPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        createCategoryMutation.mutate(formData);
+        if (editingId) {
+            updateCategoryMutation.mutate({ id: editingId, category: formData });
+        } else {
+            createCategoryMutation.mutate(formData);
+        }
     };
 
     return (
@@ -45,7 +61,11 @@ export default function CategoriesPage() {
                     <p className="text-gray-500 mt-1">Organiza tus productos</p>
                 </div>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => {
+                        setEditingId(null);
+                        setFormData({ name: '', description: '' });
+                        setIsModalOpen(true);
+                    }}
                     className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full font-bold shadow-lg hover:bg-gray-900 transition-all active:scale-95"
                 >
                     <Plus size={20} /> Nueva Categoría
@@ -68,14 +88,28 @@ export default function CategoriesPage() {
                                     </div>
                                     <p className="text-sm text-gray-500 pl-13">{category.description || 'Sin descripción'}</p>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        if (confirm('¿Eliminar categoría?')) deleteCategoryMutation.mutate(category._id);
-                                    }}
-                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => {
+                                            setEditingId(category._id);
+                                            setFormData({ name: category.name, description: category.description || '' });
+                                            setIsModalOpen(true);
+                                        }}
+                                        className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition-colors"
+                                        title="Editar"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('¿Ocultar categoría?')) deleteCategoryMutation.mutate(category._id);
+                                        }}
+                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                        title="Ocultar"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                         {categories?.length === 0 && (
@@ -93,8 +127,8 @@ export default function CategoriesPage() {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">Nueva Categoría</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                            <h2 className="text-2xl font-bold text-gray-900">{editingId ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
+                            <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -120,10 +154,10 @@ export default function CategoriesPage() {
                             </div>
                             <button
                                 type="submit"
-                                disabled={createCategoryMutation.isPending}
+                                disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
                                 className="w-full bg-black text-white py-4 rounded-xl font-bold hover:bg-gray-900 transition-all flex items-center justify-center gap-2"
                             >
-                                {createCategoryMutation.isPending ? <Loader2 className="animate-spin" /> : 'Crear Categoría'}
+                                {createCategoryMutation.isPending || updateCategoryMutation.isPending ? <Loader2 className="animate-spin" /> : editingId ? 'Guardar Cambios' : 'Crear Categoría'}
                             </button>
                         </form>
                     </div>

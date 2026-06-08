@@ -10,6 +10,14 @@ export interface User {
     is_active?: boolean;
 }
 
+export interface WhatsAppSettings {
+    enabled: boolean;
+    provider: string;
+    instance_id?: string;
+    api_token?: string;
+    default_message: string;
+}
+
 export interface TenantSettings {
     ticket_footer?: string;
     report_watermark?: string;
@@ -17,6 +25,7 @@ export interface TenantSettings {
     direccion?: string;
     telefono?: string;
     brand_color?: string;
+    whatsapp?: WhatsAppSettings;
 }
 
 export interface Tenant {
@@ -292,6 +301,7 @@ export interface SaleCreate {
     };
     vendedor_id?: string;
     vendedor_name?: string;
+    send_whatsapp?: boolean;
 }
 
 export interface PagoItem {

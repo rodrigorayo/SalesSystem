@@ -87,6 +87,9 @@ interface PosState {
 
     // Full reset
     reset: () => void;
+
+    sendWhatsApp: boolean;
+    setSendWhatsApp: (enabled: boolean) => void;
 }
 
 const DEFAULT_CLIENTE: ClienteData = { cliente_id: undefined, nit: '', razon_social: '', email: '', telefono: '', es_factura: false };
@@ -237,6 +240,9 @@ export const usePosStore = create<PosState>()((set, get) => ({
         parkedTickets: s.parkedTickets.filter((_, i) => i !== index)
     })),
 
+    sendWhatsApp: true,
+    setSendWhatsApp: (b) => set({ sendWhatsApp: b }),
+
     // ── Reset ─────────────────────────────────────────────────────────────────
-    reset: () => set({ items: [], cliente: DEFAULT_CLIENTE, vendedor: DEFAULT_VENDEDOR, pagos: [], pendingPago: DEFAULT_PENDING, descuento: DEFAULT_DESC }),
+    reset: () => set({ items: [], cliente: DEFAULT_CLIENTE, vendedor: DEFAULT_VENDEDOR, pagos: [], pendingPago: DEFAULT_PENDING, descuento: DEFAULT_DESC, sendWhatsApp: true }),
 }));
