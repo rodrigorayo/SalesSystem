@@ -24,6 +24,7 @@ from app.domain.models.b2b import NotaDevolucionMerma, NotaTraspaso, InventarioM
 from app.domain.models.comunidad import ComunidadUser, VisitaRegistro
 from app.domain.models.traslado import TrasladoInventario
 from app.domain.models.etiqueta import Etiqueta
+from app.domain.models.almacen import Almacen
 
 from app.infrastructure.core.config import settings
 
@@ -67,7 +68,8 @@ async def init_db():
             ComunidadUser,
             VisitaRegistro,
             TrasladoInventario,
-            Etiqueta
+            Etiqueta,
+            Almacen
         ]
     )
 
