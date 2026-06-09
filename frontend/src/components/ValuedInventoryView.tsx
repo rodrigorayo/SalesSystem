@@ -183,9 +183,22 @@ export default function ValuedInventoryView() {
                 {por_sucursal.map((sucursal: any, index: number) => {
                     const isExpanded = expandedBranches[sucursal.sucursal_id] || (por_sucursal.length === 1);
                     
-                    // Solo mantenemos el TOP 10 de productos más caros dentro del inventario para no saturar.
                     const productosOrdenados = [...sucursal.desglose].sort((a: any, b: any) => b.valor_fabrica - a.valor_fabrica);
                     const topItems = productosOrdenados.slice(0, 15);
+                    
+                    // Calcular resumen por categorías
+                    const resumenCategorias = sucursal.desglose.reduce((acc: any, item: any) => {
+                        const cat = item.categoria_nombre || 'Sin Categoría';
+                        if (!acc[cat]) acc[cat] = { total_unidades: 0, valor_costo: 0, valor_publico: 0 };
+                        acc[cat].total_unidades += item.cantidad;
+                        acc[cat].valor_costo += item.valor_fabrica;
+                        acc[cat].valor_publico += item.valor_publico;
+                        return acc;
+                    }, {});
+                    const categoriasArray = Object.entries(resumenCategorias).map(([cat, data]: [string, any]) => ({
+                        nombre: cat,
+                        ...data
+                    })).sort((a, b) => b.valor_costo - a.valor_costo);
                     const hasMore = productosOrdenados.length > 15;
 
                     return (
@@ -218,50 +231,78 @@ export default function ValuedInventoryView() {
 
                             {isExpanded && (
                                 <div className="border-t border-gray-100 bg-white">
-                                    <div className="overflow-x-auto p-4 md:p-6 pb-8">
-                                        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 px-2">
-                                            <Tag size={14} /> Resumen: TOP {topItems.length} items de mayor valor en esta sucursal
-                                        </div>
-                                        <div className="border border-gray-100 rounded-2xl overflow-hidden">
-                                            <table className="w-full text-sm text-left">
-                                                <thead className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 border-b border-gray-100">
-                                                    <tr>
-                                                        <th className="px-5 py-3">Referencia</th>
-                                                        <th className="px-5 py-3 text-center">Unidades</th>
-                                                        <th className="px-5 py-3 text-right">P. Costo</th>
-                                                        <th className="px-5 py-3 text-right">P. Público</th>
-                                                        <th className="px-5 py-3 text-right text-indigo-700 bg-indigo-50/30">Total Costo</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-50">
-                                                    {topItems.map((item: any, i: number) => (
-                                                        <tr key={i} className="hover:bg-gray-50/50 transition-colors group/row">
-                                                            <td className="px-5 py-2.5">
-                                                                <p className="font-bold text-gray-800 text-[13px]">{item.producto_nombre}</p>
-                                                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">#{item.producto_id.slice(-6).toUpperCase()}</p>
-                                                            </td>
-                                                            <td className="px-5 py-2.5 text-center">
-                                                                <span className="bg-gray-100/80 text-gray-600 px-2.5 py-1 rounded-md font-black text-xs">{item.cantidad}</span>
-                                                            </td>
-                                                            <td className="px-5 py-2.5 text-right font-medium text-gray-400 text-xs">{formatBs(item.costo_unitario)}</td>
-                                                            <td className="px-5 py-2.5 text-right font-medium text-gray-400 text-xs">{formatBs(item.precio_publico_unitario)}</td>
-                                                            <td className="px-5 py-2.5 text-right font-black text-indigo-600 bg-indigo-50/10 text-[13px]">{formatBs(item.valor_fabrica)}</td>
-                                                        </tr>
-                                                    ))}
-                                                    {sucursal.desglose.length === 0 && (
+                                    <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        {/* ── SECCIÓN CATEGORÍAS ── */}
+                                        <div className="overflow-x-auto">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 px-2">
+                                                <Tag size={14} /> Resumen por Categorías
+                                            </div>
+                                            <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 border-b border-gray-100">
                                                         <tr>
-                                                            <td colSpan={5} className="px-5 py-8 text-center text-gray-400 italic font-medium">
-                                                                Vacío (Sin productos).
-                                                            </td>
+                                                            <th className="px-5 py-3">Categoría</th>
+                                                            <th className="px-5 py-3 text-center">Unidades</th>
+                                                            <th className="px-5 py-3 text-right">Base P.Costo</th>
+                                                            <th className="px-5 py-3 text-right">Base P.Venta</th>
                                                         </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                            {hasMore && (
-                                                <div className="bg-gray-50 py-3 text-center text-xs font-bold text-indigo-600 border-t border-gray-100">
-                                                    + {productosOrdenados.length - 15} productos de menor valor omitidos del resumen.
-                                                </div>
-                                            )}
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {categoriasArray.map((cat: any, i: number) => (
+                                                            <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                                                                <td className="px-5 py-2.5 font-bold text-gray-800 text-[13px]">{cat.nombre}</td>
+                                                                <td className="px-5 py-2.5 text-center text-gray-600 font-black text-xs">{cat.total_unidades}</td>
+                                                                <td className="px-5 py-2.5 text-right font-black text-indigo-600 bg-indigo-50/10 text-[13px]">{formatBs(cat.valor_costo)}</td>
+                                                                <td className="px-5 py-2.5 text-right font-black text-emerald-600 bg-emerald-50/10 text-[13px]">{formatBs(cat.valor_publico)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        {/* ── SECCIÓN TOP 15 ── */}
+                                        <div className="overflow-x-auto">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 px-2">
+                                                <Tag size={14} /> TOP {topItems.length} items de mayor valor inmovilizado
+                                            </div>
+                                            <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 border-b border-gray-100">
+                                                        <tr>
+                                                            <th className="px-5 py-3">Referencia</th>
+                                                            <th className="px-5 py-3 text-center">Und.</th>
+                                                            <th className="px-5 py-3 text-right text-indigo-700 bg-indigo-50/30">Valor Inmovilizado</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {topItems.map((item: any, i: number) => (
+                                                            <tr key={i} className="hover:bg-gray-50/50 transition-colors group/row">
+                                                                <td className="px-5 py-2.5">
+                                                                    <p className="font-bold text-gray-800 text-[13px]">{item.producto_nombre}</p>
+                                                                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">#{item.producto_id.slice(-6).toUpperCase()}</p>
+                                                                </td>
+                                                                <td className="px-5 py-2.5 text-center">
+                                                                    <span className="bg-gray-100/80 text-gray-600 px-2.5 py-1 rounded-md font-black text-xs">{item.cantidad}</span>
+                                                                </td>
+                                                                <td className="px-5 py-2.5 text-right font-black text-indigo-600 bg-indigo-50/10 text-[13px]">{formatBs(item.valor_fabrica)}</td>
+                                                            </tr>
+                                                        ))}
+                                                        {sucursal.desglose.length === 0 && (
+                                                            <tr>
+                                                                <td colSpan={3} className="px-5 py-8 text-center text-gray-400 italic font-medium">
+                                                                    Vacío (Sin productos).
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                                {hasMore && (
+                                                    <div className="bg-gray-50 py-3 text-center text-xs font-bold text-indigo-600 border-t border-gray-100">
+                                                        + {productosOrdenados.length - 15} productos de menor valor omitidos del resumen.
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

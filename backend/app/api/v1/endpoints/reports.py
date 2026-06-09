@@ -638,6 +638,19 @@ async def get_valued_inventory(
             },
             {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": True }},
             {
+                "$lookup": {
+                    "from": "categories",
+                    "let": {"cid": "$product_info.categoria_id"},
+                    "pipeline": [
+                        {"$match": {
+                            "$expr": {"$eq": [{"$toString": "$_id"}, "$$cid"]}
+                        }}
+                    ],
+                    "as": "category_info"
+                }
+            },
+            {"$unwind": { "path": "$category_info", "preserveNullAndEmptyArrays": True }},
+            {
                 "$addFields": {
                     "producto_nombre": {
                         "$cond": [
@@ -645,7 +658,8 @@ async def get_valued_inventory(
                             "$producto_nombre",
                             {"$ifNull": ["$product_info.descripcion", "Producto Desconocido"]}
                         ]
-                    }
+                    },
+                    "categoria_nombre": {"$ifNull": ["$category_info.nombre", "Sin Categoría"]}
                 }
             },
             {
@@ -658,6 +672,7 @@ async def get_valued_inventory(
                         "$push": {
                             "producto_id": "$producto_id",
                             "producto_nombre": "$producto_nombre",
+                            "categoria_nombre": "$categoria_nombre",
                             "cantidad": "$cantidad",
                             "costo_unitario": "$costo_producto",
                             "precio_publico_unitario": "$precio_venta",
@@ -688,11 +703,25 @@ async def get_valued_inventory(
             },
             {"$unwind": { "path": "$product_info", "preserveNullAndEmptyArrays": True }},
             {
+                "$lookup": {
+                    "from": "categories",
+                    "let": {"cid": "$product_info.categoria_id"},
+                    "pipeline": [
+                        {"$match": {
+                            "$expr": {"$eq": [{"$toString": "$_id"}, "$$cid"]}
+                        }}
+                    ],
+                    "as": "category_info"
+                }
+            },
+            {"$unwind": { "path": "$category_info", "preserveNullAndEmptyArrays": True }},
+            {
                 "$project": {
                     "sucursal_id": 1,
                     "producto_id": 1,
                     "cantidad": 1,
                     "producto_nombre": {"$ifNull": ["$product_info.descripcion", "Producto Desconocido"]},
+                    "categoria_nombre": {"$ifNull": ["$category_info.nombre", "Sin Categoría"]},
                     "costo_producto": {"$ifNull": ["$product_info.costo_producto", 0]},
                     "precio_venta": {
                         "$ifNull": [
@@ -725,6 +754,7 @@ async def get_valued_inventory(
                     "$push": {
                         "producto_id": "$producto_id",
                         "producto_nombre": "$producto_nombre",
+                        "categoria_nombre": "$categoria_nombre",
                         "cantidad": "$cantidad",
                         "costo_unitario": "$costo_producto",
                         "precio_publico_unitario": "$precio_venta",
