@@ -793,9 +793,26 @@ async def export_valued_inventory(
             })
             
     df = pd.DataFrame(rows)
+    
+    if not df.empty:
+        pivot_df = df.pivot_table(
+            index=['PRODUCTO', 'P. COSTO', 'P. PÚBLICO'],
+            columns='SUCURSAL',
+            values='CANTIDAD',
+            aggfunc='sum',
+            fill_value=0
+        ).reset_index()
+        sucursales_cols = df['SUCURSAL'].unique().tolist()
+        pivot_df['TOTAL CANTIDAD'] = pivot_df[sucursales_cols].sum(axis=1)
+        pivot_df['VALOR COSTO TOTAL'] = pivot_df['TOTAL CANTIDAD'] * pivot_df['P. COSTO']
+        pivot_df['VALOR PÚBLICO TOTAL'] = pivot_df['TOTAL CANTIDAD'] * pivot_df['P. PÚBLICO']
+    else:
+        pivot_df = pd.DataFrame(columns=["PRODUCTO", "P. COSTO", "P. PÚBLICO", "TOTAL CANTIDAD", "VALOR COSTO TOTAL", "VALOR PÚBLICO TOTAL"])
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='Inventario Valorado', index=False)
+        df.to_excel(writer, sheet_name='Inventario Detallado', index=False)
+        pivot_df.to_excel(writer, sheet_name='Saldos por Sucursal', index=False)
         
     output.seek(0)
     
