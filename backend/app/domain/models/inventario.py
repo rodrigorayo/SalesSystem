@@ -15,6 +15,7 @@ class Inventario(Document):
     """
     tenant_id: str
     sucursal_id: str      # "CENTRAL" or a Sucursal._id string
+    almacen_id: str = "default"  # Specifies which physical/virtual warehouse inside the branch
     producto_id: str      # Product._id
     cantidad: int = 0
     precio_sucursal: Optional[DecimalMoney] = None  # Branch-specific price override
@@ -26,11 +27,12 @@ class Inventario(Document):
         indexes = [
             "tenant_id",
             "sucursal_id",
+            "almacen_id",
             "producto_id",
             IndexModel(
-                [("tenant_id", 1), ("sucursal_id", 1), ("producto_id", 1)],
+                [("tenant_id", 1), ("sucursal_id", 1), ("almacen_id", 1), ("producto_id", 1)],
                 unique=True,
-                name="tenant_branch_product_unique"
+                name="tenant_branch_warehouse_product_unique"
             ),
             [("sucursal_id", 1), ("producto_id", 1)],
         ]
@@ -53,6 +55,7 @@ class InventoryLog(Document):
     """
     tenant_id: str
     sucursal_id: str
+    almacen_id: str = "default"
     producto_id: str
     descripcion: str = ""        # Snapshot of product name
     tipo_movimiento: TipoMovimiento
@@ -71,11 +74,12 @@ class InventoryLog(Document):
         indexes = [
             "tenant_id",
             "sucursal_id",
+            "almacen_id",
             "producto_id",
             "tipo_movimiento",
             "usuario_id",
             "created_at",
             [("tenant_id", 1), ("created_at", -1)],
-            [("tenant_id", 1), ("sucursal_id", 1), ("created_at", -1)],
+            [("tenant_id", 1), ("sucursal_id", 1), ("almacen_id", 1), ("created_at", -1)],
             [("tenant_id", 1), ("producto_id", 1), ("created_at", -1)],
         ]

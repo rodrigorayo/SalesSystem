@@ -43,6 +43,7 @@ class ClienteIn(BaseModel):
 class SaleCreate(BaseModel):
     """Request body for creating a new sale."""
     sucursal_id: Optional[str] = None
+    almacen_id: str = "default"
     items: List[SaleItemIn]
     pagos: List[PagoIn] = []
     descuento: Optional[DescuentoInfo] = None

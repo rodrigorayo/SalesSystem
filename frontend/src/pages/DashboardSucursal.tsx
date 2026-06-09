@@ -18,7 +18,7 @@ export default function DashboardSucursal() {
 
     const { data: invData } = useQuery({
         queryKey: ['inventario', user?.sucursal_id],
-        queryFn: () => getInventario(user?.sucursal_id, 1, 1000),
+        queryFn: () => getInventario(user?.sucursal_id, 'default', 1, 1000),
         enabled: !!user?.sucursal_id
     });
     const inv = invData?.items || [];

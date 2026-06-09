@@ -78,7 +78,7 @@ export default function PedidosPage() {
 
     const { data: invData } = useQuery({
         queryKey: ['inventario-for-order', origenId],
-        queryFn: () => getInventario(origenId, 1, 1000),
+        queryFn: () => getInventario(origenId, 'default', 1, 1000),
         enabled: showCreate && !!origenId && origenId !== 'CENTRAL'
     });
     

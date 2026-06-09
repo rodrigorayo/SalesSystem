@@ -19,6 +19,7 @@ router = APIRouter()
 @router.get("/inventario", response_model=InventarioPaginated)
 async def get_inventario(
     sucursal_id: str = "CENTRAL",
+    almacen_id: str = "default",
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=2000),
     search: Optional[str] = Query(None, description="Filtrar por nombre del producto"),
@@ -55,6 +56,7 @@ async def get_inventario(
                 {"$match": {
                     "$expr": {"$eq": ["$producto_id", "$$pid"]},
                     "sucursal_id": sucursal_id,
+                    "almacen_id": almacen_id,
                     "tenant_id": tenant_id
                 }}
             ],
@@ -108,6 +110,7 @@ async def get_inventario(
             precio_sucursal=inv_doc.get("precio_sucursal"),
             image_url=doc.get("image_url"),
             sucursal_id=sucursal_id,
+            almacen_id=almacen_id,
             cantidad=inv_doc.get("cantidad", 0),
         ))
         
@@ -125,6 +128,7 @@ async def get_inventario(
 async def ajustar_inventario(
     ajuste: AjusteInventario,
     sucursal_id: str = "CENTRAL",
+    almacen_id: str = "default",
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -147,6 +151,7 @@ async def ajustar_inventario(
     entry = await Inventario.find_one(
         Inventario.tenant_id == tenant_id,
         Inventario.sucursal_id == sucursal_id,
+        Inventario.almacen_id == almacen_id,
         Inventario.producto_id == ajuste.producto_id,
     )
 
@@ -177,6 +182,7 @@ async def ajustar_inventario(
         entry = Inventario(
             tenant_id=tenant_id,
             sucursal_id=sucursal_id,
+            almacen_id=almacen_id,
             producto_id=ajuste.producto_id,
             cantidad=nuevo_stock,
         )
@@ -197,6 +203,7 @@ async def ajustar_inventario(
         log = InventoryLog(
             tenant_id=tenant_id,
             sucursal_id=sucursal_id,
+            almacen_id=almacen_id,
             producto_id=ajuste.producto_id,
             descripcion=product.descripcion,
             tipo_movimiento=tipo_mov,
@@ -240,6 +247,7 @@ async def ajustar_inventario_masivo(
         entry = await Inventario.find_one(
             Inventario.tenant_id == tenant_id,
             Inventario.sucursal_id == sucursal_id,
+            Inventario.almacen_id == req.almacen_id,
             Inventario.producto_id == ajuste.producto_id,
         )
 
@@ -268,6 +276,7 @@ async def ajustar_inventario_masivo(
             entry = Inventario(
                 tenant_id=tenant_id,
                 sucursal_id=sucursal_id,
+                almacen_id=req.almacen_id,
                 producto_id=ajuste.producto_id,
                 cantidad=nuevo_stock,
             )
@@ -287,6 +296,7 @@ async def ajustar_inventario_masivo(
             log = InventoryLog(
                 tenant_id=tenant_id,
                 sucursal_id=sucursal_id,
+                almacen_id=req.almacen_id,
                 producto_id=ajuste.producto_id,
                 descripcion=product.descripcion,
                 tipo_movimiento=tipo_mov,
@@ -307,22 +317,23 @@ async def ajustar_inventario_masivo(
     return {"message": "Ajuste masivo procesado exitosamente", "procesados": len(resultados)}
 
 @router.get("/inventario/movimientos")
-async def get_movimientos(
+async def get_movimientos_inventario(
     producto_id: str = None,
     sucursal_id: str = "CENTRAL",
-    start_date: Optional[str] = None, # YYYY-MM-DD
-    end_date: Optional[str] = None,   # YYYY-MM-DD
+    almacen_id: str = "default",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     search: Optional[str] = None,
     tipo_movimiento: Optional[str] = None,
-    limit: int = 1000,
+    limit: int = Query(500, le=2000),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get the movement history (Kárdex) for a specific branch and optionally filtered by product and dates.
+    Get movement history (Kárdex) for a branch and almacen.
     """
     tenant_id = current_user.tenant_id or ""
     
-    query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id}
+    query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id, "almacen_id": almacen_id}
     if producto_id:
         query["producto_id"] = producto_id
         
@@ -369,6 +380,7 @@ async def get_movimientos(
 async def exportar_movimientos(
     producto_id: str = None,
     sucursal_id: str = "CENTRAL",
+    almacen_id: str = "default",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
@@ -380,7 +392,7 @@ async def exportar_movimientos(
     """
     tenant_id = current_user.tenant_id or ""
     
-    query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id}
+    query = {"tenant_id": tenant_id, "sucursal_id": sucursal_id, "almacen_id": almacen_id}
     if producto_id: query["producto_id"] = producto_id
     if tipo_movimiento: query["tipo_movimiento"] = tipo_movimiento
     if search:

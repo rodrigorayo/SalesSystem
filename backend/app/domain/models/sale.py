@@ -55,6 +55,7 @@ class QRInfo(BaseModel):
 class Sale(Document):
     tenant_id: str
     sucursal_id: str = "CENTRAL"
+    almacen_id: str = "default"
     items: List[SaleItem]
     total: DecimalMoney
     pagos: List[PagoItem] = []

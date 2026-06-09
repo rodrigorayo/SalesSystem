@@ -17,6 +17,7 @@ class InventarioItem(BaseModel):
     precio_sucursal: Optional[DecimalMoney] = None
     image_url: Optional[str] = None
     sucursal_id: str
+    almacen_id: str = "default"
     cantidad: int
 
 
@@ -34,6 +35,7 @@ class AjusteInventarioMasivoItem(BaseModel):
 
 class AjusteInventarioMasivoRequest(BaseModel):
     sucursal_id: str
+    almacen_id: str = "default"
     notas_generales: str = ""
     ajustes: list[AjusteInventarioMasivoItem]
 

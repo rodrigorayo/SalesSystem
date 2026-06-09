@@ -45,6 +45,8 @@ export interface ParkedTicket {
 
 interface PosState {
     // Cart
+    almacen_id: string;
+    setAlmacenId: (id: string) => void;
     items: CartItem[];
     addItem: (product: Product) => void;
     removeItem: (productId: string) => void;
@@ -98,6 +100,9 @@ const DEFAULT_PENDING: PosState['pendingPago'] = { metodo: 'EFECTIVO', monto: ''
 const DEFAULT_DESC: PosState['descuento'] = { tipo: 'MONTO', valor: '', nombre: '' };
 
 export const usePosStore = create<PosState>()((set, get) => ({
+    almacen_id: 'default',
+    setAlmacenId: (id) => set({ almacen_id: id }),
+
     // ── Cart ──────────────────────────────────────────────────────────────────
     items: [],
 

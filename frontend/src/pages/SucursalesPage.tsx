@@ -6,6 +6,7 @@ import { Plus, Store, MapPin, Phone, Pencil, X, Loader2, KeyRound, Copy, Check, 
 import { toast } from 'sonner';
 import PasswordField from '../components/PasswordField';
 import Pagination from '../components/Pagination';
+import { AlmacenesManager } from '../components/AlmacenesManager';
 
 interface CreatedCredentials {
     username: string;
@@ -27,7 +28,7 @@ export default function SucursalesPage() {
     const [form, setForm] = useState<SucursalCreate>(BLANK_FORM);
     const [confirmPassword, setConfirmPassword] = useState('');
     const [editForm, setEditForm] = useState<{ nombre: string; ciudad: string; direccion: string; telefono: string; tipo: 'FISICA' | 'SUPERVISOR' | 'VENDEDOR' }>({ nombre: '', ciudad: '', direccion: '', telefono: '', tipo: 'FISICA' });
-    const [tab, setTab] = useState<'FISICA' | 'FUERZA_VENTAS'>('FISICA');
+    const [tab, setTab] = useState<'FISICA' | 'FUERZA_VENTAS' | 'ALMACENES'>('FISICA');
     
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 6; // usually fewer branches than products
@@ -119,6 +120,10 @@ export default function SucursalesPage() {
                 <button onClick={() => setTab('FUERZA_VENTAS')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'FUERZA_VENTAS' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
                     Fuerza de Ventas Móvil
+                </button>
+                <button onClick={() => setTab('ALMACENES')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'ALMACENES' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                    Almacenes
                 </button>
             </div>
 
@@ -294,17 +299,23 @@ export default function SucursalesPage() {
                 </div>
             )}
 
+            {/* ── ALMACENES VIEW ─────────────────────────────────────────────────────────── */}
+            {tab === 'ALMACENES' && (
+                <AlmacenesManager sucursales={sucursales.filter(s => s.tipo === 'FISICA' || !s.tipo)} />
+            )}
+
             {/* ── List ─────────────────────────────────────────────────────────── */}
-            {isLoading ? (
-                <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-indigo-500" /></div>
-            ) : filteredSucursales.length === 0 ? (
-                <div className="text-center py-20 text-gray-400">
-                    <Store size={48} className="mx-auto mb-4 opacity-30" />
-                    <p className="text-gray-500">No hay registros en esta vista.</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tab !== 'ALMACENES' && (
+                isLoading ? (
+                    <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-indigo-500" /></div>
+                ) : filteredSucursales.length === 0 ? (
+                    <div className="text-center py-20 text-gray-400">
+                        <Store size={48} className="mx-auto mb-4 opacity-30" />
+                        <p className="text-gray-500">No hay registros en esta vista.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {paginatedSucursales.map(s => (
                             <div key={s._id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow group">
                                 <div className="flex items-start justify-between mb-3">
@@ -359,6 +370,7 @@ export default function SucursalesPage() {
                         />
                     )}
                 </div>
+                )
             )}
         </div>
     );

@@ -13,10 +13,11 @@ interface CartItem {
 
 interface Props {
     sucursalId: string;
+    almacenId: string;
     onSuccess: () => void;
 }
 
-export default function BulkAjusteView({ sucursalId, onSuccess }: Props) {
+export default function BulkAjusteView({ sucursalId, almacenId, onSuccess }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -29,7 +30,7 @@ export default function BulkAjusteView({ sucursalId, onSuccess }: Props) {
 
     const { data: searchResults, isLoading: searching } = useQuery({
         queryKey: ['inv-search-bulk', sucursalId, debouncedSearch],
-        queryFn: () => getInventario(sucursalId, 1, 10, debouncedSearch),
+        queryFn: () => getInventario(sucursalId, almacenId, 1, 10, debouncedSearch),
         enabled: debouncedSearch.length > 1,
     });
 
@@ -80,6 +81,7 @@ export default function BulkAjusteView({ sucursalId, onSuccess }: Props) {
 
             return ajustarInventarioMasivo({
                 sucursal_id: sucursalId,
+                almacen_id: almacenId,
                 notas_generales: notasGenerales,
                 ajustes
             });

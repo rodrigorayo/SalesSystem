@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProducts, getInventario, getCategories, getSaleStatsToday, getUsers, getSucursales } from '../api/api';
+import { getProducts, getInventario, getCategories, getUsers, getSucursales, getAlmacenes } from '../api/api';
 import { useAuthStore } from '../store/authStore';
 import { usePosStore, type MetodoPago } from '../store/usePosStore';
 import { useDescuentos } from '../hooks/useDescuentos';
@@ -10,7 +10,7 @@ import { client } from '../api/client';
 import {
     ShoppingCart, Search, Plus, Minus, Trash2,
     CreditCard, DollarSign, QrCode, X, CheckCircle2,
-    Loader2, Tag, BarChart3, Package, ChevronUp, ChevronDown,
+    Loader2, Tag, Package, ChevronUp, ChevronDown,
     Lock, User as UserIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,10 +30,10 @@ const METODO_META: Record<string, { icon: React.ReactNode; color: string; bg: st
     CREDITO: { icon: <Lock size={14} />, color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300' },
 };
 
-function useStockMap(sucursalId: string) {
+function useStockMap(sucursalId: string, almacenId: string) {
     const { data: invData } = useQuery({
-        queryKey: ['inventario', sucursalId],
-        queryFn: () => getInventario(sucursalId, 1, 1000),
+        queryKey: ['inventario', sucursalId, almacenId],
+        queryFn: () => getInventario(sucursalId, almacenId, 1, 1000),
         staleTime: 30_000,
     });
     const inv = invData?.items || [];
@@ -54,6 +54,7 @@ export default function POSPage() {
     const { data: sesionActiva, isLoading: loadingSesion } = useSesionActiva();
 
     const {
+        almacen_id, setAlmacenId,
         items, addItem, removeItem, updateQty,
         cliente, setCliente,
         vendedor, setVendedor,
@@ -76,10 +77,20 @@ export default function POSPage() {
     const { data: productsData, isLoading: loadingP } = useQuery({ queryKey: ['products'], queryFn: () => getProducts(1, 1000) });
     const products = productsData?.items || [];
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
-    const { data: stats } = useQuery({ queryKey: ['pos-stats'], queryFn: () => getSaleStatsToday(), refetchInterval: 60_000 });
+
     const { data: descuentosDisponibles = [], isLoading: loadingD } = useDescuentos();
     const { data: usersData = [] } = useQuery({ queryKey: ['users'], queryFn: getUsers });
     const { data: sucursales = [] } = useQuery({ queryKey: ['sucursales'], queryFn: getSucursales });
+    const { data: almacenes = [] } = useQuery({ queryKey: ['almacenes', sucursalId], queryFn: () => getAlmacenes(sucursalId) });
+    
+    // Set default almacen if not set
+    useEffect(() => {
+        if (almacenes.length > 0 && almacen_id === 'default') {
+            const def = almacenes.find(a => a.is_default);
+            if (def) setAlmacenId(def.id!);
+            else setAlmacenId(almacenes[0].id!);
+        }
+    }, [almacenes, almacen_id, setAlmacenId]);
     
     // Filtrar usuarios que pueden ser vendedores (de la misma sucursal)
     const vendedores = useMemo(() => {
@@ -90,7 +101,7 @@ export default function POSPage() {
         );
     }, [usersData, sucursalId]);
 
-    const stockMap = useStockMap(sucursalId);
+    const stockMap = useStockMap(sucursalId, almacen_id);
 
     // BARCODE SCANNER DETECTOR
     // Los escáneres funcionan como un teclado muy rápido que termina con "Enter".
@@ -188,6 +199,7 @@ export default function POSPage() {
         mutationFn: () => client<Sale>('/ventas', {
             body: {
                 sucursal_id: sucursalId,
+                almacen_id: almacen_id,
                 items: items.map(i => ({ producto_id: i.product._id, cantidad: i.quantity, precio: i.precio })),
                 pagos: pagos.map(p => ({ metodo: p.metodo, monto: p.monto })),
                 descuento: descuento.valor ? { nombre: descuento.nombre, tipo: descuento.tipo, valor: parseFloat(descuento.valor) } : undefined,
@@ -205,7 +217,7 @@ export default function POSPage() {
             },
         }),
         onSuccess: (data) => {
-            qc.invalidateQueries({ queryKey: ['inventario', sucursalId] });
+            qc.invalidateQueries({ queryKey: ['inventario', sucursalId, almacen_id] });
             qc.invalidateQueries({ queryKey: ['pos-stats'] });
             setLastSale(data);
             setSuccess(true);
@@ -318,11 +330,20 @@ export default function POSPage() {
                             }}
                         />
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-xl shrink-0">
-                        <BarChart3 size={14} />
-                        <span className="font-bold">${fmt(stats?.today_sales ?? 0)}</span>
-                        <span className="text-[11px] text-green-500">hoy</span>
-                    </div>
+                    {almacenes.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-sm bg-indigo-50 border border-indigo-200 text-indigo-700 pl-3 pr-2 py-1.5 rounded-xl shrink-0">
+                            <Package size={14} />
+                            <select
+                                value={almacen_id}
+                                onChange={(e) => setAlmacenId(e.target.value)}
+                                className="bg-transparent border-none text-sm font-bold text-indigo-800 py-0 pl-0 pr-6 focus:ring-0 cursor-pointer"
+                            >
+                                {almacenes.map(a => (
+                                    <option key={a.id} value={a.id}>{a.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 {/* Category chips */}

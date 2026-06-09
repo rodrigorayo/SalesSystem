@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Search, History, X, Check, Tag, Upload, Download, FileSpreadsheet, Printer } from 'lucide-react';
-import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
+import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, getAlmacenes, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
 import type { AjusteInventario } from '../api/types';
@@ -20,6 +20,7 @@ export default function InventarioPage() {
     const esMatriz = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN';
     const esAdminSucursal = esMatriz || user?.role === 'ADMIN_SUCURSAL';
     const [selectedSucursal, setSelectedSucursal] = useState<string>(esMatriz ? 'CENTRAL' : (user?.sucursal_id || 'CENTRAL'));
+    const [selectedAlmacen, setSelectedAlmacen] = useState<string>('default');
     const [tab, setTab] = useLocalStorage<'stock' | 'kardex' | 'masivo'>('inventario-tab', 'stock');
     const [searchTerm, setSearchTerm] = useLocalStorage('inventario-search', '');
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -37,6 +38,20 @@ export default function InventarioPage() {
         queryFn: getSucursales,
         enabled: esMatriz,
     });
+    
+    const { data: almacenes = [] } = useQuery({
+        queryKey: ['almacenes', selectedSucursal],
+        queryFn: () => getAlmacenes(selectedSucursal),
+    });
+
+    useEffect(() => {
+        if (almacenes.length > 0) {
+            const def = almacenes.find(a => a.is_default);
+            setSelectedAlmacen(def ? def.id! : almacenes[0].id!);
+        } else {
+            setSelectedAlmacen('default');
+        }
+    }, [almacenes, selectedSucursal]);
 
     const { data: categories = [] } = useQuery({ 
         queryKey: ['categories'], 
@@ -62,8 +77,8 @@ export default function InventarioPage() {
     const ITEMS_PER_PAGE = 20;
 
     const { data: invData, isLoading: loadingInv } = useQuery({
-        queryKey: ['inventario', selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch, selectedCategory, stockBajoOnly],
-        queryFn: () => getInventario(selectedSucursal, currentPageStock, ITEMS_PER_PAGE, debouncedSearch || undefined, selectedCategory === 'ALL' ? undefined : selectedCategory, stockBajoOnly),
+        queryKey: ['inventario', selectedSucursal, selectedAlmacen, currentPageStock, ITEMS_PER_PAGE, debouncedSearch, selectedCategory, stockBajoOnly],
+        queryFn: () => getInventario(selectedSucursal, selectedAlmacen, currentPageStock, ITEMS_PER_PAGE, debouncedSearch || undefined, selectedCategory === 'ALL' ? undefined : selectedCategory, stockBajoOnly),
         enabled: tab === 'stock'
     });
     
@@ -72,8 +87,8 @@ export default function InventarioPage() {
     const totalItemsStock = invData?.total || 0;
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
-        queryKey: ['movimientos', selectedSucursal, startDate, endDate, debouncedSearch, kardexProductoId, tipoMovimiento],
-        queryFn: () => getMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined),
+        queryKey: ['movimientos', selectedSucursal, selectedAlmacen, startDate, endDate, debouncedSearch, kardexProductoId, tipoMovimiento],
+        queryFn: () => getMovimientosInventario(selectedSucursal, selectedAlmacen, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined),
         enabled: tab === 'kardex',
     });
 
@@ -85,7 +100,7 @@ export default function InventarioPage() {
     useEffect(() => {
         setCurrentPageStock(1);
         setCurrentPageKardex(1);
-    }, [searchTerm, selectedSucursal, tab, selectedCategory, stockBajoOnly]);
+    }, [searchTerm, selectedSucursal, selectedAlmacen, tab, selectedCategory, stockBajoOnly]);
 
     const filteredMovs = useMemo(() => {
         // El filtrado ya se hace principalmente en el backend ahora, pero mantenemos esto por si acaso o para refinamiento extra
@@ -111,19 +126,33 @@ export default function InventarioPage() {
                     <p className="text-xs text-gray-500 mt-0.5">Control de stock físico y kárdex de movimientos por sucursal.</p>
                 </div>
 
-                {esMatriz && (
-                    <div className="w-full md:w-56">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Viendo Sucursal</label>
-                        <select
-                            value={selectedSucursal}
-                            onChange={e => setSelectedSucursal(e.target.value)}
-                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg px-2.5 py-1.5 outline-none transition-all text-xs font-semibold text-gray-900 shadow-sm"
-                        >
-                            <option value="CENTRAL">Almacén Central (Matriz)</option>
-                            {sucursales.map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
-                        </select>
-                    </div>
-                )}
+                <div className="flex gap-3">
+                    {esMatriz && (
+                        <div className="w-full md:w-56">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Viendo Sucursal</label>
+                            <select
+                                value={selectedSucursal}
+                                onChange={e => setSelectedSucursal(e.target.value)}
+                                className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg px-2.5 py-1.5 outline-none transition-all text-xs font-semibold text-gray-900 shadow-sm"
+                            >
+                                <option value="CENTRAL">Almacén Central (Matriz)</option>
+                                {sucursales.map(s => <option key={s._id} value={s._id}>{s.nombre}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    {almacenes.length > 0 && (
+                        <div className="w-full md:w-56">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Almacén</label>
+                            <select
+                                value={selectedAlmacen}
+                                onChange={e => setSelectedAlmacen(e.target.value)}
+                                className="w-full bg-indigo-50 border border-indigo-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-lg px-2.5 py-1.5 outline-none transition-all text-xs font-bold text-indigo-900 shadow-sm"
+                            >
+                                {almacenes.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                            </select>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Toolbar (Buscador + Tabs + Category Pills) */}
@@ -263,7 +292,7 @@ export default function InventarioPage() {
                         {tab === 'kardex' && (
                             <div className="flex items-center gap-2">
                                 <button 
-                                    onClick={() => exportMovimientosInventario(selectedSucursal, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined)}
+                                    onClick={() => exportMovimientosInventario(selectedSucursal, selectedAlmacen, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined)}
                                     className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap"
                                     title="Exportar a Excel"
                                 >
@@ -453,6 +482,7 @@ export default function InventarioPage() {
             {tab === 'masivo' && (
                 <BulkAjusteView 
                     sucursalId={selectedSucursal} 
+                    almacenId={selectedAlmacen}
                     onSuccess={() => {
                         queryClient.invalidateQueries({ queryKey: ['inventario', selectedSucursal] });
                         queryClient.invalidateQueries({ queryKey: ['movimientos', selectedSucursal] });
@@ -574,6 +604,7 @@ export default function InventarioPage() {
                     isOpen={true}
                     onClose={() => setAdjItem(null)}
                     sucursalId={selectedSucursal}
+                    almacenId={selectedAlmacen}
                     productoId={adjItem.id}
                     productoNombre={adjItem.name}
                     onSuccess={handleAjusteSuccess}
@@ -674,13 +705,13 @@ function PriceRequestModal({ onClose, sucursalId, productoId, productoNombre, cu
     );
 }
 
-function AjusteModal({ onClose, sucursalId, productoId, productoNombre, onSuccess }: any) {
+function AjusteModal({ onClose, sucursalId, almacenId, productoId, productoNombre, onSuccess }: any) {
     const [tipo, setTipo] = useState<'ENTRADA' | 'SALIDA' | 'AJUSTE'>('ENTRADA');
     const [cantidad, setCantidad] = useState<number | ''>('');
     const [notas, setNotas] = useState('');
 
     const adjMut = useMutation({
-        mutationFn: (data: AjusteInventario) => ajustarInventario(sucursalId, data),
+        mutationFn: (data: AjusteInventario) => ajustarInventario(sucursalId, almacenId, data),
         onSuccess: onSuccess,
     });
 

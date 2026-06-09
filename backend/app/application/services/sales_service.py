@@ -46,6 +46,7 @@ class SalesService:
                             {
                                 "tenant_id": tenant_id,
                                 "sucursal_id": sucursal_id,
+                                "almacen_id": sale_in.almacen_id,
                                 "producto_id": item.producto_id,
                                 "cantidad": {"$gte": item.cantidad}
                             },
@@ -60,6 +61,7 @@ class SalesService:
                             inv_check = await Inventario.find_one(
                                 Inventario.tenant_id == tenant_id,
                                 Inventario.sucursal_id == sucursal_id,
+                                Inventario.almacen_id == sale_in.almacen_id,
                                 Inventario.producto_id == item.producto_id,
                                 session=session
                             )
@@ -102,6 +104,7 @@ class SalesService:
                         await InventoryLog(
                             tenant_id=tenant_id,
                             sucursal_id=sucursal_id,
+                            almacen_id=sale_in.almacen_id,
                             producto_id=item.producto_id,
                             descripcion=product.descripcion,
                             tipo_movimiento=TipoMovimiento.VENTA,
@@ -189,6 +192,7 @@ class SalesService:
                     sale = Sale(
                         tenant_id=tenant_id,
                         sucursal_id=sucursal_id,
+                        almacen_id=sale_in.almacen_id,
                         items=sale_items,
                         total=computed_total,
                         pagos=actual_pagos,
@@ -384,6 +388,7 @@ class SalesService:
                             {
                                 "tenant_id": tenant_id,
                                 "sucursal_id": sucursal_id,
+                                "almacen_id": sale.almacen_id,
                                 "producto_id": item.producto_id,
                             },
                             {"$inc": {"cantidad": item.cantidad}},
@@ -394,6 +399,7 @@ class SalesService:
                             await InventoryLog(
                                 tenant_id=tenant_id,
                                 sucursal_id=sucursal_id,
+                                almacen_id=sale.almacen_id,
                                 producto_id=item.producto_id,
                                 descripcion=item.descripcion,
                                 tipo_movimiento=TipoMovimiento.ENTRADA_MANUAL,
@@ -551,6 +557,7 @@ class SalesService:
                                 {
                                     "tenant_id": tenant_id,
                                     "sucursal_id": sucursal_id,
+                                    "almacen_id": sale.almacen_id,
                                     "producto_id": item.producto_id,
                                 },
                                 {"$inc": {"cantidad": -item.cantidad}},
@@ -562,6 +569,7 @@ class SalesService:
                                 await InventoryLog(
                                     tenant_id=tenant_id,
                                     sucursal_id=sucursal_id,
+                                    almacen_id=sale.almacen_id,
                                     producto_id=item.producto_id,
                                     descripcion=item.descripcion,
                                     tipo_movimiento=TipoMovimiento.VENTA,
@@ -597,6 +605,7 @@ class SalesService:
                             id=ObjectId(new_sale_id),
                             tenant_id=tenant_id,
                             sucursal_id=sucursal_id,
+                            almacen_id=sale.almacen_id,
                             items=sale.items,
                             total=sale.total,
                             pagos=new_pagos,

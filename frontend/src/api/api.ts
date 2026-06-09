@@ -13,6 +13,7 @@ import type {
     User, EmployeeCreate,
     SaleCreate, Sale, SalesPaginated,
     Sucursal, SucursalCreate,
+    Almacen, AlmacenCreate, AlmacenUpdate,
     InventarioItem, AjusteInventario, InventoryLog, AjusteInventarioMasivoRequest,
     PedidoInterno, PedidoCreate,
     PriceChangeRequest, PriceRequestCreate, ReportStats,
@@ -188,8 +189,13 @@ export const getSalesMatrix = (start_date: string, end_date: string, sucursal_id
 // ─── Sucursales ───────────────────────────────────────────────────────────
 export const getSucursales = () => client<Sucursal[]>('/sucursales');
 export const createSucursal = (data: SucursalCreate) => client<Sucursal>('/sucursales', { body: data });
-export const updateSucursal = (id: string, data: Partial<SucursalCreate>) =>
-    client<Sucursal>(`/sucursales/${id}`, { method: 'PUT', body: data });
+export const updateSucursal = (id: string, data: Partial<SucursalCreate>) => client<Sucursal>(`/sucursales/${id}`, { method: 'PATCH', body: data });
+
+// ─── Almacenes ────────────────────────────────────────────────────────────
+export const getAlmacenes = (sucursal_id: string) => client<Almacen[]>(`/almacenes/${sucursal_id}`);
+export const createAlmacen = (sucursal_id: string, data: AlmacenCreate) => client<Almacen>(`/almacenes/${sucursal_id}`, { method: 'POST', body: data });
+export const updateAlmacen = (almacen_id: string, data: AlmacenUpdate) => client<Almacen>(`/almacenes/${almacen_id}`, { method: 'PATCH', body: data });
+export const deleteAlmacen = (almacen_id: string) => client<{message: string}>(`/almacenes/${almacen_id}`, { method: 'DELETE' });
 export const deleteSucursal = (id: string) =>
     client<{message: string}>(`/sucursales/${id}`, { method: 'DELETE' });
 
@@ -330,17 +336,17 @@ export const importProductPrices = async (sucursal_id: string, file: File) => {
 
 
 // ─── Inventario ───────────────────────────────────────────────────────────
-export const getInventario = (sucursal_id = 'CENTRAL', page: number = 1, limit: number = 50, search?: string, categoria_id?: string, stock_bajo: boolean = false) => {
-    const params = new URLSearchParams({ sucursal_id, page: String(page), limit: String(limit) });
+export const getInventario = (sucursal_id = 'CENTRAL', almacen_id = 'default', page: number = 1, limit: number = 50, search?: string, categoria_id?: string, stock_bajo: boolean = false) => {
+    const params = new URLSearchParams({ sucursal_id, almacen_id, page: String(page), limit: String(limit) });
     if (search) params.append('search', search);
     if (categoria_id) params.append('categoria_id', categoria_id);
     if (stock_bajo) params.append('stock_bajo', 'true');
     return client<{ items: InventarioItem[], total: number, page: number, pages: number }>(`/inventario?${params.toString()}`);
 };
-export const ajustarInventario = (sucursal_id: string, data: AjusteInventario) =>
-    client<{ cantidad: number, movimiento: number }>(`/inventario/ajuste?sucursal_id=${sucursal_id}`, {
+export const ajustarInventario = (sucursal_id: string, almacen_id: string, data: AjusteInventario) =>
+    client<{ cantidad: number, movimiento: number }>(`/inventario/ajuste?sucursal_id=${sucursal_id}&almacen_id=${almacen_id}`, {
         method: 'POST',
-        body: data,
+        body: data
     });
 
 export const ajustarInventarioMasivo = (data: AjusteInventarioMasivoRequest) =>
@@ -348,8 +354,8 @@ export const ajustarInventarioMasivo = (data: AjusteInventarioMasivoRequest) =>
         method: 'POST',
         body: data,
     });
-export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
-    const params = new URLSearchParams({ sucursal_id });
+export const getMovimientosInventario = (sucursal_id = 'CENTRAL', almacen_id = 'default', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
+    const params = new URLSearchParams({ sucursal_id, almacen_id });
     if (producto_id) params.set('producto_id', producto_id);
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);
@@ -358,13 +364,13 @@ export const getMovimientosInventario = (sucursal_id = 'CENTRAL', producto_id?: 
     return client<InventoryLog[]>(`/inventario/movimientos?${params.toString()}`);
 };
 
-export const exportMovimientosInventario = async (sucursal_id = 'CENTRAL', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
+export const exportMovimientosInventario = async (sucursal_id = 'CENTRAL', almacen_id = 'default', producto_id?: string, startDate?: string, endDate?: string, search?: string, tipo_movimiento?: string) => {
     const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
     const CACHE_URL = import.meta.env.VITE_API_URL ?? (window.location.hostname.includes('vercel.app') 
         ? 'https://sales-system-kappa.vercel.app/api/v1' 
         : 'http://localhost:8000/api/v1');
         
-    const params = new URLSearchParams({ sucursal_id });
+    const params = new URLSearchParams({ sucursal_id, almacen_id });
     if (producto_id) params.set('producto_id', producto_id);
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);

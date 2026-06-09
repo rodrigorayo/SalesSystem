@@ -74,6 +74,31 @@ export interface SucursalCreate {
     admin_password: string;
 }
 
+export interface Almacen {
+    id?: string;
+    tenant_id: string;
+    sucursal_id: string;
+    nombre: string;
+    ubicacion?: string;
+    is_default?: boolean;
+    is_active?: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface AlmacenCreate {
+    nombre: string;
+    ubicacion?: string;
+    is_default?: boolean;
+}
+
+export interface AlmacenUpdate {
+    nombre?: string;
+    ubicacion?: string;
+    is_default?: boolean;
+    is_active?: boolean;
+}
+
 /** Canonical product model matching the backend Product document. */
 export interface Product {
     _id: string;
@@ -132,6 +157,7 @@ export interface AjusteInventarioMasivoItem {
 
 export interface AjusteInventarioMasivoRequest {
     sucursal_id: string;
+    almacen_id: string;
     notas_generales?: string;
     ajustes: AjusteInventarioMasivoItem[];
 }

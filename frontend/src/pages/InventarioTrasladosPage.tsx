@@ -483,7 +483,7 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
 
     const { data: inventarioResponse, isLoading: isLoadingInventario } = useQuery({
         queryKey: ['inventario-traslado', sucursalId, search],
-        queryFn: () => getInventario(sucursalId, 1, 100, search || undefined),
+        queryFn: () => getInventario(sucursalId, 'default', 1, 100, search || undefined),
     });
     const inventario = (inventarioResponse as any)?.items || [];
     const productosDisponibles = inventario.filter((inv: any) =>
