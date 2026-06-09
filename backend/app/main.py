@@ -48,7 +48,7 @@ def health():
     return {"status": "ok", "environment": settings.ENVIRONMENT}
 
 # Parse allowed origins from comma-separated env var
-origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
+origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip() and origin.strip() != "*"]
 
 # Permitir siempre la landing page de FEXCO
 if "https://taboada-fexco.vercel.app" not in origins:
