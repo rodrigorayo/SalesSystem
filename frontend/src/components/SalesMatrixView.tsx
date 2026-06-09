@@ -19,6 +19,7 @@ export default function SalesMatrixView() {
     const [startDate, setStartDate] = useState<string>(lastWeekStr);
     const [endDate, setEndDate] = useState<string>(todayStr);
     const [searchTerm, setSearchTerm] = useState('');
+    const [groupBy, setGroupBy] = useState<'day'|'week'|'month'>('day');
     
     const esMatriz = ['SUPERADMIN', 'ADMIN', 'ADMIN_MATRIZ'].includes(role || '');
     const defaultSucursal = esMatriz ? 'all' : (sucursal_id || 'CENTRAL');
@@ -35,26 +36,72 @@ export default function SalesMatrixView() {
         queryFn: () => getSalesMatrix(startDate, endDate, selectedSucursal),
     });
 
-    const filteredProducts = useMemo(() => {
-        if (!data?.products) return [];
-        return data.products.filter(p => 
-            p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [data?.products, searchTerm]);
-
-    const dateList = useMemo(() => {
-        const dates = [];
+    const columns = useMemo(() => {
+        const cols: { key: string, label: string }[] = [];
         let curr = new Date(startDate);
         const end = new Date(endDate);
-        curr.setHours(12, 0, 0, 0); // avoid timezone shifts
+        curr.setHours(12, 0, 0, 0);
         end.setHours(12, 0, 0, 0);
         
+        const added = new Set<string>();
+
         while (curr <= end) {
-            dates.push(curr.toLocaleDateString('en-CA'));
+            if (groupBy === 'month') {
+                const key = curr.toLocaleDateString('en-CA').substring(0, 7);
+                if (!added.has(key)) {
+                    added.add(key);
+                    const mName = curr.toLocaleString('es-ES', {month: 'short'});
+                    cols.push({ key, label: `${mName.toUpperCase()} ${curr.getFullYear()}` });
+                }
+            } else if (groupBy === 'week') {
+                const day = curr.getDay();
+                const diff = curr.getDate() - day + (day === 0 ? -6 : 1);
+                const mon = new Date(curr);
+                mon.setDate(diff);
+                const key = mon.toLocaleDateString('en-CA');
+                if (!added.has(key)) {
+                    added.add(key);
+                    const parts = key.split('-');
+                    cols.push({ key, label: `Sem ${parts[2]}/${parts[1]}` });
+                }
+            } else {
+                const key = curr.toLocaleDateString('en-CA');
+                if (!added.has(key)) {
+                    added.add(key);
+                    const parts = key.split('-');
+                    cols.push({ key, label: `${parts[2]}/${parts[1]}` });
+                }
+            }
             curr.setDate(curr.getDate() + 1);
         }
-        return dates;
-    }, [startDate, endDate]);
+        return cols;
+    }, [startDate, endDate, groupBy]);
+
+    const processedProducts = useMemo(() => {
+        if (!data?.products) return [];
+        let list = data.products.filter(p => 
+            p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        return list.map(p => {
+            const aggs: Record<string, number> = {};
+            for (const [dateStr, qty] of Object.entries(p.days)) {
+                let key = dateStr;
+                if (groupBy === 'month') {
+                    key = dateStr.substring(0, 7);
+                } else if (groupBy === 'week') {
+                    const curr = new Date(dateStr);
+                    curr.setHours(12, 0, 0, 0);
+                    const day = curr.getDay();
+                    const diff = curr.getDate() - day + (day === 0 ? -6 : 1);
+                    curr.setDate(diff);
+                    key = curr.toLocaleDateString('en-CA');
+                }
+                aggs[key] = (aggs[key] || 0) + (qty as number);
+            }
+            return { ...p, aggs };
+        });
+    }, [data?.products, searchTerm, groupBy]);
 
     const handleDownloadCSV = () => {
         if (!data || !data.products) return;
@@ -62,15 +109,15 @@ export default function SalesMatrixView() {
         let csvContent = "data:text/csv;charset=utf-8,";
         
         // Header
-        const header = ["Producto", ...dateList, "Total"];
+        const header = ["Producto", ...columns.map(c => c.label), "Total"];
         csvContent += header.join(",") + "\n";
         
         // Rows
-        data.products.forEach(p => {
+        processedProducts.forEach(p => {
             const row = [`"${p.descripcion.replace(/"/g, '""')}"`];
             let rowTotal = 0;
-            dateList.forEach(d => {
-                const qty = p.days[d] || 0;
+            columns.forEach(c => {
+                const qty = p.aggs[c.key] || 0;
                 row.push(qty.toString());
                 rowTotal += qty;
             });
@@ -109,7 +156,7 @@ export default function SalesMatrixView() {
                         onClick={() => {
                             if (data && data.products.length > 0) {
                                 const sucNombre = selectedSucursal === 'all' ? 'Todas las Sucursales' : (sucursales.find(s => s._id === selectedSucursal)?.nombre || selectedSucursal);
-                                descargarPDFMatriz(data, dateList, startDate, endDate, sucNombre);
+                                descargarPDFMatriz(processedProducts, columns, startDate, endDate, sucNombre);
                             }
                         }}
                         disabled={!data || data.products.length === 0}
@@ -160,6 +207,19 @@ export default function SalesMatrixView() {
                         </div>
                     </div>
                     
+                    <div className="flex items-center gap-2 flex-1 md:flex-none">
+                        <span className="text-gray-400 font-bold text-xs uppercase tracking-wider hidden md:inline">Ver por:</span>
+                        <select
+                            value={groupBy}
+                            onChange={(e) => setGroupBy(e.target.value as any)}
+                            className="w-full md:w-auto px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                        >
+                            <option value="day">Día</option>
+                            <option value="week">Semana</option>
+                            <option value="month">Mes</option>
+                        </select>
+                    </div>
+                    
                     {esMatriz && (
                         <select
                             value={selectedSucursal}
@@ -188,7 +248,7 @@ export default function SalesMatrixView() {
                 </div>
             ) : (
                 <div className="bg-white rounded-[24px] border border-gray-100 overflow-hidden shadow-sm">
-                    {filteredProducts.length === 0 ? (
+                    {processedProducts.length === 0 ? (
                         <div className="p-12 text-center text-gray-400 font-medium">
                             {searchTerm ? 'No hay productos que coincidan con la búsqueda.' : 'No se encontraron ventas en este periodo.'}
                         </div>
@@ -200,32 +260,29 @@ export default function SalesMatrixView() {
                                         <th className="p-2 border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-40 min-w-[150px]">
                                             Producto
                                         </th>
-                                        {dateList.map(d => {
-                                            const parts = d.split('-');
-                                            return (
-                                                <th key={d} className="p-2 border-b border-gray-200 text-center min-w-[45px]">
-                                                    {parts[2]}/{parts[1]}
-                                                </th>
-                                            );
-                                        })}
+                                        {columns.map(c => (
+                                            <th key={c.key} className="p-2 border-b border-gray-200 text-center min-w-[60px] whitespace-nowrap">
+                                                {c.label}
+                                            </th>
+                                        ))}
                                         <th className="p-2 border-b border-l border-gray-200 bg-indigo-50 text-indigo-700 text-center sticky right-0 z-40 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                                             Total
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
-                                    {filteredProducts.map((p) => {
+                                    {processedProducts.map((p) => {
                                         let rowTotal = 0;
                                         return (
                                             <tr key={p.producto_id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="p-2 border-r border-gray-100 sticky left-0 bg-white z-20 max-w-[200px] truncate font-bold text-gray-900 shadow-[2px_0_4px_rgba(0,0,0,0.02)]" title={p.descripcion}>
                                                     {p.descripcion}
                                                 </td>
-                                                {dateList.map(d => {
-                                                    const qty = p.days[d] || 0;
+                                                {columns.map(c => {
+                                                    const qty = p.aggs[c.key] || 0;
                                                     rowTotal += qty;
                                                     return (
-                                                        <td key={d} className="p-1 text-center">
+                                                        <td key={c.key} className="p-1 text-center">
                                                             {qty > 0 ? (
                                                                 <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-lg font-black inline-block min-w-[20px]">
                                                                     {qty}
