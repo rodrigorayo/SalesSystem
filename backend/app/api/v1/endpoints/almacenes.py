@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 from app.domain.models.almacen import Almacen, TipoAlmacen
-from app.core.security import get_current_user, require_role
+from app.infrastructure.auth import get_current_user
+from app.infrastructure.core.dependencies import require_roles
 from app.domain.models.user import User, UserRole
 
 router = APIRouter()
@@ -48,7 +49,7 @@ async def get_almacenes(
 async def create_almacen(
     sucursal_id: str,
     data: AlmacenCreate,
-    current_user: User = Depends(require_role([UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL]))
+    current_user: User = Depends(require_roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL))
 ):
     tenant_id = current_user.tenant_id
     
@@ -73,7 +74,7 @@ async def create_almacen(
 async def update_almacen(
     almacen_id: str,
     data: AlmacenUpdate,
-    current_user: User = Depends(require_role([UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL]))
+    current_user: User = Depends(require_roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL))
 ):
     almacen = await Almacen.get(almacen_id)
     if not almacen or almacen.tenant_id != current_user.tenant_id or almacen.deleted_at is not None:
@@ -94,7 +95,7 @@ async def update_almacen(
 @router.delete("/{almacen_id}")
 async def delete_almacen(
     almacen_id: str,
-    current_user: User = Depends(require_role([UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ]))
+    current_user: User = Depends(require_roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.ADMIN_MATRIZ))
 ):
     almacen = await Almacen.get(almacen_id)
     if not almacen or almacen.tenant_id != current_user.tenant_id or almacen.deleted_at is not None:
