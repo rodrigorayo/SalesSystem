@@ -31,18 +31,6 @@ async def get_almacenes(
     
     almacenes = await Almacen.find({"tenant_id": tenant_id, "sucursal_id": sucursal_id, "deleted_at": None}).to_list()
     
-    # Fallback temporal: si la sucursal no tiene almacenes, retornamos uno "virtual" por defecto
-    if not almacenes:
-        return [
-            Almacen(
-                tenant_id=tenant_id,
-                sucursal_id=sucursal_id,
-                nombre="Almacén Principal",
-                tipo=TipoAlmacen.GENERAL,
-                is_default=True,
-                id="default"
-            )
-        ]
     return almacenes
 
 @router.post("/{sucursal_id}", response_model=Almacen)
