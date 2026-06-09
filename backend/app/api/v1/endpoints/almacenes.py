@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
-from ...domain.models.almacen import Almacen, TipoAlmacen
-from ...core.security import get_current_user, require_role
-from ...domain.models.user import User, UserRole
+from app.domain.models.almacen import Almacen, TipoAlmacen
+from app.core.security import get_current_user, require_role
+from app.domain.models.user import User, UserRole
 
 router = APIRouter()
 
