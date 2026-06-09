@@ -451,6 +451,21 @@ export default function VentasPage() {
                             <span className="text-xs font-semibold text-gray-700">Solo Facturas</span>
                         </label>
                     )}
+
+                    {esMatriz && (
+                        <label className="flex items-center gap-2 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg shadow-sm cursor-pointer hover:bg-red-100 transition-colors h-[32px] shrink-0">
+                            <input 
+                                type="checkbox" 
+                                checked={soloAnomalias} 
+                                onChange={e => {
+                                    setSoloAnomalias(e.target.checked);
+                                    setPage(1);
+                                }}
+                                className="w-3.5 h-3.5 rounded border-red-300 text-red-600 focus:ring-red-500"
+                            />
+                            <span className="text-xs font-semibold text-red-700">Anomalías</span>
+                        </label>
+                    )}
                 </div>
             </div>
 
