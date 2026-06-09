@@ -114,25 +114,25 @@ async def responder_solicitud_precio(
 
     if data.estado == PriceRequestStatus.APROBADO:
         # Update Inventario price override
-        inv = await Inventario.find_one(
-            Inventario.tenant_id == request.tenant_id,
-            Inventario.sucursal_id == request.sucursal_id,
-            Inventario.producto_id == request.producto_id
-        )
-        if not inv:
-            # Create inventory record if it doesn't exist yet (though it should usually)
-            inv = Inventario(
-                tenant_id=request.tenant_id,
-                sucursal_id=request.sucursal_id,
-                producto_id=request.producto_id,
-                cantidad=0,
-                precio_sucursal=request.precio_propuesto
-            )
-            await inv.create()
-        else:
-            inv.precio_sucursal = request.precio_propuesto
-            inv.updated_at = datetime.utcnow()
-            await inv.save()
+        query = {
+            "tenant_id": request.tenant_id,
+            "sucursal_id": request.sucursal_id,
+            "producto_id": request.producto_id
+        }
+        update = {
+            "$set": {
+                "precio_sucursal": request.precio_propuesto,
+                "updated_at": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "tenant_id": request.tenant_id,
+                "sucursal_id": request.sucursal_id,
+                "producto_id": request.producto_id,
+                "cantidad": 0,
+                "created_at": datetime.utcnow()
+            }
+        }
+        await Inventario.get_motor_collection().find_one_and_update(query, update, upsert=True)
 
     await request.save()
     return request
@@ -151,26 +151,31 @@ async def override_branch_price(
 
     tenant_id = current_user.tenant_id or ""
     
-    inv = await Inventario.find_one(
-        Inventario.tenant_id == tenant_id,
-        Inventario.sucursal_id == sucursal_id,
-        Inventario.producto_id == producto_id
-    )
+    query = {
+        "tenant_id": tenant_id,
+        "sucursal_id": sucursal_id,
+        "producto_id": producto_id
+    }
     
-    if not inv:
-        if nuevo_precio is None:
-            return {"message": "Already using global price"}
-        inv = Inventario(
-            tenant_id=tenant_id,
-            sucursal_id=sucursal_id,
-            producto_id=producto_id,
-            cantidad=0,
-            precio_sucursal=nuevo_precio
-        )
-        await inv.create()
+    if nuevo_precio is None:
+        update = {
+            "$set": {"precio_sucursal": None, "updated_at": datetime.utcnow()}
+        }
     else:
-        inv.precio_sucursal = nuevo_precio
-        inv.updated_at = datetime.utcnow()
-        await inv.save()
+        update = {
+            "$set": {
+                "precio_sucursal": nuevo_precio,
+                "updated_at": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "tenant_id": tenant_id,
+                "sucursal_id": sucursal_id,
+                "producto_id": producto_id,
+                "cantidad": 0,
+                "created_at": datetime.utcnow()
+            }
+        }
+        
+    await Inventario.get_motor_collection().find_one_and_update(query, update, upsert=True)
         
     return {"message": "Price updated successfully", "precio_sucursal": nuevo_precio}

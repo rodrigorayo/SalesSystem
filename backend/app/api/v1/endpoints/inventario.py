@@ -288,43 +288,70 @@ async def ajustar_inventario_masivo(
         if not product or (current_user.role != UserRole.SUPERADMIN and product.tenant_id != tenant_id):
             continue
 
-        entry = await Inventario.find_one(
-            Inventario.tenant_id == tenant_id,
-            Inventario.sucursal_id == sucursal_id,
-            Inventario.almacen_id == req.almacen_id,
-            Inventario.producto_id == ajuste.producto_id,
-        )
+        from pymongo import ReturnDocument
+        from datetime import datetime
 
-        stock_anterior = entry.cantidad if entry else 0
-        cantidad_cambio = 0
+        motor_coll = Inventario.get_motor_collection()
         
+        query = {
+            "tenant_id": tenant_id,
+            "sucursal_id": sucursal_id,
+            "almacen_id": req.almacen_id,
+            "producto_id": ajuste.producto_id,
+        }
+
+        entry_before = await motor_coll.find_one(query)
+        stock_anterior = entry_before["cantidad"] if entry_before else 0
+
+        now = datetime.utcnow()
+        set_on_insert = {
+            "tenant_id": tenant_id,
+            "sucursal_id": sucursal_id,
+            "almacen_id": req.almacen_id,
+            "producto_id": ajuste.producto_id,
+            "created_at": now,
+        }
+
         if ajuste.tipo == "ENTRADA":
-            nuevo_stock = stock_anterior + ajuste.cantidad
-            cantidad_cambio = ajuste.cantidad
+            update = {
+                "$inc": {"cantidad": ajuste.cantidad},
+                "$set": {"updated_at": now},
+                "$setOnInsert": set_on_insert
+            }
             tipo_mov = TipoMovimiento.ENTRADA_MANUAL
         elif ajuste.tipo == "SALIDA":
-            nuevo_stock = max(0, stock_anterior - ajuste.cantidad)
-            cantidad_cambio = nuevo_stock - stock_anterior
+            update = [
+                {
+                    "$set": {
+                        "cantidad": {"$max": [0, {"$subtract": [{"$ifNull": ["$cantidad", 0]}, ajuste.cantidad]}]},
+                        "updated_at": now,
+                        "tenant_id": tenant_id,
+                        "sucursal_id": sucursal_id,
+                        "almacen_id": req.almacen_id,
+                        "producto_id": ajuste.producto_id,
+                        "created_at": {"$ifNull": ["$created_at", now]}
+                    }
+                }
+            ]
             tipo_mov = TipoMovimiento.SALIDA_MANUAL
         elif ajuste.tipo == "AJUSTE":
-            nuevo_stock = ajuste.cantidad
-            cantidad_cambio = nuevo_stock - stock_anterior
+            update = {
+                "$set": {"cantidad": ajuste.cantidad, "updated_at": now},
+                "$setOnInsert": set_on_insert
+            }
             tipo_mov = TipoMovimiento.AJUSTE_FISICO
         else:
             continue
 
-        if entry:
-            entry.cantidad = nuevo_stock
-            await entry.save()
-        else:
-            entry = Inventario(
-                tenant_id=tenant_id,
-                sucursal_id=sucursal_id,
-                almacen_id=req.almacen_id,
-                producto_id=ajuste.producto_id,
-                cantidad=nuevo_stock,
-            )
-            await entry.create()
+        updated_doc = await motor_coll.find_one_and_update(
+            query,
+            update,
+            upsert=True,
+            return_document=ReturnDocument.AFTER
+        )
+        
+        nuevo_stock = updated_doc["cantidad"]
+        cantidad_cambio = nuevo_stock - stock_anterior
 
         if cantidad_cambio != 0:
             mismatch_note = ""
