@@ -117,8 +117,8 @@ export default function POSPage() {
         const result: Record<string, Record<string, number>> = {};
         almacenes.forEach((a, idx) => {
             const items = almacenesStockQueries[idx]?.data?.items || [];
-            result[a.id] = {};
-            for (const inv of items) result[a.id][inv.producto_id] = inv.cantidad;
+            result[a.id!] = {};
+            for (const inv of items) result[a.id!][inv.producto_id] = inv.cantidad;
         });
         return result;
     }, [almacenes, almacenesStockQueries]);
@@ -331,7 +331,7 @@ export default function POSPage() {
                             {/* Almacenes */}
                             <div className="p-3 space-y-2">
                                 {almacenes.map(a => {
-                                    const stockEnAlmacen = allAlmacenesStockMap[a.id]?.[almacenSelectorProduct._id] ?? 0;
+                                    const stockEnAlmacen = allAlmacenesStockMap[a.id!]?.[almacenSelectorProduct._id] ?? 0;
                                     const sinStock = stockEnAlmacen <= 0;
                                     return (
                                         <button key={a.id} onClick={() => {

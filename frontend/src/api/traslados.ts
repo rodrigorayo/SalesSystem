@@ -12,6 +12,8 @@ export interface TrasladoCreate {
     cliente_destino_nombre?: string;
     notas?: string;
     items: TrasladoItemCreate[];
+    almacen_id?: string;          // Almacén ORIGEN del que sale el stock
+    almacen_destino_id?: string;  // Almacén DESTINO donde recibirán el stock
 }
 
 export interface TrasladoItemReceive {

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Truck, Plus, ArrowRight, Package, CheckCircle2, Clock, XCircle, FileText, Search, Download, Eye, User2, Building2, Warehouse } from 'lucide-react';
 import { getTraslados, despacharTraslado, recibirTraslado, cancelarTraslado } from '../api/traslados';
 import { getSucursales, getInventario, getClientes, createCliente, getAlmacenes } from '../api/api';
+import type { Almacen } from '../api/types';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { formatFullDate } from '../utils/dateUtils';
@@ -484,29 +485,33 @@ function CreateTrasladoModal({ onClose, sucursales, onSuccess }: any) {
     const sucursalId = user?.sucursal_id || 'CENTRAL';
 
     // Cargar almacenes de la sucursal origen
-    const { data: almacenesOrigen = [] } = useQuery({
+    const { data: almacenesOrigen = [] } = useQuery<Almacen[]>({
         queryKey: ['almacenes', sucursalId],
         queryFn: () => getAlmacenes(sucursalId),
-        onSuccess: (data: any[]) => {
-            // Auto-seleccionar el almacén default
-            const def = data.find(a => a.is_default);
-            if (def) setAlmacenOrigenId(def.id!);
-            else if (data.length > 0) setAlmacenOrigenId(data[0].id!);
+    });
+    useEffect(() => {
+        if (almacenesOrigen.length > 0) {
+            const def = almacenesOrigen.find((a: Almacen) => a.is_default);
+            setAlmacenOrigenId(def?.id ?? almacenesOrigen[0].id ?? 'default');
         }
-    } as any);
+    }, [almacenesOrigen]);
 
     // Cargar almacenes de la sucursal destino (cuando sea SUCURSAL y esté seleccionada)
-    const { data: almacenesDestino = [] } = useQuery({
+    const { data: almacenesDestino = [] } = useQuery<Almacen[]>({
         queryKey: ['almacenes', destinoId],
         queryFn: () => getAlmacenes(destinoId),
         enabled: destinoTipo === 'SUCURSAL' && !!destinoId,
-        onSuccess: (data: any[]) => {
-            const def = data.find((a: any) => a.is_default);
-            if (def) setAlmacenDestinoId(def.id!);
-            else if (data.length > 0) setAlmacenDestinoId(data[0].id!);
-            else setAlmacenDestinoId('default');
+    });
+    useEffect(() => {
+        if (destinoId) {
+            if (almacenesDestino.length > 0) {
+                const def = almacenesDestino.find((a: Almacen) => a.is_default);
+                setAlmacenDestinoId(def?.id ?? almacenesDestino[0].id ?? 'default');
+            } else {
+                setAlmacenDestinoId('default');
+            }
         }
-    } as any);
+    }, [almacenesDestino, destinoId]);
 
     const { data: inventarioResponse, isLoading: isLoadingInventario } = useQuery({
         queryKey: ['inventario-traslado', sucursalId, almacenOrigenId, search],
