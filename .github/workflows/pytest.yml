@@ -35,7 +35,7 @@ jobs:
 
     - name: Run Pytest
       env:
-        MONGO_URI: "mongodb://localhost:27017/salessystem_test"
+        MONGO_URI: "mongodb://127.0.0.1:27017/salessystem_test"
         PYTHONPATH: "backend"
       run: |
         cd backend
