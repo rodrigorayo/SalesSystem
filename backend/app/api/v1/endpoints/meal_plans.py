@@ -93,6 +93,7 @@ async def list_client_meal_plans(
     for p in plans:
         template = await MealPlanTemplate.get(p.template_id)
         p_dump = p.model_dump()
+        p_dump["_id"] = str(p.id)
         p_dump["template_name"] = template.nombre if template else "Plan Desconocido"
         result.append(p_dump)
         

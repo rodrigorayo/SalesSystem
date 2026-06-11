@@ -76,6 +76,7 @@ async def list_meal_schedules(
     for s in schedules:
         client = await Cliente.get(s.cliente_id)
         s_dump = s.model_dump()
+        s_dump["_id"] = str(s.id)
         s_dump["client_name"] = client.nombre if client else "Cliente Desconocido"
         
         recipe_names = []
