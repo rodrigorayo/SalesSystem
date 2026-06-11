@@ -3,7 +3,7 @@ import pytest_asyncio
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.infrastructure.db import init_db
-from app.config import get_settings
+from app.infrastructure.core.config import settings
 
 # Sobreescribimos la variable de entorno para que Beanie use una DB de prueba
 os.environ["MONGODB_URL"] = os.getenv("MONGO_URI", "mongodb://localhost:27017/salessystem_test_local")
@@ -14,7 +14,6 @@ async def initialize_test_database():
     Se ejecuta automáticamente al inicio de los tests.
     Levanta una conexión real o en memoria a MongoDB para que Beanie inicialice sus colecciones.
     """
-    settings = get_settings()
     # Para tests, ignoramos la configuración de entorno y forzamos la URL de prueba
     client = AsyncIOMotorClient(os.environ["MONGODB_URL"])
     
