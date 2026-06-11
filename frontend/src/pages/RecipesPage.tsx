@@ -351,14 +351,21 @@ export default function RecipesPage() {
                                             </div>
 
                                             {/* Unidad */}
-                                            <div className="w-full md:w-20">
-                                                <input
-                                                    type="text" required
-                                                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-black/5"
-                                                    placeholder="Unidad"
+                                            <div className="w-full md:w-24">
+                                                <select
+                                                    required
+                                                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-black/5"
                                                     value={ing.unidad_medida_receta}
                                                     onChange={e => handleIngredientChange(index, 'unidad_medida_receta', e.target.value)}
-                                                />
+                                                >
+                                                    <option value="kg">kg</option>
+                                                    <option value="g">g</option>
+                                                    <option value="L">L</option>
+                                                    <option value="ml">ml</option>
+                                                    <option value="u">u</option>
+                                                    <option value="oz">oz</option>
+                                                    <option value="lb">lb</option>
+                                                </select>
                                             </div>
 
                                             {/* Notas */}
