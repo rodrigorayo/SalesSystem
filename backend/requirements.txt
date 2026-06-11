@@ -2,6 +2,7 @@ fastapi
 uvicorn
 beanie
 motor
+pymongo<4.9.0
 pydantic-settings
 python-multipart
 passlib[bcrypt]
