@@ -58,14 +58,70 @@ async def get_sales_percentiles(
         )
         datos = await cursor.to_list(length=None)
 
+        # Inyectar ventas POS (caja en vivo)
+        # 1) Mapeo de sucursales si hay filtro
+        import re
+        sucursales_cursor = db.sucursales.find({}, {"_id": 1, "nombre": 1})
+        sucursales_list = await sucursales_cursor.to_list(length=None)
+        suc_id_to_name = {}
+        for s in sucursales_list:
+            nombre = str(s.get("nombre", ""))
+            sid = str(s["_id"])
+            nl = nombre.lower()
+            if 'heroina' in nl or 'hero' in nl:
+                suc_name = "Heroínas"
+            elif 'recoleta' in nl:
+                suc_name = "Recoleta"
+            elif 'calacoto' in nl:
+                suc_name = "Calacoto"
+            else:
+                suc_name = nombre
+            suc_id_to_name[sid] = suc_name
+
+        # 2) Buscar ventas POS en el rango
+        pos_filter = {
+            "anulada": {"$ne": True},
+            "created_at": {"$gte": start_dt, "$lte": end_dt}
+        }
+        
+        pos_cursor = db.sales.find(
+            pos_filter, 
+            {"_id": 0, "created_at": 1, "total": 1, "sucursal_id": 1, "items": 1}
+        ).batch_size(1000)
+        pos_sales = await pos_cursor.to_list(length=None)
+        
+        for sale in pos_sales:
+            sid = str(sale.get("sucursal_id", ""))
+            suc_name = suc_id_to_name.get(sid, "")
+            
+            # Filtro por sucursal
+            if sucursal and sucursal.strip():
+                suc_pattern = sucursal.strip()
+                if suc_pattern.lower() == "heroinas":
+                    suc_pattern = "Heroínas"
+                if not re.search(suc_pattern, suc_name, re.IGNORECASE):
+                    continue
+                    
+            items = sale.get("items", [])
+            for item in items:
+                try:
+                    monto = float(str(item.get("subtotal", 0)))
+                except:
+                    monto = 0
+                datos.append({
+                    "fecha_transaccion": sale.get("created_at"),
+                    "monto_total_bs": monto
+                })
+
         if not datos:
             return _empty_percentiles(group_by)
 
         df = pd.DataFrame(datos)
         df["fecha_transaccion"] = pd.to_datetime(df["fecha_transaccion"], errors="coerce", utc=True)
         df.dropna(subset=["fecha_transaccion"], inplace=True)
+        df["fecha_transaccion_local"] = df["fecha_transaccion"].dt.tz_convert('America/La_Paz')
         df["monto_total_bs"] = pd.to_numeric(df["monto_total_bs"], errors="coerce").fillna(0)
-        df["fecha_solo"] = df["fecha_transaccion"].dt.date
+        df["fecha_solo"] = df["fecha_transaccion_local"].dt.date
 
         # ── Agrupar por período ──────────────────────────────────────────────
         daily = df.groupby("fecha_solo")["monto_total_bs"].sum().reset_index()

@@ -10,9 +10,9 @@ echo.
 
 :: ── BACKEND ──────────────────────────────────
 echo  [1/2] Iniciando Backend (FastAPI)...
-cd /d "%~dp0backend"
+cd /d "%~dp0"
 
-if not exist "..\.venv\Scripts\activate.bat" (
+if not exist ".venv\Scripts\activate.bat" (
     echo  [ERROR] No se encontro el entorno virtual en la raiz (.venv)
     echo  Ejecuta: python -m venv .venv ^&^& .venv\Scripts\pip install -r requirements.txt
     pause
@@ -26,7 +26,7 @@ timeout /t 3 /nobreak > nul
 
 :: ── FRONTEND ─────────────────────────────────
 echo  [2/2] Iniciando Frontend (Vite/React)...
-start "SalesSystem Frontend :5173" cmd /k "cd /d %~dp0frontend && npm run dev"
+start "SalesSystem Frontend :5173" cmd /k "cd /d %~dp0frontend && call npm run dev"
 
 echo.
 echo  ==========================================

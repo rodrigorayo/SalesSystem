@@ -1,6 +1,7 @@
 from app.infrastructure.db import get_client
 import math
 import logging
+import asyncio
 from datetime import datetime
 from typing import List, Optional
 from fastapi import HTTPException
@@ -13,6 +14,7 @@ from app.domain.models.product import Product
 from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.domain.models.caja import CajaMovimiento, CajaSesion, EstadoSesion, SubtipoMovimiento
 from app.domain.models.cliente import Cliente
+from app.domain.models.sucursal import Sucursal
 from app.domain.models.user import User, UserRole
 from app.domain.schemas.sale import SaleCreate
 from app.utils.pricing import resolver_precio
@@ -314,7 +316,46 @@ class SalesService:
                     return sale
 
         # ── Ejecutar con reintento automático ante WriteConflict ──────────────
-        return await retry_on_write_conflict(_run_transaction)
+        sale = await retry_on_write_conflict(_run_transaction)
+
+        # --- Sincronización automática en segundo plano con ventas_historicas_crudas (BI) ---
+        async def _sync_background():
+            try:
+                sucursal_obj = await Sucursal.get(sale.sucursal_id)
+                sucursal_name = sucursal_obj.nombre if sucursal_obj else sale.sucursal_id
+                
+                # Normalizar nombre sucursal según estándares de analítica
+                name_lower = sucursal_name.lower()
+                if 'heroinas' in name_lower or 'heroína' in name_lower or 'hero' in name_lower:
+                    sucursal_name_mapped = 'Heroínas'
+                elif 'recoleta' in name_lower:
+                    sucursal_name_mapped = 'Recoleta'
+                elif 'calacoto' in name_lower:
+                    sucursal_name_mapped = 'Calacoto'
+                else:
+                    sucursal_name_mapped = sucursal_name
+                    
+                db_raw = get_client().salessystem
+                new_historical_records = []
+                for item in sale.items:
+                    new_historical_records.append({
+                        "fecha_transaccion": sale.created_at,
+                        "nombre_producto": item.descripcion.upper().strip(),
+                        "cantidad_vendida": float(item.cantidad),
+                        "sucursal": sucursal_name_mapped,
+                        "monto_total_bs": float(item.subtotal),
+                        "tenant_id": sale.tenant_id,
+                        "original_sale_id": sale.id
+                    })
+                
+                if new_historical_records:
+                    await db_raw.ventas_historicas_crudas.insert_many(new_historical_records)
+            except Exception as e:
+                logger.error(f"Error en segundo plano sincronizando venta a ventas_historicas_crudas: {e}", exc_info=True)
+
+        asyncio.create_task(_sync_background())
+
+        return sale
 
 
     @staticmethod
@@ -354,6 +395,7 @@ class SalesService:
                 detail="Para anular por 'Error de cobro' debes especificar cuál fue el método de pago real."
             )
 
+        sale_obj = None
         try:
             async with await client.start_session() as session:
                 async with session.start_transaction():
@@ -574,10 +616,25 @@ class SalesService:
                         session=session
                     ).delete(session=session)
                     
-                    return sale
+                    sale_obj = sale
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"[SalesService.anular_sale] Transaction aborted: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Error transaccional al anular la venta: {str(e)}")
+
+        if sale_obj:
+            # --- Sincronización en segundo plano para eliminar los ítems de ventas_historicas_crudas ---
+            async def _sync_anular_background():
+                try:
+                    db_raw = get_client().salessystem
+                    await db_raw.ventas_historicas_crudas.delete_many(
+                        {"original_sale_id": sale_obj.id}
+                    )
+                except Exception as e:
+                    logger.error(f"Error en segundo plano eliminando venta anulada de ventas_historicas_crudas: {e}", exc_info=True)
+            
+            asyncio.create_task(_sync_anular_background())
+
+        return sale_obj
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type RefObject } from 'react';
 import { getHourlyMultiyear } from '../api/api';
 import {
-    ResponsiveContainer, LineChart, Line, XAxis, YAxis,
+    ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis,
     CartesianGrid, Tooltip
 } from 'recharts';
 import { Activity, Calendar, Loader2, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Store } from 'lucide-react';
@@ -11,7 +11,7 @@ import { useOnClickOutside } from 'usehooks-ts';
 // Helpers & Festividades
 // ───────────────────────────────────────────────────────────────────────────────
 const formatBs = (n: number) =>
-    `Bs. ${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    `Bs. ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const formatReadableDate = (dateStr: string) => {
     if (!dateStr || dateStr === "—") return dateStr;
@@ -337,6 +337,9 @@ export default function HourlyMultiyearChart() {
     }, [fechaRef, sucursal, fetchData]);
 
     const hasPrediction = chartData.some((d) => d.prediccion !== undefined && d.prediccion > 0);
+    const totalVendidoHoy = chartData.reduce((acc, curr) => acc + (curr.real || 0), 0);
+
+    const renderedData = chartData;
 
     // Calcular estado general del día (Verde, Amarillo, Rojo)
     let insightColor = 'bg-gray-50 text-gray-800 border-gray-100';
@@ -365,8 +368,8 @@ export default function HourlyMultiyearChart() {
                         <Activity className="text-indigo-600" />
                         Comparativa Horaria Multi-Año
                     </h3>
-                    <p className="text-gray-500 text-sm flex flex-wrap items-center gap-2">
-                        <span>Eje temporal forzado <strong>08:00 – 20:00</strong>.</span>
+                    <p className="text-gray-500 text-sm flex flex-wrap items-center gap-2 mb-4">
+                        <span>Eje temporal: <strong>08:00 – 21:00</strong>.</span>
                         <span className="text-gray-300">•</span>
                         {meta ? (
                             <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
@@ -413,39 +416,56 @@ export default function HourlyMultiyearChart() {
             </div>
 
             {/* Mini Resumen del Día */}
-            {meta && !isLoading && meta.variacion_vs_anio1 !== null && (
+            {meta && !isLoading && (
                 <div className={`mb-8 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border shadow-sm transition-all duration-500 ${insightColor}`}>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/60 rounded-xl shadow-sm">
+                    <div className="flex items-start gap-3">
+                        <div className="p-2 bg-white/60 rounded-xl shadow-sm mt-1">
                             {insightIcon}
                         </div>
                         <div>
                             <p className="text-sm font-bold opacity-80 mb-0.5">Rendimiento General del Día</p>
                             <h4 className="text-lg font-black tracking-tight">
-                                {meta.variacion_vs_anio1 > 0 ? 'Superando objetivos' : meta.variacion_vs_anio1 < -5 ? 'Por debajo del año pasado' : 'Manteniendo el nivel'}
+                                {meta.variacion_vs_anio1 === null 
+                                    ? 'Resumen de ventas' 
+                                    : meta.variacion_vs_anio1 > 0 
+                                        ? 'Superando objetivos' 
+                                        : meta.variacion_vs_anio1 < -5 
+                                            ? 'Por debajo del año pasado' 
+                                            : 'Manteniendo el nivel'
+                                }
                             </h4>
+                            <div className="mt-2.5 flex items-center gap-2 bg-white/60 shadow-sm border border-black/5 rounded-xl px-3 py-1.5 w-fit">
+                                <span className="text-[11px] font-black uppercase tracking-wider opacity-75">
+                                    {meta?.es_hoy ? 'Total Vendido Hoy' : 'Total Vendido'}
+                                </span>
+                                <span className="text-base font-black">
+                                    {formatBs(totalVendidoHoy)}
+                                </span>
+                            </div>
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-4 bg-white/60 px-4 py-2 rounded-xl">
-                        <div className="text-right">
-                            <p className="text-xs font-bold opacity-70 mb-0.5">Vs Año Pasado</p>
-                            <p className="text-base font-black">
-                                {meta.variacion_vs_anio1 > 0 ? '+' : ''}{meta.variacion_vs_anio1}%
-                            </p>
+                    {meta.variacion_vs_anio1 !== null && (
+                        <div className="flex items-center gap-4 bg-white/60 px-4 py-2 rounded-xl">
+                            <div className="text-right">
+                                <p className="text-xs font-bold opacity-70 mb-0.5">Vs Año Pasado</p>
+                                <p className="text-base font-black">
+                                    {meta.variacion_vs_anio1 > 0 ? '+' : ''}{meta.variacion_vs_anio1}%
+                                </p>
+                            </div>
+                            {meta.variacion_vs_anio2 !== null && (
+                                <>
+                                    <div className="w-px h-8 bg-black/10"></div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-bold opacity-70 mb-0.5">Vs Hace 2 Años</p>
+                                        <p className="text-base font-black">
+                                            {meta.variacion_vs_anio2 > 0 ? '+' : ''}{meta.variacion_vs_anio2}%
+                                        </p>
+                                    </div>
+                                </>
+                            )}
                         </div>
-                        {meta.variacion_vs_anio2 !== null && (
-                            <>
-                                <div className="w-px h-8 bg-black/10"></div>
-                                <div className="text-right">
-                                    <p className="text-xs font-bold opacity-70 mb-0.5">Vs Hace 2 Años</p>
-                                    <p className="text-base font-black">
-                                        {meta.variacion_vs_anio2 > 0 ? '+' : ''}{meta.variacion_vs_anio2}%
-                                    </p>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    )}
                 </div>
             )}
 
@@ -477,7 +497,7 @@ export default function HourlyMultiyearChart() {
             )}
 
             {/* Gráfico */}
-            <div className="h-[500px] w-full mt-8">
+            <div className="w-full h-[500px] min-h-[500px] mt-8">
                 {isLoading ? (
                     <div className="h-full flex flex-col items-center justify-center gap-4 text-indigo-500">
                         <Loader2 size={40} className="animate-spin" />
@@ -489,7 +509,7 @@ export default function HourlyMultiyearChart() {
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 10, right: 20, left: 40, bottom: 10 }}>
+                        <ComposedChart data={renderedData} margin={{ top: 10, right: 20, left: 40, bottom: 10 }}>
                             <CartesianGrid
                                 strokeDasharray="4 4"
                                 stroke="#f1f5f9"
@@ -497,6 +517,7 @@ export default function HourlyMultiyearChart() {
                             />
                             <XAxis
                                 dataKey="hora"
+                                interval={0}
                                 tick={{ fontSize: 12, fill: '#64748b', fontWeight: 700 }}
                                 axisLine={false}
                                 tickLine={false}
@@ -512,39 +533,44 @@ export default function HourlyMultiyearChart() {
                             />
                             <Tooltip
                                 content={<CustomTooltip meta={meta} />}
-                                cursor={{ stroke: '#cbd5e1', strokeWidth: 2, strokeDasharray: '4 4' }}
+                                cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
                             />
 
-                            {/* Línea Año -2 */}
-                            <Line
-                                type="monotone"
+                            {/* Barras Año -2 */}
+                            <Bar
                                 dataKey="anio2"
-                                stroke="#fb7185"
-                                strokeWidth={2}
-                                dot={false}
-                                activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff' }}
-                                connectNulls
+                                fill="#fb7185"
+                                opacity={0.5}
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={20}
                             />
 
-                            {/* Línea Año -1 */}
-                            <Line
-                                type="monotone"
+                            {/* Barras Año -1 */}
+                            <Bar
                                 dataKey="anio1"
-                                stroke="#f59e0b"
-                                strokeWidth={2.5}
-                                dot={false}
-                                activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff' }}
-                                connectNulls
+                                fill="#fcd34d"
+                                opacity={0.8}
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={20}
+                            />
+                            
+                            {/* Barras Real */}
+                            <Bar
+                                dataKey="real"
+                                fill="#818cf8"
+                                opacity={0.9}
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={20}
                             />
 
                             {/* Línea Real (encima de todas) */}
                             <Line
                                 type="monotone"
                                 dataKey="real"
-                                stroke="#6366f1"
-                                strokeWidth={4}
-                                dot={false}
-                                activeDot={{ r: 8, stroke: '#fff', strokeWidth: 3, fill: '#6366f1' }}
+                                stroke="#4f46e5"
+                                strokeWidth={3}
+                                dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#4f46e5' }}
+                                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 3, fill: '#4f46e5' }}
                                 connectNulls
                             />
 
@@ -561,7 +587,7 @@ export default function HourlyMultiyearChart() {
                                     connectNulls
                                 />
                             )}
-                        </LineChart>
+                        </ComposedChart>
                     </ResponsiveContainer>
                 )}
             </div>

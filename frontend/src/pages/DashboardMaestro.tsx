@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { getAnalyticsDashboard } from '../api/api';
+import { getAnalyticsDashboard, getSucursales } from '../api/api';
 import {
-    LayoutDashboard, TrendingUp, DollarSign, Users,
-    Package, AlertTriangle, Loader2, Target,
-    Activity, CheckCircle2, CloudRain, Bot
+    LayoutDashboard, DollarSign,
+    Package, AlertTriangle, Loader2,
+    Activity, CheckCircle2, CloudRain, Bot, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -19,11 +19,44 @@ function cn(...inputs: ClassValue[]) {
 
 const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatRangeLabel = (startStr: string, endStr: string) => {
-    if (!startStr || !endStr) return "";
-    const s = new Date(startStr);
-    const e = new Date(endStr);
-    return `del ${s.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })} al ${e.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+
+
+const getDynamicPeriodText = (timeRange: string, customStart: string, customEnd: string, selectedMonth: string, selectedYear: string) => {
+    const today = new Date();
+    
+    const formatDate = (date: Date) => date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const formatLongDate = (date: Date) => date.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    if (timeRange === 'today') {
+        return `HOY ${formatLongDate(today)}`;
+    } else if (timeRange === 'yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        return `AYER ${formatLongDate(yesterday)}`;
+    } else if (timeRange === '7days') {
+        const past = new Date(today);
+        past.setDate(today.getDate() - 6);
+        return `7 DÍAS del ${formatDate(past)} al ${formatDate(today)}`;
+    } else if (timeRange === '30days') {
+        const past = new Date(today);
+        past.setDate(today.getDate() - 29);
+        return `30 DÍAS del ${formatDate(past)} al ${formatDate(today)}`;
+    } else if (timeRange === 'this_month') {
+        return `ESTE MES`;
+    } else if (timeRange === 'custom_month') {
+        const [y, m] = selectedMonth.split('-');
+        const date = new Date(parseInt(y), parseInt(m) - 1, 1);
+        return `MES ${date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase()}`;
+    } else if (timeRange === 'custom_year') {
+        return `AÑO ${selectedYear}`;
+    } else if (timeRange === 'custom_date') {
+        if (customStart && customEnd) {
+            const s = new Date(`${customStart}T00:00:00`);
+            const e = new Date(`${customEnd}T00:00:00`);
+            return `del ${formatDate(s)} al ${formatDate(e)}`;
+        }
+    }
+    return "";
 };
 
 export default function DashboardMaestro() {
@@ -32,11 +65,20 @@ export default function DashboardMaestro() {
     const [isError, setIsError] = useState(false);
     const [data, setData] = useState<any>(null);
     const [climaEvento, setClimaEvento] = useState('');
+    const [isBackendOffline, setIsBackendOffline] = useState(false);
+    const [selectedSucursal, setSelectedSucursal] = useState('all');
+    const [sucursales, setSucursales] = useState<any[]>([]);
+    const [showRevenueBreakdown, setShowRevenueBreakdown] = useState(false);
+    const [showMargenDetails, setShowMargenDetails] = useState(false);
+    const [showTicketMedioDetails, setShowTicketMedioDetails] = useState(false);
+    const [showTicketClienteDetails, setShowTicketClienteDetails] = useState(false);
 
     // NUEVOS ESTADOS DE TIEMPO
-    const [timeRange, setTimeRange] = useState('30days'); // 'today', '7days', '30days', 'this_month', 'this_year', 'historico', 'custom_month', 'custom_year'
+    const [timeRange, setTimeRange] = useState('today'); // 'today', '7days', '30days', 'this_month', 'this_year', 'historico', 'custom_month', 'custom_year', 'custom_date'
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear().toString());
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
     
     const [dates, setDates] = useState({ start: '2024-01-01T00:00:00.000Z', end: '2026-12-31T23:59:59.000Z' });
 
@@ -53,13 +95,55 @@ export default function DashboardMaestro() {
             const end = new Date(y, 11, 31);
             end.setHours(23, 59, 59, 999);
             setDates({ start: start.toISOString(), end: end.toISOString() });
+        } else if (timeRange === 'custom_date') {
+            if (customStartDate && customEndDate) {
+                const start = new Date(`${customStartDate}T00:00:00`);
+                const end = new Date(`${customEndDate}T23:59:59`);
+                setDates({ start: start.toISOString(), end: end.toISOString() });
+            }
         } else {
-            setDates({ start: '2024-01-01T00:00:00.000Z', end: '2026-12-31T23:59:59.000Z' });
+            let startYear = '2024';
+            const sObj = sucursales.find(s => s.id === selectedSucursal);
+            if (sObj) {
+                const sName = sObj.nombre.toLowerCase();
+                if (sName.includes('calacoto') || sName.includes('recoleta')) {
+                    startYear = '2025';
+                }
+            }
+            setDates({ start: `${startYear}-01-01T00:00:00.000Z`, end: '2026-12-31T23:59:59.000Z' });
         }
-    }, [timeRange, selectedMonth, selectedYear]);
+    }, [timeRange, selectedMonth, selectedYear, customStartDate, customEndDate, selectedSucursal, sucursales]);
 
+    useEffect(() => {
+        getSucursales().then(setSucursales).catch(console.error);
+    }, []);
 
-    const [isBackendOffline, setIsBackendOffline] = useState(false);
+    const getAvailableYears = () => {
+        if (selectedSucursal === 'all') {
+            return ['2026', '2025', '2024'];
+        }
+        const sObj = sucursales.find(s => s.id === selectedSucursal);
+        if (!sObj) return ['2026', '2025', '2024'];
+        
+        const sName = sObj.nombre.toLowerCase();
+        if (sName.includes('calacoto') || sName.includes('recoleta')) {
+            return ['2026', '2025'];
+        }
+        return ['2026', '2025', '2024'];
+    };
+    
+    const availableYears = getAvailableYears();
+
+    useEffect(() => {
+        const sObj = sucursales.find(s => s.id === selectedSucursal);
+        if (sObj) {
+            const sName = sObj.nombre.toLowerCase();
+            const isNewBranch = sName.includes('calacoto') || sName.includes('recoleta');
+            if (isNewBranch && (selectedYear === '2024' || selectedYear === '2023')) {
+                setSelectedYear('2025');
+            }
+        }
+    }, [selectedSucursal, sucursales, selectedYear]);
 
     useEffect(() => {
         let isMounted = true;
@@ -72,7 +156,7 @@ export default function DashboardMaestro() {
                 const res = await getAnalyticsDashboard(
                     dates.start,
                     dates.end,
-                    undefined,
+                    selectedSucursal === 'all' ? undefined : selectedSucursal,
                     backendTimeRange,
                     climaEvento
                 );
@@ -91,7 +175,7 @@ export default function DashboardMaestro() {
         };
         fetchData();
         return () => { isMounted = false; };
-    }, [timeRange, climaEvento, dates]);
+    }, [timeRange, climaEvento, dates, selectedSucursal]);
 
     const esAdmin = ['SUPERADMIN', 'ADMIN_MATRIZ', 'ADMIN'].includes(role || '');
 
@@ -113,7 +197,7 @@ export default function DashboardMaestro() {
                 {isBackendOffline ? (
                     <>
                         <h2 className="text-2xl font-black text-gray-900 mb-3">Servidor Offline</h2>
-                        <p className="text-gray-500 mb-2 font-medium">El backend no está corriendo en el puerto <code className="bg-gray-100 px-2 py-0.5 rounded-lg text-indigo-600 font-bold">8000</code>.</p>
+                        <p className="text-gray-500 mb-2 font-medium">El backend no está corriendo en el puerto <code className="bg-gray-100 px-2 py-0.5 rounded-lg text-indigo-600 font-bold">8001</code>.</p>
                         <p className="text-gray-400 text-sm mb-6">Para iniciar el sistema, haz <strong>doble clic</strong> en el archivo:</p>
                         <div className="bg-slate-900 text-emerald-400 font-mono text-sm px-6 py-4 rounded-2xl w-full mb-8 text-left">
                             <span className="text-slate-500">SalesSystem/</span><span className="font-bold">start.bat</span>
@@ -145,9 +229,9 @@ export default function DashboardMaestro() {
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 pb-24">
 
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="flex flex-col gap-6">
                 <div>
-                    <h1 className="text-4xl font-black text-gray-900 flex items-center gap-3 tracking-tight">
+                    <h1 className="text-3xl md:text-4xl font-black text-gray-900 flex items-center gap-3 tracking-tight whitespace-nowrap">
                         <div className="p-3 bg-gradient-to-br from-indigo-600 to-purple-700 text-white rounded-2xl shadow-lg shadow-indigo-200">
                             <LayoutDashboard size={28} />
                         </div>
@@ -156,15 +240,27 @@ export default function DashboardMaestro() {
                     <p className="text-gray-500 mt-2 text-base font-medium flex flex-wrap items-center gap-2">
                         <Activity size={16} className="text-emerald-500" />
                         <span>Orquestación en tiempo real sobre ~110k Registros Históricos.</span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
-                            Período: {formatRangeLabel(dates.start, dates.end)}
-                        </span>
                     </p>
                 </div>
 
-                <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full lg:w-auto mt-4 md:mt-0">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 w-full border-t border-gray-100 pt-5">
                     
+                    {/* Filtro de Sucursal */}
+                    <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl border border-indigo-100 transition-all hover:bg-indigo-100/50">
+                        <select
+                            value={selectedSucursal}
+                            onChange={(e) => setSelectedSucursal(e.target.value)}
+                            className="bg-transparent text-sm outline-none font-black cursor-pointer text-indigo-700 w-[140px]"
+                        >
+                            <option value="all">Todas las Sucursales</option>
+                            {sucursales.map((s, index) => (
+                                <option key={s.id || s._id || index} value={s.id || s._id || index}>{s.nombre}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="w-px bg-gray-300 mx-1 my-1"></div>
+
                     {/* Segmented Control Rango (Estilo Premium) */}
                     <div className="flex bg-gray-100/80 p-1.5 rounded-xl shadow-inner border border-gray-200/60 overflow-x-auto w-full lg:w-auto custom-scrollbar">
                         <button 
@@ -172,6 +268,12 @@ export default function DashboardMaestro() {
                             className={cn("px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all", timeRange === 'today' ? "bg-white text-indigo-700 shadow-sm border border-gray-200/50" : "text-gray-500 hover:text-gray-900 hover:bg-gray-200/50")}
                         >
                             Hoy
+                        </button>
+                        <button 
+                            onClick={() => setTimeRange('yesterday')} 
+                            className={cn("px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all", timeRange === 'yesterday' ? "bg-white text-indigo-700 shadow-sm border border-gray-200/50" : "text-gray-500 hover:text-gray-900 hover:bg-gray-200/50")}
+                        >
+                            Ayer
                         </button>
                         <button 
                             onClick={() => setTimeRange('7days')} 
@@ -205,11 +307,29 @@ export default function DashboardMaestro() {
                                 onChange={(e) => { setSelectedYear(e.target.value); setTimeRange('custom_year'); }} 
                                 className={cn("bg-transparent text-sm outline-none font-bold cursor-pointer transition-colors w-[70px]", timeRange === 'custom_year' ? "text-indigo-700" : "text-gray-500")}
                             >
-                                <option value="2026">2026</option>
-                                <option value="2025">2025</option>
-                                <option value="2024">2024</option>
-                                <option value="2023">2023</option>
+                                {availableYears.map((year, index) => (
+                                    <option key={year || index} value={year}>{year}</option>
+                                ))}
                             </select>
+                        </div>
+
+                        <div className="w-px bg-gray-300 mx-1 my-1"></div>
+
+                        {/* Rango de Fechas Personalizado */}
+                        <div className={cn("flex items-center gap-2 px-3 py-1 rounded-lg transition-all", timeRange === 'custom_date' ? "bg-white shadow-sm border border-gray-200/50" : "hover:bg-gray-200/50")}>
+                            <input 
+                                type="date" 
+                                value={customStartDate} 
+                                onChange={(e) => { setCustomStartDate(e.target.value); if(customEndDate) setTimeRange('custom_date'); }} 
+                                className={cn("bg-transparent text-sm outline-none font-bold cursor-pointer transition-colors w-[115px]", timeRange === 'custom_date' ? "text-indigo-700" : "text-gray-500")}
+                            />
+                            <span className="text-gray-400 font-bold">-</span>
+                            <input 
+                                type="date" 
+                                value={customEndDate} 
+                                onChange={(e) => { setCustomEndDate(e.target.value); if(e.target.value && customStartDate) setTimeRange('custom_date'); }} 
+                                className={cn("bg-transparent text-sm outline-none font-bold cursor-pointer transition-colors w-[115px]", timeRange === 'custom_date' ? "text-indigo-700" : "text-gray-500")}
+                            />
                         </div>
                     </div>
 
@@ -234,86 +354,235 @@ export default function DashboardMaestro() {
                 </div>
             </div>
 
-            {isLoading ? (
+            {/* Sub-header text indicating period and branch for the data below */}
+            <div className="flex justify-start mb-2 mt-0">
+                <span className="text-gray-500 font-black text-[11px] bg-white px-3 py-1.5 rounded-lg border border-gray-100 uppercase tracking-widest shadow-sm">
+                    Mostrando: {getDynamicPeriodText(timeRange, customStartDate, customEndDate, selectedMonth, selectedYear)} • {selectedSucursal === 'all' ? 'Todas las Sucursales' : sucursales.find(s => s.id === selectedSucursal)?.nombre || selectedSucursal}
+                </span>
+            </div>
+
+            {isLoading && !data ? (
                 <div className="flex flex-col justify-center items-center py-32 space-y-4">
                     <Loader2 size={48} className="animate-spin text-indigo-600 mb-2" />
                     <p className="text-indigo-900 font-bold tracking-widest text-sm uppercase animate-pulse">
                         Calculando Métricas Globales...
                     </p>
                 </div>
-            ) : isError || !data ? (
+            ) : isError || (!data && !isLoading) ? (
                 <div className="bg-red-50 text-red-600 p-8 rounded-3xl text-center border border-red-100">
                     <AlertTriangle size={32} className="mx-auto mb-2" />
                     <h3 className="font-bold">Error obteniendo métricas ejecutivas</h3>
                 </div>
             ) : (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                <div className={cn("space-y-8 transition-opacity duration-500", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
 
                     {/* CAPA 1: 5 KPIs FINANCIEROS (INCLUYE PREDICCIÓN AI) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
                         {/* Ventas Brutas */}
-                        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:border-indigo-100 transition-all flex flex-col justify-between">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><DollarSign size={80} /></div>
-                            <div>
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><DollarSign size={24} /></div>
+                        <div className="bg-[#7b75a6] rounded-[2rem] p-6 shadow-sm relative flex flex-col justify-between text-white h-full min-h-[220px]">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-semibold opacity-90">Ingresos Totales</span>
+                                <div className="w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center">
+                                    <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                                 </div>
-                                <h3 className="text-gray-500 font-semibold text-sm mb-1 relative z-10">Ventas Brutas</h3>
-                                <h2 className="text-3xl xl:text-4xl font-black text-gray-900 tracking-tight relative z-10">{formatBs(data.overview.ventas_brutas)}</h2>
                             </div>
-                            <div className="mt-4 pt-4 border-t border-gray-50 relative z-10 bg-slate-50 p-2 rounded-lg">
-                                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-950">Lo que entró</span>
+                            
+                            <div className="text-sm opacity-80 mb-4 font-semibold">Global</div>
+                            
+                            <div className="flex items-baseline gap-1 mb-6">
+                                <h2 className="text-4xl xl:text-5xl font-black tracking-tighter">{formatBs(data.overview.ventas_brutas)}</h2>
+                            </div>
+                            
+                            <div className="mt-auto pt-4 flex flex-col">
+                                <div className="text-xl font-bold tracking-wide mb-3">
+                                    Ventas Brutas
+                                </div>
+                                
+                                <div className="border-t border-white/20 pt-3">
+                                    <div 
+                                        className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => setShowRevenueBreakdown(!showRevenueBreakdown)}
+                                    >
+                                        <span className="text-sm font-bold uppercase tracking-wider">Desglose</span>
+                                        <ChevronDown size={18} className={cn("transition-transform", showRevenueBreakdown && "rotate-180")} />
+                                    </div>
+                                    
+                                    {showRevenueBreakdown && (
+                                        <div className="mt-3 space-y-2 relative z-10 animate-in fade-in slide-in-from-top-2 bg-white/10 p-4 rounded-xl shadow-sm">
+                                            {data.sales_by_branch?.map((branch: any) => (
+                                                <div key={branch.name} className="flex flex-col border-b border-white/10 pb-2 last:border-0 last:pb-0">
+                                                    <div className="flex justify-between items-center text-base">
+                                                        <span className="font-medium text-white/90 truncate mr-2">{branch.name}</span>
+                                                        <span className="font-bold text-white whitespace-nowrap">{formatBs(branch.ventas)}</span>
+                                                    </div>
+                                                    {branch.tickets_cliente !== undefined && (
+                                                        <div className="text-sm text-white/70 mt-1 font-medium">
+                                                            {branch.tickets_cliente} Tickets Cliente
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {(!data.sales_by_branch || data.sales_by_branch.length === 0) && (
+                                                <div className="text-sm text-white/50 text-center py-2 font-medium">Sin desglose disponible</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Margen Líquido 15% */}
-                        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:border-emerald-100 transition-all flex flex-col justify-between">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><TrendingUp size={80} /></div>
-                            <div>
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><TrendingUp size={24} /></div>
-                                    <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg text-xs font-bold">
-                                        <TrendingUp size={12} /> 15%
+                        {/* Margen Líquido */}
+                        <div className="bg-[#fbfafd] rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col justify-between h-full min-h-[220px]">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-bold text-gray-800">Margen Líquido</span>
+                                <ChevronRight size={16} className="text-gray-400" />
+                            </div>
+                            
+                            <div className="text-sm font-semibold text-gray-500 mb-4">
+                                Com: {formatBs(data.overview.comision_matriz ?? 0)} + Ret: {formatBs(data.overview.margen_retail ?? 0)}
+                            </div>
+                            
+                            <div className="flex items-baseline gap-2 mb-6">
+                                <h2 className="text-4xl xl:text-5xl font-black tracking-tighter text-gray-900">{formatBs(data.overview.margen_liquido)}</h2>
+                                <span className="text-xs font-bold text-gray-400 mb-1">+{data.overview.revenue_growth}%</span>
+                            </div>
+                            
+                            <div className="mt-auto pt-4 flex flex-col">
+                                <div className="text-xl font-bold tracking-wide text-gray-700 mb-3">
+                                    Ganancia Neta
+                                </div>
+                                
+                                <div className="border-t border-gray-200 pt-3">
+                                    <div 
+                                        className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity text-gray-600"
+                                        onClick={() => setShowMargenDetails(!showMargenDetails)}
+                                    >
+                                        <span className="text-sm font-bold uppercase tracking-wider">Desglose</span>
+                                        <ChevronDown size={18} className={cn("transition-transform", showMargenDetails && "rotate-180")} />
+                                    </div>
+                                    
+                                    {showMargenDetails && (
+                                        <div className="mt-3 space-y-2 relative z-10 animate-in fade-in slide-in-from-top-2 bg-gray-50 border border-gray-200 p-4 rounded-xl shadow-sm">
+                                            {data.sales_by_branch?.map((branch: any) => (
+                                                <div key={branch.name} className="flex flex-col border-b border-gray-200 pb-2 last:border-0 last:pb-0">
+                                                    <div className="flex justify-between items-center text-base">
+                                                        <span className="font-semibold text-gray-700 truncate mr-2">{branch.name}</span>
+                                                        <span className="font-bold text-gray-900 whitespace-nowrap">{formatBs(branch.margen)}</span>
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1 font-medium">
+                                                        Matriz: {formatBs(branch.comision_matriz ?? 0)} | Retail: {formatBs(branch.margen_retail ?? 0)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!data.sales_by_branch || data.sales_by_branch.length === 0) && (
+                                                <div className="text-sm text-gray-400 text-center py-2 font-medium">Sin desglose disponible</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Ticket Medio */}
+                        <div className="bg-[#f3faeb] rounded-[2rem] p-6 shadow-sm border border-[#e8f1df] flex flex-col justify-between h-full min-h-[220px]">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-bold text-[#455c45]">Ticket Medio</span>
+                                <ChevronRight size={16} className="text-[#8ca18c]" />
+                            </div>
+                            
+                            <div className="text-sm font-semibold text-[#455c45]/60 mb-4">Promedio Global</div>
+                            
+                            <div className="flex items-baseline gap-2 mb-6">
+                                <h2 className="text-4xl xl:text-5xl font-black tracking-tighter text-[#3a443a]">{formatBs(data.overview.ticket_medio)}</h2>
+                            </div>
+                            
+                            <div className="mt-auto pt-4 flex flex-col">
+                                <div className="text-xl font-bold tracking-wide text-[#455c45] mb-3">
+                                    Gasto por Cliente
+                                </div>
+                                
+                                <div className="border-t border-[#d3e2cd] pt-3">
+                                    <div 
+                                        className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity text-[#455c45]"
+                                        onClick={() => setShowTicketMedioDetails(!showTicketMedioDetails)}
+                                    >
+                                        <span className="text-sm font-bold uppercase tracking-wider">Desglose</span>
+                                        <ChevronDown size={18} className={cn("transition-transform", showTicketMedioDetails && "rotate-180")} />
+                                    </div>
+                                    
+                                    {showTicketMedioDetails && (
+                                        <div className="mt-3 space-y-2 relative z-10 animate-in fade-in slide-in-from-top-2 bg-white/60 border border-[#d3e2cd] p-4 rounded-xl shadow-sm">
+                                            {data.sales_by_branch?.map((branch: any) => {
+                                                const tickets = branch.tickets_cliente || 0;
+                                                const branchTicketMedio = tickets > 0 ? (branch.ventas / tickets) : 0;
+                                                return (
+                                                    <div key={branch.name} className="flex flex-col border-b border-[#d3e2cd]/50 pb-2 last:border-0 last:pb-0">
+                                                        <div className="flex justify-between items-center text-base">
+                                                            <span className="font-semibold text-[#3a443a] truncate mr-2">{branch.name}</span>
+                                                            <span className="font-bold text-[#2d362d] whitespace-nowrap">{formatBs(branchTicketMedio)}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {(!data.sales_by_branch || data.sales_by_branch.length === 0) && (
+                                                <div className="text-sm text-[#586b58]/50 text-center py-2 font-medium">Sin desglose disponible</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Ticket Cliente */}
+                        <div className="bg-[#fcf5f1] rounded-[2rem] p-6 shadow-sm border border-[#f3e7e0] flex flex-col justify-between h-full min-h-[220px]">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-bold text-[#c78b66]">Ticket Cliente</span>
+                                <ChevronRight size={16} className="text-[#d8ab91]" />
+                            </div>
+                            
+                            <div className="text-sm font-semibold text-[#c78b66]/80 mb-4 flex items-center gap-1 overflow-hidden">
+                                {data.sales_by_branch?.map((branch: any, index: number) => (
+                                    <span key={branch.name} className="whitespace-nowrap">
+                                        {branch.name}: {branch.tickets_cliente ?? 0}
+                                        {index < data.sales_by_branch.length - 1 && <span className="mx-1 opacity-50">|</span>}
                                     </span>
+                                ))}
+                            </div>
+                            
+                            <div className="flex items-baseline gap-2 mb-6">
+                                <h2 className="text-4xl xl:text-5xl font-black tracking-tighter text-[#bd754e]">{data.overview.total_orders}</h2>
+                            </div>
+                            
+                            <div className="mt-auto pt-4 flex flex-col">
+                                <div className="text-xl font-bold tracking-wide text-[#b56d47] mb-3">
+                                    Total de Visitas
                                 </div>
-                                <h3 className="text-gray-500 font-semibold text-sm mb-1 relative z-10">Margen Líquido</h3>
-                                <h2 className="text-3xl xl:text-4xl font-black text-emerald-900 tracking-tight relative z-10">{formatBs(data.overview.margen_liquido)}</h2>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-gray-50 relative z-10 bg-slate-50 p-2 rounded-lg">
-                                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-950">Lo que nos queda libre</span>
-                            </div>
-                        </div>
-
-                        {/* Ticket Promedio */}
-                        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group flex flex-col justify-between">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Target size={80} /></div>
-                            <div>
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <div className="p-3 bg-slate-100 text-slate-800 rounded-2xl"><Target size={24} /></div>
+                                
+                                <div className="border-t border-[#e8dacd] pt-3">
+                                    <div 
+                                        className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity text-[#b56d47]"
+                                        onClick={() => setShowTicketClienteDetails(!showTicketClienteDetails)}
+                                    >
+                                        <span className="text-sm font-bold uppercase tracking-wider">Desglose</span>
+                                        <ChevronDown size={18} className={cn("transition-transform", showTicketClienteDetails && "rotate-180")} />
+                                    </div>
+                                    
+                                    {showTicketClienteDetails && (
+                                        <div className="mt-3 space-y-2 relative z-10 animate-in fade-in slide-in-from-top-2 bg-white/60 border border-[#e8dacd] p-4 rounded-xl shadow-sm">
+                                            {data.sales_by_branch?.map((branch: any) => (
+                                                <div key={branch.name} className="flex flex-col border-b border-[#e8dacd]/50 pb-2 last:border-0 last:pb-0">
+                                                    <div className="flex justify-between items-center text-base">
+                                                        <span className="font-semibold text-[#b56d47] truncate mr-2">{branch.name}</span>
+                                                        <span className="font-bold text-[#a65f3a] whitespace-nowrap">{branch.tickets_cliente ?? 0} Tickets</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!data.sales_by_branch || data.sales_by_branch.length === 0) && (
+                                                <div className="text-sm text-[#b56d47]/50 text-center py-2 font-medium">Sin desglose disponible</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                                <h3 className="text-gray-500 font-semibold text-sm mb-1 relative z-10">Ticket Promedio</h3>
-                                <h2 className="text-3xl xl:text-4xl font-black text-gray-900 tracking-tight relative z-10">{formatBs(data.overview.average_ticket)}</h2>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-gray-50 relative z-10 bg-slate-50 p-2 rounded-lg">
-                                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-950">Lo que gasta cada uno</span>
-                            </div>
-                        </div>
-
-                        {/* Clientes Recurrentes */}
-                        <div className="bg-white border-gray-100 border rounded-[2rem] p-6 shadow-sm relative overflow-hidden flex flex-col justify-between">
-                            <div className="absolute top-0 right-0 p-4 opacity-5"><Users size={80} /></div>
-                            <div>
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl"><Users size={24} /></div>
-                                </div>
-                                <h3 className="text-gray-500 font-semibold text-sm mb-1 relative z-10">Clientes Frecuentes</h3>
-                                <div className="flex items-baseline gap-2 relative z-10">
-                                    <h2 className="text-3xl xl:text-4xl font-black text-gray-900 tracking-tight">{data.overview.recurrent_customers}</h2>
-                                    <span className="text-gray-500 font-medium">de {data.overview.active_customers}</span>
-                                </div>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-gray-50 relative z-10 bg-slate-50 p-2 rounded-lg">
-                                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-950">Fidelización</span>
                             </div>
                         </div>
 

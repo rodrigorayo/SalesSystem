@@ -68,10 +68,16 @@ export default function SalesPercentileTracker(){
   const weekStart=(()=>{ const d=getMonday(new Date()); d.setDate(d.getDate()+weekOffset*7); return d; })();
 
   const fetchData=useCallback(async(suc:string)=>{
-    setIsLoading(true);setIsError(false);
-    try{ setData(await getSalesPercentiles(suc||undefined,365,"day")); }
-    catch{ setIsError(true); }
-    finally{ setIsLoading(false); }
+    setIsLoading(true);
+    setIsError(false);
+    try { 
+      const res = await getSalesPercentiles(suc||undefined,365,"day"); 
+      setData(res);
+    } catch(err) { 
+      setIsError(true); 
+    } finally { 
+      setIsLoading(false); 
+    }
   },[]);
   useEffect(()=>{ fetchData(sucursal); },[sucursal,fetchData]);
 
@@ -152,9 +158,14 @@ export default function SalesPercentileTracker(){
               
               {/* Card 1: Total Facturado */}
               <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[140px] hover:shadow-md transition-all">
-                <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1">
-                  💰 Total Facturado
-                </span>
+                <div>
+                  <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1">
+                    💰 Total Facturado
+                  </span>
+                  <p className="text-[10px] text-slate-400 font-medium mb-2">
+                    Acumulado últimos 365 días • {sucursal ? `Sucursal: ${SUCS.find(s=>s.value===sucursal)?.label}` : "Todas las sucursales"}
+                  </p>
+                </div>
                 <div className="flex items-end justify-between gap-4 mt-2">
                   {/* Mini Bars */}
                   <div className="flex items-end gap-1.5 h-16 w-32 pb-0.5">
@@ -221,11 +232,14 @@ export default function SalesPercentileTracker(){
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               
               {/* Card 3: P25 Mínimo */}
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px] hover:shadow-md transition-all">
-                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-1">
-                  🔴 P25 (Mínimo)
-                </span>
-                <div className="flex items-end justify-between gap-2 mt-2">
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                <div>
+                  <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1 flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-400"/> P25 (Mínimo)
+                  </span>
+                  <p className="text-[9px] text-slate-400 font-medium">Límite inferior del último año</p>
+                </div>
+                <div className="flex items-end justify-between mt-3">
                   {/* Mini Bars */}
                   <div className="flex items-end gap-2 h-12 w-24 pb-0.5">
                     <div className="w-4 bg-red-500 rounded-t-sm transition-all duration-300" style={{ height: `${p25Pct}%` }} />
@@ -234,20 +248,23 @@ export default function SalesPercentileTracker(){
                   </div>
                   {/* Values */}
                   <div className="text-right">
-                    <p className="text-2xl lg:text-3xl font-black text-red-600 leading-none">{fmt(p25)}</p>
+                    <p className="text-2xl font-black text-red-600 leading-none">{fmt(p25)}</p>
                     <span className="text-[9px] text-slate-400 font-bold block mt-1.5 leading-none">
-                      25% de los días menores
+                      Basado en 365 días
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Card 4: Mediana (P50) */}
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px] hover:shadow-md transition-all">
-                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-1">
-                  🟡 P50 (Mediana)
-                </span>
-                <div className="flex items-end justify-between gap-2 mt-2">
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                <div>
+                  <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1 flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400"/> P50 (Mediana)
+                  </span>
+                  <p className="text-[9px] text-slate-400 font-medium">Punto de equilibrio exacto del año</p>
+                </div>
+                <div className="flex items-end justify-between mt-3">
                   {/* Mini Bars */}
                   <div className="flex items-end gap-2 h-12 w-24 pb-0.5">
                     <div className="w-4 bg-red-500 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: `${p25Pct}%` }} />
@@ -256,20 +273,23 @@ export default function SalesPercentileTracker(){
                   </div>
                   {/* Values */}
                   <div className="text-right">
-                    <p className="text-2xl lg:text-3xl font-black text-amber-600 leading-none">{fmt(p50)}</p>
+                    <p className="text-2xl font-black text-amber-600 leading-none">{fmt(p50)}</p>
                     <span className="text-[9px] text-slate-400 font-bold block mt-1.5 leading-none">
-                      La venta típica diaria
+                      Basado en 365 días
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Card 5: P75 (Meta) */}
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px] hover:shadow-md transition-all">
-                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block mb-1">
-                  🟣 P75 (Meta)
-                </span>
-                <div className="flex items-end justify-between gap-2 mt-2">
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                <div>
+                  <span className="text-xs font-black tracking-widest text-slate-400 uppercase block mb-1 flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-violet-400"/> P75 (Meta)
+                  </span>
+                  <p className="text-[9px] text-slate-400 font-medium">El 25% superior de tu historial</p>
+                </div>
+                <div className="flex items-end justify-between mt-3">
                   {/* Mini Bars */}
                   <div className="flex items-end gap-2 h-12 w-24 pb-0.5">
                     <div className="w-4 bg-red-500 rounded-t-sm transition-all duration-300 opacity-30" style={{ height: `${p25Pct}%` }} />

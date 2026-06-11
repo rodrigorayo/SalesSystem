@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { getAnalyticsDashboard } from '../api/api';
+import { getAnalyticsDashboard, getRentabilidadReal, getProducts } from '../api/api';
 import {
     AlertTriangle, Loader2, Target, Activity,
     TrendingUp, Package, Calendar, DollarSign,
-    Search, FileSpreadsheet, Trophy, Clock
+    Search, FileSpreadsheet, Clock
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -32,11 +32,29 @@ export default function CatalogRentability() {
 
     // Estado de filtro LOCAL para la tabla de Rentabilidad (independiente del filtro global)
     const [rentRange, setRentRange] = useState('30days');
+    const [rentSucursal, setRentSucursal] = useState('');
     const [rentData, setRentData] = useState<any[]>([]);
     const [isRentLoading, setIsRentLoading] = useState(false);
-    // Vista semanal / mensual para el grÃ¡fico de evoluciÃ³n
+    // Vista semanal / mensual para el gráfico de evolución
     const [chartView, setChartView] = useState<'day' | 'week' | 'month'>('week');
     const [meta, setMeta] = useState<number>(0);
+
+    const [catalogo, setCatalogo] = useState<any[]>([]);
+
+    useEffect(() => {
+        getProducts(1, 2000).then(res => {
+            setCatalogo(res.items || []);
+        }).catch(err => {
+            console.error("Error cargando catalogo en CatalogRentability:", err);
+        });
+    }, []);
+    
+    const SUCS = [
+        { value: '', label: 'Todas las Sucursales' },
+        { value: 'Heroinas', label: 'Heroínas' },
+        { value: 'Recoleta', label: 'Recoleta' },
+        { value: 'Calacoto', label: 'Calacoto' },
+    ];
 
     const rentRangeLabels: Record<string, string> = {
         'today': 'Hoy',
@@ -52,14 +70,37 @@ export default function CatalogRentability() {
         const fetchRent = async () => {
             setIsRentLoading(true);
             try {
-                const res = await getAnalyticsDashboard(
-                    '2024-01-01T00:00:00.000Z',
-                    '2026-12-31T23:59:59.000Z',
-                    undefined,
-                    rentRange,
-                    ''
+                // Convertir rentRange a fechas reales
+                const now = new Date();
+                let start = new Date('2024-01-01T00:00:00.000Z');
+                let end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                if (rentRange === 'today') {
+                    const startOfToday = new Date();
+                    startOfToday.setHours(0, 0, 0, 0);
+                    const endOfToday = new Date();
+                    endOfToday.setHours(23, 59, 59, 999);
+                    start = startOfToday;
+                    end = endOfToday;
+                } else if (rentRange === '7days') {
+                    start = new Date(now); start.setDate(now.getDate() - 7);
+                    end   = now;
+                } else if (rentRange === '30days') {
+                    start = new Date(now); start.setDate(now.getDate() - 30);
+                    end   = now;
+                } else if (rentRange === 'this_month') {
+                    start = new Date(now.getFullYear(), now.getMonth(), 1);
+                    end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                } else if (rentRange === 'this_year') {
+                    start = new Date(now.getFullYear(), 0, 1);
+                    end   = now;
+                }
+                const res = await getRentabilidadReal(
+                    start.toISOString(),
+                    end.toISOString(),
+                    rentSucursal || undefined,
+                    50
                 );
-                if (isMounted) setRentData(res?.top_productos_rentabilidad || []);
+                if (isMounted) setRentData(Array.isArray(res) ? res : []);
             } catch (e) {
                 if (isMounted) setRentData([]);
             } finally {
@@ -68,7 +109,7 @@ export default function CatalogRentability() {
         };
         fetchRent();
         return () => { isMounted = false; };
-    }, [rentRange]);
+    }, [rentRange, rentSucursal]);
 
     const rangeLabels: Record<string, string> = {
         'today': 'Hoy',
@@ -123,9 +164,6 @@ export default function CatalogRentability() {
         );
     }
 
-    const rentabilidad: any[] = (data?.top_productos_rentabilidad || []).filter((p: any) => 
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
     
     // Filtramos la tendencia por sucursalTrend en el frontend si es que está todo mezclado, 
     // pero idealmente deberíamos re-hacer fetch si sucursal_id cambia.
@@ -209,172 +247,201 @@ export default function CatalogRentability() {
         ? Math.round(dataCompletada.reduce((s, d) => s + d.ingresos, 0) / dataCompletada.length)
         : 0;
 
+    const processedRentData = useMemo(() => {
+        // 1. Filtro estricto de Zona Horaria para "today"
+        const isTodayFilter = rentRange === 'today';
+        const hoyStrBO = new Date().toLocaleDateString('es-BO', { timeZone: 'America/La_Paz' });
+
+        const ventasValidas = rentData.filter((venta: any) => {
+            if (venta.estado === 'Cancelado' || venta.estado === 'Borrador' || venta.estado === 'En proceso' || venta.anulada === true) {
+                return false;
+            }
+            if (isTodayFilter && venta.fecha) {
+                const ventaDateStrBO = new Date(venta.fecha).toLocaleDateString('es-BO', { timeZone: 'America/La_Paz' });
+                if (ventaDateStrBO !== hoyStrBO) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // 2. Normalización de Clave (La Clave Única)
+        const claveUnica = (nombre: string) => String(nombre || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+        // 3. Agrupación Consolidada
+        const mapaProductos = new Map<string, {
+            nombreLimpio: string;
+            unidades: number;
+            ingreso_bruto: number;
+        }>();
+
+        ventasValidas.forEach((venta: any) => {
+            if (!venta.nombre) return;
+            const key = claveUnica(venta.nombre);
+            
+            if (mapaProductos.has(key)) {
+                const existente = mapaProductos.get(key)!;
+                existente.unidades += Number(venta.unidades || venta.cantidad || 0);
+                existente.ingreso_bruto += Number(venta.ingreso_bruto || venta.ingresos || 0);
+            } else {
+                mapaProductos.set(key, {
+                    nombreLimpio: String(venta.nombre).toUpperCase().trim(),
+                    unidades: Number(venta.unidades || venta.cantidad || 0),
+                    ingreso_bruto: Number(venta.ingreso_bruto || venta.ingresos || 0)
+                });
+            }
+        });
+
+        const productosFinales = Array.from(mapaProductos.values());
+
+        // 4. Motor de Cálculo Financiero
+        return productosFinales.map((group) => {
+            const cleanName = group.nombreLimpio;
+            const unidades = group.unidades;
+            const ingreso_bruto = group.ingreso_bruto;
+
+            // Buscar en el catálogo
+            const prodCat = catalogo.find((c: any) => {
+                const desc = (c.descripcion || c.nombre || '').toUpperCase().trim();
+                return desc === cleanName;
+            });
+
+            const proveedor = String(prodCat?.proveedor || '').toLowerCase();
+            const costoBase = Number(prodCat?.costo_producto || prodCat?.costo_base || 0);
+            const esTaboada = proveedor.includes('taboada');
+
+            let ganancia_matriz = 0;
+            let ganancia_sucursal = 0;
+
+            if (esTaboada) {
+                const precioMatriz = costoBase * 1.15;
+                ganancia_matriz = (precioMatriz - costoBase) * unidades;
+                ganancia_sucursal = ingreso_bruto - (precioMatriz * unidades);
+            } else {
+                ganancia_matriz = 0;
+                ganancia_sucursal = ingreso_bruto - (costoBase * unidades);
+            }
+
+            const costo_real = costoBase * unidades;
+            const margen_pct = ingreso_bruto > 0 ? ((ingreso_bruto - costo_real) / ingreso_bruto) * 100 : 0;
+            const precio_venta_retail = unidades > 0 ? (ingreso_bruto / unidades) : 0;
+
+            return {
+                nombreLimpio: cleanName,
+                unidades,
+                ingreso_bruto,
+                costo_real,
+                ganancia_suc: ganancia_sucursal,
+                ganancia_matriz,
+                precio_prom: precio_venta_retail,
+                costo_prom: costoBase,
+                margen_pct
+            };
+        });
+    }, [rentData, catalogo, rentRange]);
+
     const handleExportCSV = () => {
-        if (!rentabilidad.length) return;
-        const header = ["Producto", "Unidades", "Ingreso Bruto (Bs)", "Costo 85% (Bs)", "Margen 15% (Bs)", "Precio Prom. PR (Bs)"];
-        const csv = [header.join(","), ...rentabilidad.map((p: any) => `"${p.nombre}",${p.cantidad},${p.ingresos},${p.costo_85},${p.margen_15},${(p.ingresos/(p.cantidad||1)).toFixed(2)}`)].join("\n");
+        const rows = processedRentData.filter((p: any) => p.nombreLimpio.toLowerCase().includes(searchTerm.toLowerCase()));
+        if (!rows.length) return;
+        const header = ["Producto","Unidades","Ingreso Bruto","Costo Real","Ganancia Sucursal","Ganancia Matriz","% Margen","PR Venta","Costo Unit."];
+        const csv = [header.join(","), ...rows.map((p: any) =>
+            `"${p.nombreLimpio}",${p.unidades},${p.ingreso_bruto},${p.costo_real},${p.ganancia_suc},${p.ganancia_matriz},${p.margen_pct}%,${p.precio_prom},${p.costo_prom}`
+        )].join("\n");
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Rentabilidad_${timeRange}.csv`;
-        a.click();
+        const a = document.createElement('a'); a.href = url;
+        a.download = `Rentabilidad_Real_${rentRange}.csv`; a.click();
     };
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 pb-24">
 
-            {/* Header */}
-            <div className="space-y-4">
-                {/* Título */}
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl shadow-lg shadow-amber-200">
-                        <Target size={28} />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Catálogo y Rentabilidad</h1>
-                        <p className="text-gray-400 text-sm font-medium flex items-center gap-1.5 mt-0.5">
-                            <Activity size={13} className="text-amber-500" />
-                            Análisis de Rentabilidad, Matriz BCG y evolución de costos por producto.
-                        </p>
-                    </div>
+            {/* Header Premium (Executive Dashboard) */}
+            <div className="flex flex-col gap-2 w-full mb-4">
+                
+                {/* 1. Cabecera y Títulos */}
+                <div>
+                    <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-700 to-purple-600 bg-clip-text text-transparent">Catálogo y Rentabilidad</h1>
+                    <p className="text-sm font-medium text-gray-500 mt-1">Análisis de Rentabilidad, Matriz BCG y evolución de costos por producto.</p>
                 </div>
 
-                {/* Pills de rango — debajo del título */}
-                <div className="flex flex-wrap items-center gap-1.5 bg-white px-3 py-2 rounded-2xl border border-gray-100 shadow-sm w-fit">
+                {/* 2. Filtros de Fecha (Segmented Control / Pills) */}
+                <div className="flex flex-wrap bg-gray-100 p-1.5 rounded-2xl gap-1 mt-6 w-fit">
                     {Object.entries(rangeLabels).map(([key, label]) => (
                         <button
                             key={key}
                             onClick={() => handlePresetClick(key)}
                             className={cn(
-                                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap",
+                                "px-4 py-2 rounded-xl text-xs transition-all",
                                 timeRange === key
-                                ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
-                                : 'text-gray-500 hover:bg-amber-50 hover:text-amber-700'
+                                ? 'font-bold bg-white text-indigo-700 shadow-sm border border-gray-200'
+                                : 'font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
                             )}
                         >
                             {label}
                         </button>
                     ))}
                 </div>
-            </div>
 
-            {isLoading ? (
-                <div className="flex flex-col justify-center items-center py-32 space-y-4">
-                    <Loader2 size={48} className="animate-spin text-amber-500 mb-2" />
-                    <p className="text-amber-900 font-bold tracking-widest text-sm uppercase animate-pulse">
-                        Analizando Catálogo y Márgenes...
-                    </p>
-                </div>
-            ) : isError || !data ? (
-                <div className="bg-red-50 text-red-600 p-8 rounded-3xl text-center border border-red-100">
-                    <AlertTriangle size={32} className="mx-auto mb-2" />
-                    <h3 className="font-bold">Error cargando datos de catálogo</h3>
-                </div>
-            ) : (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
-
-                    {/* CAPA 1: KPIs del PerÃ­odo Seleccionado */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                        {/* Ingresos Brutos del PerÃ­odo */}
-                        <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm flex flex-col justify-between hover:border-amber-100 transition-all">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-                                    <DollarSign size={22} />
-                                </div>
+                {/* 3. Tarjetas KPI "Glassmorphism" */}
+                {isLoading ? (
+                    <div className="flex flex-col justify-center items-center py-32 space-y-4">
+                        <Loader2 size={48} className="animate-spin text-amber-500 mb-2" />
+                        <p className="text-amber-900 font-bold tracking-widest text-sm uppercase animate-pulse">
+                            Analizando Catálogo y Márgenes...
+                        </p>
+                    </div>
+                ) : isError || !data ? (
+                    <div className="bg-red-50 text-red-600 p-8 rounded-3xl text-center border border-red-100 mt-6">
+                        <AlertTriangle size={32} className="mx-auto mb-2" />
+                        <h3 className="font-bold">Error cargando datos de catálogo</h3>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6 w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        {/* Tarjeta Producto Estrella */}
+                        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-amber-400 flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                                <span className="bg-amber-100 text-amber-600 p-1.5 rounded-lg">⭐</span>
+                                <span className="text-[11px] uppercase font-bold text-gray-400 tracking-wider">Producto Estrella ({rangeLabels[timeRange as keyof typeof rangeLabels] || 'Periodo'})</span>
                             </div>
-                            <div>
-                                <p className="text-gray-500 text-sm font-semibold mb-1">Ingresos Brutos</p>
-                                <h2 className="text-3xl font-black text-gray-900 tracking-tight">{formatBs(data.overview?.ventas_brutas)}</h2>
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-gray-50 bg-amber-50 rounded-lg p-2">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Total del perÃ­odo</span>
-                            </div>
+                            <h3 className="text-base font-black text-gray-800 mt-2 truncate">{data.top_productos_rentabilidad?.[0]?.nombre || 'Sin estrella'}</h3>
+                            <p className="text-lg font-bold text-gray-900">
+                                {data.top_productos_rentabilidad?.[0] ? formatBs(data.top_productos_rentabilidad[0].ingresos) : 'Bs. 0.00'} 
+                                <span className="text-xs font-normal text-gray-500"> en ingresos</span>
+                            </p>
+                            <p className="text-[11px] font-semibold text-amber-600 mt-1">#1 en rentabilidad del periodo seleccionado</p>
                         </div>
 
-                        {/* Margen LÃ­quido */}
-                        <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm flex flex-col justify-between hover:border-emerald-100 transition-all">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                                    <TrendingUp size={22} />
-                                </div>
-                                <span className="text-xs font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg">15%</span>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-sm font-semibold mb-1">Margen LÃ­quido</p>
-                                <h2 className="text-3xl font-black text-emerald-900 tracking-tight">{formatBs(data.overview?.margen_liquido)}</h2>
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-gray-50 bg-emerald-50 rounded-lg p-2">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Lo que queda libre</span>
-                            </div>
-                        </div>
-
-                        {/* Producto Estrella */}
-                        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[2rem] p-6 text-white shadow-lg shadow-amber-200 flex flex-col justify-between">
-                            <div className="p-3 bg-white/20 rounded-2xl w-fit mb-4">
-                                <Package size={22} />
-                            </div>
-                            <div>
-                                <p className="text-amber-100 text-sm font-semibold mb-1">Producto Estrella</p>
-                                <h2 className="text-xl font-black tracking-tight leading-tight">
-                                    {data.top_productos_rentabilidad?.[0]?.nombre || 'Sin datos'}
-                                </h2>
-                                {data.top_productos_rentabilidad?.[0] && (
-                                    <p className="text-amber-100 text-xs mt-1">{formatBs(data.top_productos_rentabilidad[0].ingresos)} en ingresos</p>
-                                )}
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-white/20 p-2">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-200">#1 en rentabilidad</span>
-                            </div>
-                        </div>
-
-                        {/* Ticket Promedio por Producto */}
-                        <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm flex flex-col justify-between hover:border-indigo-100 transition-all">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-                                    <Target size={22} />
-                                </div>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-sm font-semibold mb-1">Ticket Promedio</p>
-                                <h2 className="text-3xl font-black text-gray-900 tracking-tight">{formatBs(data.overview?.average_ticket)}</h2>
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-gray-50 bg-indigo-50 rounded-lg p-2">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Por transacción</span>
-                            </div>
-                        </div>
-
-                        {/* Top Sucursal Contribuidora */}
+                        {/* Tarjeta Sucursal Top */}
                         {data.sucursal_top && (
-                            <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[2rem] p-6 text-white shadow-lg shadow-indigo-200 flex flex-col justify-between lg:col-span-4 mt-2">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Trophy size={20} className="text-indigo-200" />
-                                    <p className="text-indigo-100 text-sm font-semibold">Sucursal Top Contribuidora</p>
+                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-emerald-500 flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-emerald-100 text-emerald-600 p-1.5 rounded-lg">🏢</span>
+                                    <span className="text-[11px] uppercase font-bold text-gray-400 tracking-wider">Sucursal Top Contribuidora</span>
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                                    <div>
-                                        <h2 className="text-2xl font-black tracking-tight leading-tight">
-                                            {data.sucursal_top.nombre}
-                                        </h2>
-                                        <p className="text-indigo-100 text-sm mt-1">{formatBs(data.sucursal_top.ingresos)}</p>
-                                    </div>
-                                    <div className="bg-white/20 px-3 py-1.5 rounded-xl border border-white/30 backdrop-blur-sm">
-                                        <span className="text-sm font-black text-white">{data.sucursal_top.pct}% del total global</span>
-                                    </div>
-                                </div>
+                                <h3 className="text-base font-black text-gray-800 mt-2 truncate">{data.sucursal_top.nombre}</h3>
+                                <p className="text-lg font-bold text-gray-900">{formatBs(data.sucursal_top.ingresos)}</p>
+                                <p className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
+                                    <TrendingUp size={12} className="text-emerald-600"/>
+                                    {data.sucursal_top.pct}% del total global
+                                </p>
                             </div>
                         )}
                     </div>
+                )}
+            </div>
 
                     {/* CAPA 2: Matriz BCG Evolucionada con su propio estado de tiempo */}
-                    <BcgMatrix />
+                    <div className="min-h-[300px] w-full">
+                        <BcgMatrix />
+                    </div>
 
-                    {/* CAPA 3: Tabla de Rentabilidad por Producto */}
+                    {/* CAPA 3: Tabla de Rentabilidad por Producto — DATOS REALES */}
                     <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
                         {/* Header de la tarjeta con filtros propios */}
                         <div className="mb-6 pb-4 border-b border-gray-50">
                             <div className="flex flex-col gap-4">
-                                {/* TÃ­tulo + bÃºsqueda + exportar */}
+                                {/* Título + búsqueda + exportar */}
                                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                                     <div>
                                         <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
@@ -382,21 +449,21 @@ export default function CatalogRentability() {
                                             Rentabilidad por Producto
                                         </h2>
                                         <p className="text-gray-500 text-sm mt-1">
-                                            Top productos ordenados por ingresos. Costo al <strong>85%</strong>, Margen al <strong>15%</strong> y columna PR (Precio Promedio).
+                                            Costos y márgenes <strong className="text-emerald-600">reales</strong> desde cada venta POS e historial importado.
                                         </p>
                                     </div>
                                     <div className="flex flex-col sm:flex-row items-center gap-3">
                                         <div className="relative w-full sm:w-64">
                                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                            <input 
-                                                type="text" 
-                                                placeholder="Buscar producto..." 
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar producto..."
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
                                                 className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow"
                                             />
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={handleExportCSV}
                                             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
                                         >
@@ -406,111 +473,132 @@ export default function CatalogRentability() {
                                     </div>
                                 </div>
 
-                                {/* Botones de Filtro de Fecha DENTRO de la tarjeta */}
-                                <div className="flex flex-wrap items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
-                                    <Calendar size={14} className="text-gray-400 ml-1" />
-                                    {Object.keys(rentRangeLabels).map(key => (
-                                        <button
-                                            key={key}
-                                            onClick={() => setRentRange(key)}
-                                            className={cn(
-                                                "px-4 py-1.5 rounded-xl text-xs font-black transition-all duration-300",
-                                                rentRange === key
-                                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200 scale-105'
-                                                : 'bg-transparent text-gray-500 hover:bg-white hover:text-gray-900 hover:shadow-sm'
-                                            )}
+                                {/* Filtros de fecha + sucursal */}
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-2">
+                                    <div className="flex flex-wrap items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+                                        <Calendar size={14} className="text-gray-400 ml-1" />
+                                        {Object.keys(rentRangeLabels).map(key => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setRentRange(key)}
+                                                className={cn(
+                                                    "px-4 py-1.5 rounded-xl text-xs font-black transition-all duration-300",
+                                                    rentRange === key
+                                                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200 scale-105'
+                                                    : 'bg-transparent text-gray-500 hover:bg-white hover:text-gray-900 hover:shadow-sm'
+                                                )}
+                                            >
+                                                {rentRangeLabels[key]}
+                                            </button>
+                                        ))}
+                                        {isRentLoading && <Loader2 size={14} className="animate-spin text-emerald-500 ml-2" />}
+                                    </div>
+                                    <div className="relative w-full sm:w-auto min-w-[160px]">
+                                        <select
+                                            value={rentSucursal}
+                                            onChange={(e) => setRentSucursal(e.target.value)}
+                                            className="w-full pl-4 pr-8 py-2 text-xs font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white appearance-none cursor-pointer transition-all"
                                         >
-                                            {rentRangeLabels[key]}
-                                        </button>
-                                    ))}
-                                    {isRentLoading && <Loader2 size={14} className="animate-spin text-emerald-500 ml-2" />}
+                                            {SUCS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {(() => {
-                            const rentabilidad = rentData.filter((p: any) =>
-                                p.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+                            const rows = processedRentData.filter((p: any) =>
+                                p.nombreLimpio.toLowerCase().includes(searchTerm.toLowerCase())
                             );
-                            return rentabilidad.length > 0 ? (
+                            const totIngreso   = rows.reduce((s: number, p: any) => s + (p.ingreso_bruto  || 0), 0);
+                            const totCosto     = rows.reduce((s: number, p: any) => s + (p.costo_real     || 0), 0);
+                            const totGanSuc    = rows.reduce((s: number, p: any) => s + (p.ganancia_suc   || 0), 0);
+                            const totGanMat    = rows.reduce((s: number, p: any) => s + (p.ganancia_matriz || 0), 0);
+                            const margenTotal  = totIngreso > 0 ? ((totIngreso - totCosto) / totIngreso * 100) : 0;
+                            return rows.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-100">
-                                            <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">#</th>
-                                            <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Producto</th>
-                                            <th className="text-right py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Unidades</th>
-                                            <th className="text-right py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Ingreso Bruto</th>
-                                            <th className="text-right py-3 px-4 text-xs font-black text-red-400 uppercase tracking-widest">Costo (85%)</th>
-                                            <th className="text-right py-3 px-4 text-xs font-black text-emerald-500 uppercase tracking-widest">Margen (15%)</th>
-                                            <th className="text-center py-3 px-4 text-xs font-black text-indigo-500 uppercase tracking-widest">PR (Precio Prom.)</th>
-                                            <th className="text-center py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">% Margen</th>
+                                    <thead className="bg-gray-50 text-xs text-gray-700 uppercase font-bold">
+                                        <tr>
+                                            <th className="px-4 py-3">Producto</th>
+                                            <th className="px-4 py-3 text-right">Unidades Vendidas</th>
+                                            <th className="px-4 py-3 text-right">Ingreso Bruto</th>
+                                            <th className="px-4 py-3 text-right">Costo Real</th>
+                                            <th className="px-4 py-3 text-right">Ganancia Sucursal</th>
+                                            <th className="px-4 py-3 text-right">Ganancia Matriz</th>
+                                            <th className="px-4 py-3 text-right">Precio Venta (Retail)</th>
+                                            <th className="px-4 py-3 text-right">Costo Unitario</th>
+                                            <th className="px-4 py-3 text-right">Margen %</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rentabilidad.map((prod, i) => (
+                                        {rows.map((prod: any, i: number) => {
+                                            const margenColor = prod.margen_pct > 15 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                                : prod.margen_pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                                : 'bg-red-50 text-red-600 border-red-100';
+                                            return (
                                             <tr
                                                 key={i}
                                                 className={cn(
-                                                    "border-b border-gray-50 hover:bg-amber-50/50 transition-colors group",
-                                                    i === 0 ? "bg-amber-50/30" : ""
+                                                    "border-b border-gray-50 hover:bg-emerald-50/30 transition-colors group",
+                                                    i === 0 ? "bg-amber-50/20" : ""
                                                 )}
                                             >
-                                                <td className="py-4 px-4">
-                                                    <div className={cn(
-                                                        "w-7 h-7 rounded-xl font-black flex items-center justify-center text-xs",
-                                                        i === 0 ? "bg-amber-400 text-white" :
-                                                        i === 1 ? "bg-gray-300 text-white" :
-                                                        i === 2 ? "bg-orange-300 text-white" :
-                                                        "bg-gray-100 text-gray-500"
-                                                    )}>
-                                                        {i + 1}
-                                                    </div>
+                                                <td className="px-4 py-3 max-w-[220px]">
+                                                    <span className="font-bold text-gray-800">{prod.nombreLimpio}</span>
                                                 </td>
-                                                <td className="py-4 px-4">
-                                                    <span className="font-bold text-gray-800 group-hover:text-amber-700 transition-colors">{prod.nombre}</span>
+                                                <td className="px-4 py-3 text-right">
+                                                    <span className="font-semibold text-gray-600">{(prod.unidades||0).toLocaleString()}</span>
                                                 </td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <span className="font-semibold text-gray-600">{prod.cantidad.toLocaleString()}</span>
+                                                <td className="px-4 py-3 text-right font-bold text-gray-900">
+                                                    Bs. {(prod.ingreso_bruto || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                                 </td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <span className="font-bold text-gray-900">{formatBs(prod.ingresos)}</span>
+                                                <td className="px-4 py-3 text-right font-bold text-red-500">
+                                                    Bs. {(prod.costo_real || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                                 </td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <span className="font-bold text-red-500">{formatBs(prod.costo_85)}</span>
+                                                <td className="px-4 py-3 text-right font-black text-emerald-600 text-base">
+                                                    Bs. {(prod.ganancia_suc || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                                 </td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <span className="font-black text-emerald-600 text-base">{formatBs(prod.margen_15)}</span>
+                                                <td className="px-4 py-3 text-right font-semibold text-violet-600">
+                                                    Bs. {(prod.ganancia_matriz || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                                 </td>
-                                                <td className="py-4 px-4 text-center">
-                                                    <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">Bs. {(prod.ingresos / (prod.cantidad || 1)).toFixed(2)}</span>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg text-xs">
+                                                        Bs. {(prod.precio_prom || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                                    </span>
                                                 </td>
-                                                <td className="py-4 px-4 text-center">
-                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                                        15.0%
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className="font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-lg text-xs">
+                                                        Bs. {(prod.costo_prom || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black border ${margenColor}`}>
+                                                        {(prod.margen_pct||0).toFixed(1)}%
                                                     </span>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="bg-gray-50 rounded-b-2xl">
-                                            <td colSpan={3} className="py-4 px-4 font-black text-gray-700 text-sm uppercase tracking-wider">
-                                                TOTAL (Top {rentabilidad.length})
+                                        <tr className="bg-gray-50">
+                                            <td colSpan={2} className="px-4 py-4 font-black text-gray-700 text-sm uppercase tracking-wider">
+                                                TOTAL ({rows.length} productos)
                                             </td>
-                                            <td className="py-4 px-4 text-right font-black text-gray-900">
-                                                {formatBs(rentabilidad.reduce((s, p) => s + p.ingresos, 0))}
-                                            </td>
-                                            <td className="py-4 px-4 text-right font-black text-red-500">
-                                                {formatBs(rentabilidad.reduce((s, p) => s + p.costo_85, 0))}
-                                            </td>
-                                            <td className="py-4 px-4 text-right font-black text-emerald-600 text-base">
-                                                {formatBs(rentabilidad.reduce((s, p) => s + p.margen_15, 0))}
-                                            </td>
-                                            <td className="py-4 px-4 text-center text-gray-400">-</td>
-                                            <td className="py-4 px-4 text-center">
-                                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                                    15.0%
+                                            <td className="px-4 py-4 text-right font-black text-gray-900">Bs. {totIngreso.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                            <td className="px-4 py-4 text-right font-black text-red-500">Bs. {totCosto.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                            <td className="px-4 py-4 text-right font-black text-emerald-600 text-base">Bs. {totGanSuc.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                            <td className="px-4 py-4 text-right font-semibold text-violet-600">Bs. {totGanMat.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                            <td className="px-4 py-4 text-center text-gray-400">-</td>
+                                            <td className="px-4 py-4 text-center text-gray-400">-</td>
+                                            <td className="px-4 py-4 text-center">
+                                                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black border ${
+                                                    margenTotal > 15 ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                                    : margenTotal > 5 ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                                    : 'bg-red-100 text-red-700 border-red-200'
+                                                }`}>
+                                                    {margenTotal.toFixed(1)}%
                                                 </span>
                                             </td>
                                         </tr>
@@ -721,8 +809,6 @@ export default function CatalogRentability() {
                             );
                         })()}
                     </div>
-                </div>
-            )}
         </div>
     );
 }

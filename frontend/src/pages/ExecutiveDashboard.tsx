@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { Building2, Lightbulb, Bot, AlertTriangle, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Building2, Lightbulb, Bot, AlertTriangle, UploadCloud } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -10,9 +10,7 @@ import AnaliticaAvanzada from './AnaliticaAvanzada';
 
 import ImportadorInteligente from '../components/DataImporterWizard'; 
 import ChatbotAnalitico from '../components/ChatbotAnalitico';
-import { generateExecutivePDF } from '../utils/reportGenerator';
-import { getOrchestration, getAnalyticsBcg, getAnalyticsDashboard } from '../api/api';
-import { toast } from 'sonner';
+
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -24,7 +22,6 @@ export default function ExecutiveDashboard() {
 
     // Tabs state actualizado para incluir 'importar'
     const [activeTab, setActiveTab] = useState<'maestro' | 'bi' | 'ml' | 'importar'>('maestro');
-    const [isExporting, setIsExporting] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
     useEffect(() => {
@@ -44,30 +41,7 @@ export default function ExecutiveDashboard() {
         return () => scrollContainer.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleExport = async () => {
-        setIsExporting(true);
-        try {
-            toast.info("Generando reporte PDF multi-dimensional...");
-            const d = new Date();
-            const end = d.toISOString();
-            d.setDate(d.getDate() - 30);
-            const start = d.toISOString();
 
-            const [orchestration, kpis, bcg] = await Promise.all([
-                getOrchestration(30),
-                getAnalyticsDashboard(start, end),
-                getAnalyticsBcg(start, end)
-            ]);
-
-            await generateExecutivePDF(kpis?.kpis, bcg, orchestration);
-            toast.success("PDF generado exitosamente.");
-        } catch (e) {
-            const error = e as Error;
-            toast.error("Error al exportar PDF: " + error.message);
-        } finally {
-            setIsExporting(false);
-        }
-    };
 
     if (!esAdmin) {
         return (
@@ -81,94 +55,84 @@ export default function ExecutiveDashboard() {
 
     return (
         <div className="flex flex-col min-h-screen pb-20 bg-gray-50">
-            {/* Cabecera Superior: Título y Acciones (Se desliza naturalmente con la página) */}
-            <div className="bg-white px-4 sm:px-8 py-5 sm:py-6 w-full">
-                <div className="max-w-7xl mx-auto flex flex-col justify-center">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-2 lg:mb-4 gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center shrink-0">
-                                <Building2 size={24} className="text-white" strokeWidth={1.5} />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                                    Centro de Inteligencia 
-                                </h1>
-                                <p className="text-sm text-gray-500 mt-1 font-medium">Controla tus finanzas, administra tu stock y anticipa tus ventas con IA.</p>
-                            </div>
-                        </div>
+            {/* ── Barra única sticky: Logo · Tabs centrados · Importador ── */}
+            <div className={cn(
+                "bg-white sticky top-0 z-40 w-full border-b border-gray-200 transition-all duration-300",
+                isScrolled ? "shadow-lg" : ""
+            )}>
+                <div className="max-w-7xl mx-auto px-4 sm:px-8 h-20 flex items-center justify-between gap-6">
 
-                        {/* Botones de Acción */}
-                        <div className="flex gap-3 w-full sm:w-auto">
-                            <button 
-                                onClick={handleExport}
-                                disabled={isExporting}
-                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-bold transition shadow-sm text-sm">
-                                <DownloadCloud size={16} />
-                                <span className="hidden sm:inline">{isExporting ? "Generando..." : "Descargar Informe PDF"}</span>
-                                <span className="sm:hidden">PDF</span>
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('importar')}
-                                className={cn(
-                                    "flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-bold transition text-sm",
-                                    activeTab === 'importar' 
-                                        ? "bg-gray-900 text-white shadow-md" 
-                                        : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"
-                                )}>
-                                <UploadCloud size={16} />
-                                <span className="hidden sm:inline">Importador Datos</span>
-                                <span className="sm:hidden">Subir</span>
-                            </button>
+                    {/* LEFT – Logo + título */}
+                    <div className="flex items-center gap-3 shrink-0">
+                        <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center">
+                            <Building2 size={22} className="text-white" strokeWidth={1.5} />
+                        </div>
+                        <div className="hidden sm:block">
+                            <h1 className="text-xl font-black text-gray-900 tracking-tight leading-tight">
+                                Centro de Inteligencia
+                            </h1>
+                            <p className="text-xs text-gray-400 font-medium">
+                                Finanzas · Stock · Predicciones IA
+                            </p>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Fila inferior: Selector de Pestañas (STIKY - Se queda pegada arriba) */}
-            <div className={cn(
-                "bg-white sticky top-0 z-40 px-4 sm:px-8 w-full border-b border-gray-200 transition-all duration-300",
-                isScrolled ? "shadow-md pt-4" : "pt-2"
-            )}>
-                <div className="max-w-7xl mx-auto flex items-center justify-center w-full">
-                    <div className="flex gap-6 sm:gap-12 overflow-x-auto custom-scrollbar no-scrollbar w-full justify-start md:justify-center px-2">
+                    {/* CENTER – Tabs con estilo de línea inferior */}
+                    <nav className="flex items-stretch h-full gap-1 sm:gap-2">
                         <button
                             onClick={() => setActiveTab('maestro')}
-                                className={cn(
-                                    "flex items-center gap-2 pb-4 sm:pb-5 text-[10px] sm:text-[11px] font-bold tracking-[0.15em] uppercase transition-all whitespace-nowrap border-b-[2px]",
-                                    activeTab === 'maestro' 
-                                        ? "border-gray-900 text-gray-900" 
-                                        : "border-transparent text-gray-400 hover:text-gray-800"
-                                )}>
-                                <Building2 size={14} strokeWidth={2.5} className={cn(activeTab !== 'maestro' && "opacity-60")} />
-                                Panel General
-                            </button>
-                        
-                            <button
-                                onClick={() => setActiveTab('bi')}
-                                className={cn(
-                                    "flex items-center gap-2 pb-4 sm:pb-5 text-[10px] sm:text-[11px] font-bold tracking-[0.15em] uppercase transition-all whitespace-nowrap border-b-[2px]",
-                                    activeTab === 'bi' 
-                                        ? "border-gray-900 text-gray-900" 
-                                        : "border-transparent text-gray-400 hover:text-gray-800"
-                                )}>
-                                <Lightbulb size={14} strokeWidth={2.5} className={cn(activeTab !== 'bi' && "opacity-60")} />
-                                Rentabilidad
-                            </button>
+                            className={cn(
+                                "flex items-center gap-2 px-4 sm:px-6 text-sm font-bold tracking-wide transition-all duration-200 whitespace-nowrap border-b-[3px] -mb-px",
+                                activeTab === 'maestro'
+                                    ? "border-gray-900 text-gray-900"
+                                    : "border-transparent text-gray-400 hover:text-gray-700 hover:border-gray-300"
+                            )}>
+                            <Building2 size={16} strokeWidth={2.5} />
+                            <span className="hidden sm:inline">Panel General</span>
+                            <span className="sm:hidden">Panel</span>
+                        </button>
 
-                            <button
-                                onClick={() => setActiveTab('ml')}
-                                className={cn(
-                                    "flex items-center gap-2 pb-4 sm:pb-5 text-[10px] sm:text-[11px] font-bold tracking-[0.15em] uppercase transition-all whitespace-nowrap border-b-[2px]",
-                                    activeTab === 'ml' 
-                                        ? "border-gray-900 text-gray-900" 
-                                        : "border-transparent text-gray-400 hover:text-gray-800"
-                                )}>
-                                <Bot size={14} strokeWidth={2.5} className={cn(activeTab !== 'ml' && "opacity-60")} />
-                                Predicciones AI
-                            </button>
-                            
+                        <button
+                            onClick={() => setActiveTab('bi')}
+                            className={cn(
+                                "flex items-center gap-2 px-4 sm:px-6 text-sm font-bold tracking-wide transition-all duration-200 whitespace-nowrap border-b-[3px] -mb-px",
+                                activeTab === 'bi'
+                                    ? "border-gray-900 text-gray-900"
+                                    : "border-transparent text-gray-400 hover:text-gray-700 hover:border-gray-300"
+                            )}>
+                            <Lightbulb size={16} strokeWidth={2.5} />
+                            <span className="hidden sm:inline">Rentabilidad</span>
+                            <span className="sm:hidden">BI</span>
+                        </button>
 
-                    </div>
+                        <button
+                            onClick={() => setActiveTab('ml')}
+                            className={cn(
+                                "flex items-center gap-2 px-4 sm:px-6 text-sm font-bold tracking-wide transition-all duration-200 whitespace-nowrap border-b-[3px] -mb-px",
+                                activeTab === 'ml'
+                                    ? "border-gray-900 text-gray-900"
+                                    : "border-transparent text-gray-400 hover:text-gray-700 hover:border-gray-300"
+                            )}>
+                            <Bot size={16} strokeWidth={2.5} />
+                            <span className="hidden sm:inline">Predicciones AI</span>
+                            <span className="sm:hidden">AI</span>
+                        </button>
+                    </nav>
+
+                    {/* RIGHT – Importador Datos */}
+                    <button
+                        onClick={() => setActiveTab('importar')}
+                        className={cn(
+                            "shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-200",
+                            activeTab === 'importar'
+                                ? "bg-gray-900 text-white shadow-md"
+                                : "bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                        )}>
+                        <UploadCloud size={16} />
+                        <span className="hidden sm:inline">Importador Datos</span>
+                        <span className="sm:hidden">Subir</span>
+                    </button>
+
                 </div>
             </div>
 

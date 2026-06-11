@@ -19,6 +19,11 @@ async def calculate_bcg_matrix(
     from app.db import get_raw_db
     db = await get_raw_db()
 
+    from datetime import timezone
+    # Forzar zona horaria a UTC para que coincida con la DB
+    if start_date.tzinfo is None: start_date = start_date.replace(tzinfo=timezone.utc)
+    if end_date.tzinfo is None: end_date = end_date.replace(tzinfo=timezone.utc)
+    
     # 1. Calcular el periodo previo equivalente
     delta = end_date - start_date
     prev_end_date = start_date
@@ -35,6 +40,10 @@ async def calculate_bcg_matrix(
             "fecha_transaccion": {"$gte": start, "$lte": end},
         }
         # Solo agregar filtro de tenant si existe (algunos registros tienen tenant_id=None)
+    def pipeline_for_period(start: datetime, end: datetime):
+        match: Dict[str, Any] = {
+            "fecha_transaccion": {"$gte": start, "$lte": end},
+        }
         if tenant_id:
             match["$or"] = [
                 {"tenant_id": tenant_id},
@@ -42,7 +51,11 @@ async def calculate_bcg_matrix(
                 {"tenant_id": {"$exists": False}}
             ]
         if sucursal_id:
-            match["sucursal_id"] = sucursal_id
+            s_lower = sucursal_id.lower()
+            if 'heroina' in s_lower or 'heroína' in s_lower:
+                match["sucursal"] = {"$regex": "hero.*nas?", "$options": "i"}
+            else:
+                match["sucursal"] = {"$regex": s_lower, "$options": "i"}
 
         return [
             {"$match": match},
@@ -55,16 +68,49 @@ async def calculate_bcg_matrix(
             }
         ]
 
-    # 3. Ejecutar consultas paralelas
-    cursor_current = await db["ventas_historicas_crudas"].aggregate(
+    def pos_pipeline_for_period(start: datetime, end: datetime):
+        match_pos: Dict[str, Any] = {
+            "anulada": {"$ne": True},
+            "created_at": {"$gte": start, "$lte": end}
+        }
+        if sucursal_id:
+            s_lower = sucursal_id.lower()
+            if 'heroina' in s_lower or 'heroína' in s_lower:
+                match_pos["sucursal_id"] = {"$regex": "hero.*nas?", "$options": "i"}
+            else:
+                match_pos["sucursal_id"] = {"$regex": s_lower, "$options": "i"}
+        return [
+            {"$match": match_pos},
+            {"$unwind": "$items"},
+            {
+                "$group": {
+                    "_id": "$items.descripcion",
+                    "nombre": {"$first": "$items.descripcion"},
+                    "ingresos": {"$sum": {"$toDouble": "$items.subtotal"}}
+                }
+            }
+        ]
+
+    # 3. Ejecutar consultas paralelas (Historial + POS)
+    cursor_current_hist = await db["ventas_historicas_crudas"].aggregate(
         pipeline_for_period(start_date, end_date)
     ).to_list(length=2000)
-
-    cursor_prev = await db["ventas_historicas_crudas"].aggregate(
+    
+    cursor_current_pos = await db["sales"].aggregate(
+        pos_pipeline_for_period(start_date, end_date)
+    ).to_list(length=2000)
+    
+    cursor_prev_hist = await db["ventas_historicas_crudas"].aggregate(
         pipeline_for_period(prev_start_date, prev_end_date)
     ).to_list(length=2000)
+    
+    cursor_prev_pos = await db["sales"].aggregate(
+        pos_pipeline_for_period(prev_start_date, prev_end_date)
+    ).to_list(length=2000)
 
-    print(f"[BCG] Docs actuales: {len(cursor_current)} | Docs previos: {len(cursor_prev)}")
+    # Consolidar current y prev
+    cursor_current = cursor_current_hist + cursor_current_pos
+    cursor_prev = cursor_prev_hist + cursor_prev_pos
 
     # 4. Fusionar datos en RAM
     productos_dict: Dict[str, Dict[str, Any]] = {}

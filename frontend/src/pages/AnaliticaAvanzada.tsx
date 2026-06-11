@@ -173,7 +173,7 @@ export default function AnaliticaAvanzada() {
             <div className="bg-red-50 text-red-600 p-8 rounded-3xl text-center border border-red-100">
                 <AlertTriangle size={32} className="mx-auto mb-2"/>
                 <h3 className="font-bold">Error conectando con ML Pipeline</h3>
-                <p className="text-sm">Revisa que el backend esté activo en puerto 8000.</p>
+                <p className="text-sm">Revisa que el backend esté activo en puerto 8001.</p>
             </div>
         ):(
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">

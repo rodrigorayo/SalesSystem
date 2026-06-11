@@ -22,7 +22,7 @@ const formatBs = (num?: number) => `Bs. ${(num || 0).toLocaleString('en-US', { m
 
 export default function AnalyticsDashboard() {
     const { role } = useAuthStore();
-    const [dateRange, setDateRange] = useState<'today' | '7days' | '30days'>('30days');
+    const [dateRange, setDateRange] = useState<'today' | '7days' | '30days'>('today');
     
     const [dashboard, setDashboard] = useState<any>(null);
     const [bcg, setBcg] = useState<any>(null);
@@ -54,7 +54,7 @@ export default function AnalyticsDashboard() {
                 // 2. Disparamos Peticiones Reales al Backend simultáneamente
                 const token = localStorage.getItem('choco-token') || JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
                 
-                const urlDashboard = `http://127.0.0.1:8000/api/v1/analytics/dashboard?start_date=${startStr}&end_date=${endStr}&time_range=${dateRange}`;
+                const urlDashboard = `http://127.0.0.1:8001/api/v1/analytics/dashboard?start_date=${startStr}&end_date=${endStr}&time_range=${dateRange}`;
                 const resDash = await fetch(urlDashboard, { headers: { 'Authorization': `Bearer ${token}` } });
                 
                 if (!resDash.ok) throw new Error("Fallo en la red");

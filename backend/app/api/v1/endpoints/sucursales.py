@@ -55,7 +55,19 @@ async def list_sucursales(current_user: User = Depends(get_current_active_user))
     """List all branches for the current tenant."""
     if not current_user.tenant_id:
         raise HTTPException(status_code=403, detail="No tenant context")
-    return await Sucursal.find(Sucursal.tenant_id == current_user.tenant_id).to_list()
+        
+    sucursales = await Sucursal.find(Sucursal.tenant_id == current_user.tenant_id).to_list()
+    
+    # === LISTA BLANCA ESTRICTA (Limpiar Dropdown del Frontend) ===
+    sucursales_limpias = []
+    for s in sucursales:
+        nombre = str(s.nombre).lower()
+        if any(bad in nombre for bad in ["fexco", "distribucion", "vendedores", "sucre", "mayorista"]):
+            continue
+        if "heroinas" in nombre or "heroína" in nombre or "calacoto" in nombre or "recoleta" in nombre:
+            sucursales_limpias.append(s)
+            
+    return sucursales_limpias
 
 
 @router.post("/sucursales")
