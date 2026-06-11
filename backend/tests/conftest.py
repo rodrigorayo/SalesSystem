@@ -6,7 +6,7 @@ from app.infrastructure.db import init_db
 from app.infrastructure.core.config import settings
 
 # Sobreescribimos la configuración para que Beanie use una DB de prueba
-test_db_url = os.getenv("MONGO_URI", "mongodb://localhost:27017/salessystem_test_local")
+test_db_url = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/salessystem_test_local")
 os.environ["MONGODB_URL"] = test_db_url
 settings.MONGODB_URL = test_db_url
 
