@@ -38,8 +38,15 @@ _client = None
 async def init_db():
     global _client
     _client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGODB_URL)
+    
+    # Resolver dinámicamente la base de datos por defecto de la URI (evita problemas de permisos en Atlas)
+    try:
+        database = _client.get_default_database()
+    except Exception:
+        database = _client.salessystem
+
     await init_beanie(
-        database=_client.salessystem,
+        database=database,
         document_models=[
             User,
             Tenant,
