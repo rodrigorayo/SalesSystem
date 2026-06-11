@@ -2,14 +2,25 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches:
+      - main
+      - develop
+      - 'feature/*'
   pull_request:
-    branches: [ "main", "develop" ]
+    branches:
+      - main
+      - develop
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+
     steps:
     - uses: actions/checkout@v4
     
@@ -18,6 +29,24 @@ jobs:
       with:
         python-version: "3.11"
         cache: 'pip'
+
+    - name: Wait for MongoDB
+      run: |
+        python -c '
+        import socket, time
+        for i in range(15):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(1)
+                    s.connect(("127.0.0.1", 27017))
+                    print("MongoDB is up and running!")
+                    exit(0)
+            except Exception:
+                print("Waiting for MongoDB...")
+                time.sleep(1)
+        print("MongoDB did not start in time")
+        exit(1)
+        '
 
     - name: Install dependencies
       run: |
@@ -31,6 +60,9 @@ jobs:
         ruff check backend/app/ --select=E9,F63,F7,F82
 
     - name: Run Backend Tests
+      env:
+        MONGO_URI: "mongodb://127.0.0.1:27017/salessystem_test"
+        PYTHONPATH: "backend"
       run: |
         cd backend
-        PYTHONPATH=. pytest tests/ -v
+        pytest tests/ -v
