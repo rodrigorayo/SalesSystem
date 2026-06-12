@@ -415,12 +415,24 @@ async def get_movimientos_inventario(
     if search:
         # Escapar caracteres especiales y luego des-escapar el espacio porque MongoDB regex no maneja bien '\ '
         safe_search = re.escape(search).replace("\\ ", " ")
+        
+        # Buscar productos que coincidan con el texto para incluir sus IDs
+        product_query = {"tenant_id": tenant_id, "$or": [
+            {"descripcion": {"$regex": safe_search, "$options": "i"}},
+            {"codigo_corto": {"$regex": safe_search, "$options": "i"}},
+            {"codigo_largo": {"$regex": safe_search, "$options": "i"}},
+        ]}
+        matching_products = await Product.find(product_query).to_list()
+        matching_product_ids = [str(p.id) for p in matching_products]
+        
         query["$or"] = [
             {"descripcion": {"$regex": safe_search, "$options": "i"}},
             {"notas": {"$regex": safe_search, "$options": "i"}},
             {"usuario_nombre": {"$regex": safe_search, "$options": "i"}},
             {"referencia_id": {"$regex": safe_search, "$options": "i"}}
         ]
+        if matching_product_ids:
+            query["$or"].append({"producto_id": {"$in": matching_product_ids}})
         
     # Rangos de fecha flexibles (pueden venir solo uno o ambos)
     date_filter = {}
@@ -473,12 +485,23 @@ async def exportar_movimientos(
     if tipo_movimiento: query["tipo_movimiento"] = tipo_movimiento
     if search:
         safe_search = re.escape(search).replace("\\ ", " ")
+        
+        product_query = {"tenant_id": tenant_id, "$or": [
+            {"descripcion": {"$regex": safe_search, "$options": "i"}},
+            {"codigo_corto": {"$regex": safe_search, "$options": "i"}},
+            {"codigo_largo": {"$regex": safe_search, "$options": "i"}},
+        ]}
+        matching_products = await Product.find(product_query).to_list()
+        matching_product_ids = [str(p.id) for p in matching_products]
+        
         query["$or"] = [
             {"descripcion": {"$regex": safe_search, "$options": "i"}},
             {"notas": {"$regex": safe_search, "$options": "i"}},
             {"usuario_nombre": {"$regex": safe_search, "$options": "i"}},
             {"referencia_id": {"$regex": safe_search, "$options": "i"}}
         ]
+        if matching_product_ids:
+            query["$or"].append({"producto_id": {"$in": matching_product_ids}})
         
     try:
         date_filter = {}
