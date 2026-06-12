@@ -411,11 +411,16 @@ async def get_movimientos_inventario(
     if tipo_movimiento:
         query["tipo_movimiento"] = tipo_movimiento
 
-    # Soporte para búsqueda por texto en la descripción del log
+    # Soporte para búsqueda por texto en varios campos del log
     if search:
         # Escapar caracteres especiales como ( ) + * para que se busquen literalmente y no rompan el motor de regex
         safe_search = re.escape(search)
-        query["descripcion"] = {"$regex": safe_search, "$options": "i"}
+        query["$or"] = [
+            {"descripcion": {"$regex": safe_search, "$options": "i"}},
+            {"notas": {"$regex": safe_search, "$options": "i"}},
+            {"usuario_nombre": {"$regex": safe_search, "$options": "i"}},
+            {"referencia_id": {"$regex": safe_search, "$options": "i"}}
+        ]
         
     # Rangos de fecha flexibles (pueden venir solo uno o ambos)
     date_filter = {}
@@ -468,7 +473,12 @@ async def exportar_movimientos(
     if tipo_movimiento: query["tipo_movimiento"] = tipo_movimiento
     if search:
         safe_search = re.escape(search)
-        query["descripcion"] = {"$regex": safe_search, "$options": "i"}
+        query["$or"] = [
+            {"descripcion": {"$regex": safe_search, "$options": "i"}},
+            {"notas": {"$regex": safe_search, "$options": "i"}},
+            {"usuario_nombre": {"$regex": safe_search, "$options": "i"}},
+            {"referencia_id": {"$regex": safe_search, "$options": "i"}}
+        ]
         
     try:
         date_filter = {}

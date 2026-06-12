@@ -90,7 +90,7 @@ export default function InventarioPage() {
 
     const { data: movimientos = [], isLoading: loadingMovs } = useQuery({
         queryKey: ['movimientos', selectedSucursal, selectedAlmacen, startDate, endDate, debouncedSearch, kardexProductoId, tipoMovimiento],
-        queryFn: () => getMovimientosInventario(selectedSucursal, selectedAlmacen, kardexProductoId, startDate || undefined, endDate || undefined, kardexProductoId ? undefined : (debouncedSearch || undefined), tipoMovimiento || undefined),
+        queryFn: () => getMovimientosInventario(selectedSucursal, selectedAlmacen, kardexProductoId, startDate || undefined, endDate || undefined, debouncedSearch || undefined, tipoMovimiento || undefined),
         enabled: tab === 'kardex',
     });
 
