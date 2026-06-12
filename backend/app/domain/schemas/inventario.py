@@ -18,20 +18,20 @@ class InventarioItem(BaseModel):
     image_url: Optional[str] = None
     sucursal_id: str
     almacen_id: str = "default"
-    cantidad: int
+    cantidad: float
 
 
 class AjusteInventario(BaseModel):
     """Request body to manually adjust stock for a product in a branch."""
     producto_id: str
     tipo: str       # 'ENTRADA' | 'SALIDA' | 'AJUSTE'
-    cantidad: int   # Must be a positive absolute value
+    cantidad: float   # Must be a positive absolute value
     notas: str = ""
 
 class AjusteInventarioMasivoItem(BaseModel):
     producto_id: str
     tipo: str
-    cantidad: int
+    cantidad: float
 
 class AjusteInventarioMasivoRequest(BaseModel):
     sucursal_id: str
