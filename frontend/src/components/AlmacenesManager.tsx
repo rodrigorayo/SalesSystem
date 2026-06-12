@@ -4,8 +4,11 @@ import { getAlmacenes, createAlmacen, updateAlmacen, deleteAlmacen } from '../ap
 import type { Almacen, Sucursal } from '../api/types';
 import { Plus, Package, MapPin, Pencil, Trash2, X, Check, Loader2, Star } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirm } from './ConfirmModal';
+
 
 export function AlmacenesManager({ sucursales }: { sucursales: Sucursal[] }) {
+    const confirm = useConfirm();
     const qc = useQueryClient();
     const [selectedSucursalId, setSelectedSucursalId] = useState<string>(sucursales[0]?._id || '');
     const [showCreate, setShowCreate] = useState(false);
@@ -105,7 +108,17 @@ export function AlmacenesManager({ sucursales }: { sucursales: Sucursal[] }) {
                                         className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50">
                                         <Pencil size={15} />
                                     </button>
-                                    <button onClick={() => { if (confirm("¿Eliminar almacén?")) deleteMut.mutate(a.id!); }} disabled={deleteMut.isPending}
+                                    <button onClick={async () => {
+                                         if (await confirm({
+                                             title: '¿Eliminar almacén?',
+                                             message: 'Esta acción no se puede deshacer y eliminará el almacén seleccionado.',
+                                             type: 'danger',
+                                             confirmLabel: 'Eliminar',
+                                             cancelLabel: 'Cancelar'
+                                         })) {
+                                             deleteMut.mutate(a.id!);
+                                         }
+                                     }} disabled={deleteMut.isPending}
                                         className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50">
                                         <Trash2 size={15} />
                                     </button>

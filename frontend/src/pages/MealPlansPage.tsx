@@ -3,8 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMealPlanTemplates, createMealPlanTemplate, updateMealPlanTemplate, deleteMealPlanTemplate } from '../api/api';
 import { Plus, Trash2, Loader2, CalendarRange, X, Edit3, HeartHandshake } from 'lucide-react';
 import type { MealPlanTemplate, MealPlanTemplateCreate } from '../api/types';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 export default function MealPlansPage() {
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -173,8 +176,16 @@ export default function MealPlansPage() {
                                         <Edit3 size={15} /> Editar
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            if (confirm('¿Eliminar esta plantilla de plan?')) deleteMutation.mutate(tpl._id);
+                                        onClick={async () => {
+                                            if (await confirm({
+                                                title: '¿Eliminar plantilla de plan?',
+                                                message: '¿Estás seguro de que deseas eliminar esta plantilla de plan?',
+                                                type: 'danger',
+                                                confirmLabel: 'Eliminar',
+                                                cancelLabel: 'Cancelar'
+                                            })) {
+                                                deleteMutation.mutate(tpl._id);
+                                            }
                                         }}
                                         className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold"
                                         title="Eliminar"

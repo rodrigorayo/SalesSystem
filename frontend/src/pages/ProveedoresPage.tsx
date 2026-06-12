@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 // Simple debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -20,6 +22,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function ProveedoresPage() {
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const debouncedSearch = useDebounce(searchTerm, 400);
@@ -136,8 +139,14 @@ export default function ProveedoresPage() {
         }
     };
 
-    const handleDelete = (id: string, name: string) => {
-        if (confirm(`¿Estás seguro de que deseas eliminar al proveedor "${name}"?`)) {
+    const handleDelete = async (id: string, name: string) => {
+        if (await confirm({
+            title: '¿Eliminar proveedor?',
+            message: `¿Estás seguro de que deseas eliminar al proveedor "${name}"?`,
+            type: 'danger',
+            confirmLabel: 'Eliminar',
+            cancelLabel: 'Cancelar'
+        })) {
             deleteMut.mutate(id);
         }
     };

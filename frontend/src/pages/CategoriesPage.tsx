@@ -3,8 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from '../api/client';
 import { Plus, Trash2, Loader2, Tag, X } from 'lucide-react';
 import type { Category, CategoryCreate } from '../api/types';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 export default function CategoriesPage() {
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -101,9 +104,17 @@ export default function CategoriesPage() {
                                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            if (confirm('¿Ocultar categoría?')) deleteCategoryMutation.mutate(category._id);
-                                        }}
+                                         onClick={async () => {
+                                             if (await confirm({
+                                                 title: '¿Ocultar categoría?',
+                                                 message: '¿Estás seguro de que deseas ocultar esta categoría?',
+                                                 type: 'danger',
+                                                 confirmLabel: 'Ocultar',
+                                                 cancelLabel: 'Cancelar'
+                                             })) {
+                                                 deleteCategoryMutation.mutate(category._id);
+                                             }
+                                         }}
                                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
                                         title="Ocultar"
                                     >

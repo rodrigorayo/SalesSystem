@@ -8,8 +8,12 @@ import {
     Loader2, Utensils, CheckCircle, X, Plus, ChevronLeft, ChevronRight, ClipboardList
 } from 'lucide-react';
 import type { MealSchedule } from '../api/types';
+import { toast } from 'sonner';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 export default function ProductionCalendarPage() {
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const today = new Date();
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -145,8 +149,14 @@ export default function ProductionCalendarPage() {
         });
     }
 
-    const handleDeliver = (id: string) => {
-        if (confirm('¿Marcar como entregado? Esto descontará automáticamente los ingredientes del inventario.')) {
+    const handleDeliver = async (id: string) => {
+        if (await confirm({
+            title: '¿Marcar como entregado?',
+            message: 'Esto descontará automáticamente los ingredientes del inventario.',
+            type: 'info',
+            confirmLabel: 'Entregar',
+            cancelLabel: 'Cancelar'
+        })) {
             deliverMutation.mutate(id);
         }
     };
@@ -176,7 +186,7 @@ export default function ProductionCalendarPage() {
     const handleCreateScheduleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedCliente || !selectedPlanId || newScheduleRecipes.length === 0) {
-            alert('Por favor selecciona un cliente, su plan de comida, e introduce al menos una receta para el bowl.');
+            toast.warning('Por favor selecciona un cliente, su plan de comida, e introduce al menos una receta para el bowl.');
             return;
         }
 

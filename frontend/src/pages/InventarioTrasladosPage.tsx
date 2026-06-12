@@ -7,8 +7,11 @@ import type { Almacen } from '../api/types';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { formatFullDate } from '../utils/dateUtils';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 export default function InventarioTrasladosPage() {
+    const confirm = useConfirm();
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
     const [tab, setTab] = useState<'enviados' | 'recibidos'>('enviados');
@@ -152,8 +155,14 @@ export default function InventarioTrasladosPage() {
                                     )}
                                     {tab === 'enviados' && t.estado === 'EN_TRANSITO' && (
                                         <button 
-                                            onClick={() => {
-                                                if(confirm("¿Estás seguro de cancelar este traslado? El stock volverá a tu sucursal.")) {
+                                            onClick={async () => {
+                                                if (await confirm({
+                                                    title: '¿Cancelar envío?',
+                                                    message: '¿Estás seguro de cancelar este traslado? El stock volverá a tu sucursal.',
+                                                    type: 'danger',
+                                                    confirmLabel: 'Cancelar Envío',
+                                                    cancelLabel: 'Volver'
+                                                })) {
                                                     cancelMutation.mutate(t._id);
                                                 }
                                             }}
@@ -183,8 +192,14 @@ export default function InventarioTrasladosPage() {
                     traslado={isDetailOpen}
                     onClose={() => setIsDetailOpen(null)}
                     onReceive={(t: any) => { setIsDetailOpen(null); setIsReceiveModalOpen(t); }}
-                    onCancel={(id: string) => {
-                        if(confirm("¿Cancelar este traslado? El stock volverá a tu sucursal.")) {
+                    onCancel={async (id: string) => {
+                        if (await confirm({
+                            title: '¿Cancelar envío?',
+                            message: '¿Cancelar este traslado? El stock volverá a tu sucursal.',
+                            type: 'danger',
+                            confirmLabel: 'Cancelar Envío',
+                            cancelLabel: 'Volver'
+                        })) {
                             cancelMutation.mutate(id);
                             setIsDetailOpen(null);
                         }

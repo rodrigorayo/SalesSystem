@@ -4,6 +4,8 @@ import { getTenantStats, getProducts, getUsers, getCategories, createProduct, up
 import { Plus, Users, Package, DollarSign, Store, ShoppingBag, Loader2, X, Upload, ImageIcon, KeyRound, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import type { Product, ProductCreate, EmployeeCreate } from '../api/types';
+import { toast } from 'sonner';
+
 import { Link } from 'react-router-dom';
 import { BASE_URL } from '../api/client';
 import PasswordField from '../components/PasswordField';
@@ -111,7 +113,7 @@ export default function TenantDashboard() {
             const data = await res.json();
             if (data.url) setProductForm(prev => ({ ...prev, image_url: data.url }));
         } catch {
-            alert('Error al subir imagen');
+            toast.error('Error al subir imagen');
         }
     };
 

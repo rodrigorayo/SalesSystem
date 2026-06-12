@@ -5,6 +5,8 @@ import { Warehouse, ArrowDownRight, ArrowUpRight, Scale, Loader2, Package, Searc
 import { getInventario, getMovimientosInventario, ajustarInventario, getSucursales, getAlmacenes, crearSolicitudPrecio, exportInventoryTemplate, importInventoryBranchExcel, getCategories, exportMovimientosInventario } from '../api/api';
 import { useDropzone } from 'react-dropzone';
 import { useAuthStore } from '../store/authStore';
+import { toast } from 'sonner';
+
 import type { AjusteInventario } from '../api/types';
 import Pagination from '../components/Pagination';
 import BulkAjusteView from '../components/BulkAjusteView';
@@ -836,7 +838,7 @@ function ImportInventoryModal({ onClose, sucursalId }: { onClose: () => void, su
         try {
             await exportInventoryTemplate(sucursalId);
         } catch (err) {
-            alert("Error descargando plantilla de inventario");
+            toast.error("Error descargando plantilla de inventario");
         }
     }
 

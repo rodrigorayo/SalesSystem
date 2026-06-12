@@ -5,8 +5,11 @@ import { Tag, Plus, Loader2, Edit2, Trash2, ShieldCheck, Power, Percent, DollarS
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { getSucursales } from '../api/api';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 export default function DescuentosPage() {
+    const confirm = useConfirm();
     const { role } = useAuthStore();
     const isAuthorized = role === 'ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN_SUCURSAL' || role === 'ADMIN_MATRIZ';
 
@@ -201,8 +204,14 @@ export default function DescuentosPage() {
                                                     <Edit2 size={14} />
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        if (confirm(`¿Deseas borrar permanentemente el descuento "${d.nombre}"?`)) {
+                                                    onClick={async () => {
+                                                        if (await confirm({
+                                                            title: '¿Eliminar descuento?',
+                                                            message: `¿Deseas borrar permanentemente el descuento "${d.nombre}"?`,
+                                                            type: 'danger',
+                                                            confirmLabel: 'Borrar',
+                                                            cancelLabel: 'Cancelar'
+                                                        })) {
                                                             deleteMut.mutate(d._id);
                                                         }
                                                     }}

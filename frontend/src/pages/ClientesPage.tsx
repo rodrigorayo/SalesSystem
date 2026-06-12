@@ -4,6 +4,9 @@ import {
     X, ShoppingBag, ShieldCheck, HeartHandshake, CheckCircle, Calendar, Loader2
 } from 'lucide-react';
 import { useClientes, useCreateCliente, useUpdateCliente, useDeleteCliente } from '../hooks/useClientes';
+import { toast } from 'sonner';
+import { useConfirm } from '../components/ConfirmModal';
+
 import type { Cliente } from '../api/clientes';
 import { getClientMealPlans, assignPlanToClient, getMealPlanTemplates, getMealSchedules, createMealSchedule, getRecipes } from '../api/api';
 import type { ClientMealPlan, MealSchedule } from '../api/types';
@@ -21,6 +24,7 @@ function useDebounce<T>(value: T, delay: number): [T] {
 }
 
 export default function ClientesPage() {
+    const confirm = useConfirm();
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch] = useDebounce(searchTerm, 500);
     const [page] = useState(1);
@@ -147,8 +151,14 @@ export default function ClientesPage() {
         }
     };
 
-    const handleDelete = (id: string, nombre: string) => {
-        if (window.confirm(`¿Estás seguro de eliminar a ${nombre}?`)) {
+    const handleDelete = async (id: string, nombre: string) => {
+        if (await confirm({
+            title: '¿Eliminar cliente?',
+            message: `¿Estás seguro de eliminar a ${nombre}?`,
+            type: 'danger',
+            confirmLabel: 'Eliminar',
+            cancelLabel: 'Cancelar'
+        })) {
             deleteMut.mutate(id);
         }
     };
@@ -166,7 +176,7 @@ export default function ClientesPage() {
     const handleScheduleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!schedulePlanId || scheduleRecipes.length === 0) {
-            alert('Por favor selecciona un plan y al menos una receta.');
+            toast.warning('Por favor selecciona un plan y al menos una receta.');
             return;
         }
         createScheduleMutation.mutate({
@@ -399,7 +409,7 @@ export default function ClientesPage() {
                                                 <button
                                                     onClick={() => {
                                                         if (!clientPlans || clientPlans.length === 0) {
-                                                            alert('El cliente debe tener al menos un plan activo para programarle entregas.');
+                                                            toast.warning('El cliente debe tener al menos un plan activo para programarle entregas.');
                                                             return;
                                                         }
                                                         setSchedulePlanId(clientPlans[0]._id);

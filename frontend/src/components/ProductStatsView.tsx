@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getProductStatsReport, getProducts, getSucursales } from '../api/api';
 import { useAuthStore } from '../store/authStore';
+import { toast } from 'sonner';
+
 import { 
     Loader2, AlertTriangle, Search, X,
     BarChart3, CheckCircle2, TrendingUp
@@ -73,7 +75,7 @@ export default function ProductStatsView() {
             return;
         }
         if (selectedProducts.length >= 7) {
-            alert("Puedes comparar hasta 7 productos a la vez.");
+            toast.warning("Puedes comparar hasta 7 productos a la vez.");
             return;
         }
         

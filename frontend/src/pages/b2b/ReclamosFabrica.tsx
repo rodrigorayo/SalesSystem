@@ -3,6 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMermasReclamos, compensarMermaReclamo } from '../../api/api';
 import { Loader2, TrendingDown, CheckCircle2, Factory, Store, FileWarning } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
+import { useConfirm } from '../../components/ConfirmModal';
+
 
 const formatDate = (dateStr: string) => {
     const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
@@ -10,6 +13,7 @@ const formatDate = (dateStr: string) => {
 };
 
 export default function ReclamosFabrica() {
+    const confirm = useConfirm();
     const qc = useQueryClient();
     const [page, setPage] = useState(1);
     const [filterEstado, setFilterEstado] = useState<'' | 'PENDIENTE' | 'COMPENSADO'>('PENDIENTE');
@@ -27,11 +31,17 @@ export default function ReclamosFabrica() {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['mermas'] });
         },
-        onError: (err: any) => alert(err.message || 'Error al compensar reclamo.')
+        onError: (err: any) => toast.error(err.message || 'Error al compensar reclamo.')
     });
 
-    const handleCompensar = (id: string) => {
-        if(window.confirm("¿Confirmas que la fábrica matriz pagó o repuso esta merma? El reclamo bajará de la cuenta por cobrar.")){
+    const handleCompensar = async (id: string) => {
+        if (await confirm({
+            title: '¿Marcar como compensado?',
+            message: '¿Confirmas que la fábrica matriz pagó o repuso esta merma? El reclamo bajará de la cuenta por cobrar.',
+            type: 'info',
+            confirmLabel: 'Compensar',
+            cancelLabel: 'Cancelar'
+        })) {
             compensarMut.mutate(id);
         }
     };

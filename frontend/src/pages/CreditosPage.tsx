@@ -4,6 +4,9 @@ import { getCuentasCredito, getDeudasPorCuenta, getTransaccionesCuenta, registra
 import { Loader2, Search, Wallet, User as UserIcon, PlusCircle, X, History, FileText, ChevronRight, CheckCircle2, Printer, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../components/Pagination';
+import { toast } from 'sonner';
+import { useConfirm } from '../components/ConfirmModal';
+
 
 const formatDate = (dateStr: string) => {
     const isoStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
@@ -40,6 +43,7 @@ interface Transaccion {
 }
 
 export default function CreditosPage() {
+    const confirm = useConfirm();
     const qc = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterEstado, setFilterEstado] = useState<'' | 'AL_DIA' | 'MOROSO'>('');
@@ -88,7 +92,7 @@ export default function CreditosPage() {
                 setSelectedCuenta({ ...selectedCuenta, saldo_total: res.nuevo_saldo });
             }
         },
-        onError: (err: any) => alert(err.message || 'Error al registrar el abono.')
+        onError: (err: any) => toast.error(err.message || 'Error al registrar el abono.')
     });
 
     const anularMut = useMutation({
@@ -102,14 +106,20 @@ export default function CreditosPage() {
                 setSelectedCuenta({ ...selectedCuenta, saldo_total: res.nuevo_saldo });
             }
         },
-        onError: (err: any) => alert(err.message || 'Error al anular el abono.')
+        onError: (err: any) => toast.error(err.message || 'Error al anular el abono.')
     });
 
-    const handleAnularAbono = (t: Transaccion) => {
+    const handleAnularAbono = async (t: Transaccion) => {
         if (t.anulada) return;
         const motivo = window.prompt("Escriba el motivo de la anulación (Ej. Cobro duplicado, error de monto):");
         if (!motivo) return;
-        if (window.confirm("¿Está seguro de anular este abono? El dinero se restará de caja y la deuda retornará.")) {
+        if (await confirm({
+            title: '¿Anular abono?',
+            message: '¿Está seguro de anular este abono? El dinero se restará de caja y la deuda retornará.',
+            type: 'danger',
+            confirmLabel: 'Anular',
+            cancelLabel: 'Cancelar'
+        })) {
             anularMut.mutate({ transaccionId: t.id, motivo });
         }
     };
@@ -175,7 +185,10 @@ export default function CreditosPage() {
 
     const handleAbonoSubmit = () => {
         const total = getTotalAbono();
-        if (total <= 0) return alert("Ingrese un monto válido");
+        if (total <= 0) {
+            toast.warning("Ingrese un monto válido");
+            return;
+        }
         
         const payloadPagos = pagosIn.filter(p => parseFloat(p.monto) > 0).map(p => ({
             metodo: p.metodo,

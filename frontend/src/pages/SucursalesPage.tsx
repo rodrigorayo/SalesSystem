@@ -4,7 +4,9 @@ import { getSucursales, createSucursal, updateSucursal, deleteSucursal } from '.
 import type { SucursalCreate } from '../api/types';
 import { Plus, Store, MapPin, Phone, Pencil, X, Loader2, KeyRound, Copy, Check, AlertTriangle, Building, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirm } from '../components/ConfirmModal';
 import PasswordField from '../components/PasswordField';
+
 import Pagination from '../components/Pagination';
 import { AlmacenesManager } from '../components/AlmacenesManager';
 
@@ -20,6 +22,7 @@ const BLANK_FORM: SucursalCreate = {
 };
 
 export default function SucursalesPage() {
+    const confirm = useConfirm();
     const qc = useQueryClient();
     const [showCreate, setShowCreate] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
@@ -71,8 +74,14 @@ export default function SucursalesPage() {
         },
     });
 
-    const handleDelete = (id: string, name: string) => {
-        if (confirm(`¿Estás seguro de que deseas desactivar la sucursal "${name}"? El superadmin puede reactivarla después.`)) {
+    const handleDelete = async (id: string, name: string) => {
+        if (await confirm({
+            title: '¿Desactivar sucursal?',
+            message: `¿Estás seguro de que deseas desactivar la sucursal "${name}"? El superadmin puede reactivarla después.`,
+            type: 'danger',
+            confirmLabel: 'Desactivar',
+            cancelLabel: 'Cancelar'
+        })) {
             deleteMut.mutate(id);
         }
     };

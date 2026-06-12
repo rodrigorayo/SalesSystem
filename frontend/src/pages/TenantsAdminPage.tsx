@@ -5,7 +5,9 @@ import { Plus, Users, Building, Loader2, X, Check, Edit2, Trash2, ShieldAlert, K
 import { useAuthStore } from '../store/authStore';
 import type { Tenant, TenantCreate, TenantUpdate } from '../api/types';
 import { toast } from 'sonner';
+import { useConfirm } from '../components/ConfirmModal';
 import PasswordField from '../components/PasswordField';
+
 import Pagination from '../components/Pagination';
 
 
@@ -45,6 +47,7 @@ const PlanBadge = ({ plan }: { plan: string }) => {
 
 export default function TenantsAdminPage() {
     const { user } = useAuthStore();
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
@@ -232,8 +235,14 @@ export default function TenantsAdminPage() {
         }
     };
 
-    const handleDelete = (tenant: Tenant) => {
-        if (confirm(`¿Eliminar permanentemente "${tenant.name}"?`)) {
+    const handleDelete = async (tenant: Tenant) => {
+        if (await confirm({
+            title: '¿Eliminar empresa?',
+            message: `¿Eliminar permanentemente "${tenant.name}"? Esta acción no se puede deshacer.`,
+            type: 'danger',
+            confirmLabel: 'Eliminar',
+            cancelLabel: 'Cancelar'
+        })) {
             deleteTenantMutation.mutate(tenant._id);
         }
     };

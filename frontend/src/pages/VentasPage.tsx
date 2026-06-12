@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TicketPrinter } from '../components/TicketPrinter';
 import Pagination from '../components/Pagination';
 import type { Sale } from '../api/types';
+import { toast } from 'sonner';
 
 import { formatFullDate as formatDate } from '../utils/dateUtils';
 
@@ -391,13 +392,13 @@ export default function VentasPage() {
             qc.invalidateQueries({ queryKey: ['inventario'] });
             setAnularVenta(null);
         },
-        onError: (err: any) => alert(err.message || 'Error al anular la venta.')
+        onError: (err: any) => toast.error(err.message || 'Error al anular la venta.')
     });
 
     const facturaMut = useMutation({
         mutationFn: ({ id, emitida }: { id: string, emitida: boolean }) => toggleFacturaEmitida(id, emitida),
         onSuccess: () => qc.invalidateQueries({ queryKey: ['sales-history'] }),
-        onError: (err: any) => alert(err.message || 'Error al actualizar el estado de la factura.')
+        onError: (err: any) => toast.error(err.message || 'Error al actualizar el estado de la factura.')
     });
 
     // We now filter on the server

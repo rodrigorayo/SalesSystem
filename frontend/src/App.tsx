@@ -37,6 +37,7 @@ import { useAuthStore } from './store/authStore';
 import { getMyFeatures, getMyTenant } from './api/api';
 import { Toaster } from 'sonner';
 import { ErrorModalProvider, useErrorModal } from './components/ErrorModal';
+import { ConfirmProvider } from './components/ConfirmModal';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -173,11 +174,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorModalProvider>
-        <ErrorEventBridge />
-        <FeaturesFetcher />
-        <SoftLockBlocker />
-        <Toaster position="top-right" richColors theme="light" />
-      <BrowserRouter>
+        <ConfirmProvider>
+          <ErrorEventBridge />
+          <FeaturesFetcher />
+          <SoftLockBlocker />
+          <Toaster position="top-right" richColors theme="light" />
+          <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
@@ -382,6 +384,7 @@ function App() {
           } />
         </Routes>
       </BrowserRouter>
+        </ConfirmProvider>
       </ErrorModalProvider>
     </QueryClientProvider>
   );

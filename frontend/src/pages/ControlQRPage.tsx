@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSales, getSucursales, updateQRInfo } from '../api/api';
 import { useAuthStore } from '../store/authStore';
+import { toast } from 'sonner';
+
 import Pagination from '../components/Pagination';
 import { 
     QrCode, Search, CheckCircle2, Clock, CalendarDays, Loader2, 
@@ -70,7 +72,7 @@ export default function ControlQRPage() {
             qc.invalidateQueries({ queryKey: ['sales-history-qr'] });
             setSelectedSale(null);
         },
-        onError: (err: any) => alert(err.message || 'Error al confirmar QR.')
+        onError: (err: any) => toast.error(err.message || 'Error al confirmar QR.')
     });
 
     // Apply UI Filters on top of what came from server (for status and search)

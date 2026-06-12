@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPedidos, createPedido, despacharPedido, recibirPedido, cancelarPedido, aceptarPedido, getSucursales, getInventario, getProducts, downloadPedidoPDF, getEtiquetas } from '../api/api';
 import { useAuthStore } from '../store/authStore';
+import { toast } from 'sonner';
+
 
 import {
     ClipboardList, Plus, Truck, CheckCircle2, Clock,
@@ -115,23 +117,23 @@ export default function PedidosPage() {
     const createMut = useMutation({
         mutationFn: createPedido,
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['pedidos'] }); setShowCreate(false); resetForm(); },
-        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al crear pedido')
+        onError: (err: any) => toast.error(err?.response?.data?.detail || err.message || 'Error al crear pedido')
     });
     const despacharMut = useMutation({
         mutationFn: despacharPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
-        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al despachar pedido')
+        onError: (err: any) => toast.error(err?.response?.data?.detail || err.message || 'Error al despachar pedido')
     });
 
     const cancelarMut = useMutation({
         mutationFn: cancelarPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
-        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al cancelar pedido')
+        onError: (err: any) => toast.error(err?.response?.data?.detail || err.message || 'Error al cancelar pedido')
     });
     const aceptarMut = useMutation({
         mutationFn: aceptarPedido,
         onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
-        onError: (err: any) => alert(err?.response?.data?.detail || err.message || 'Error al aceptar pedido')
+        onError: (err: any) => toast.error(err?.response?.data?.detail || err.message || 'Error al aceptar pedido')
     });
 
     const filteredCatalog = useMemo(() => {
@@ -309,7 +311,7 @@ export default function PedidosPage() {
                                             <button onClick={async () => {
                                                 try {
                                                     await downloadPedidoPDF(pedido._id);
-                                                } catch (err: any) { alert(err.message); }
+                                                } catch (err: any) { toast.error(err.message); }
                                             }}
                                                 className="flex items-center gap-1.5 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ml-auto shadow-sm">
                                                 <Download size={14} />
@@ -348,11 +350,11 @@ export default function PedidosPage() {
                             e.preventDefault();
                             const validItems = orderItems.filter(i => i.producto_id.trim() !== '');
                             if (!selectedSucursal && (isMatriz() || user?.role === 'SUPERADMIN' || user?.role === 'SUPERVISOR')) {
-                                alert("Por favor, selecciona una sucursal.");
+                                toast.warning("Por favor, selecciona una sucursal.");
                                 return;
                             }
                             if (validItems.length === 0) {
-                                alert("Por favor, selecciona al menos un producto válido para el pedido.");
+                                toast.warning("Por favor, selecciona al menos un producto válido para el pedido.");
                                 return;
                             }
                             
@@ -829,7 +831,7 @@ function ReceptionModal({ pedido, onClose, onSuccess }: { pedido: any; onClose: 
     const mut = useMutation({
         mutationFn: () => recibirPedido(pedido._id, items.map(i => ({ producto_id: i.producto_id, cantidad_recibida: i.cantidad_recibida }))),
         onSuccess,
-        onError: (err: any) => alert(err?.message || "Error al confirmar recepción")
+        onError: (err: any) => toast.error(err?.message || "Error al confirmar recepción")
     });
 
     return (

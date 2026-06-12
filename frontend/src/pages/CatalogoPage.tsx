@@ -5,10 +5,13 @@ import { getProducts, getCategories, createProduct, updateProduct, deactivatePro
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { useAuthStore } from '../store/authStore';
+import { useConfirm } from '../components/ConfirmModal';
+
 import type { Product, Category, ProductCreate, Sucursal } from '../api/types';
 import Pagination from '../components/Pagination';
 
 export default function CatalogoPage() {
+    const confirm = useConfirm();
     const { user } = useAuthStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -70,8 +73,14 @@ export default function CatalogoPage() {
         }
     });
 
-    const handleDeactivateProduct = (id: string) => {
-        if (confirm('¿Estás seguro de que deseas desactivar/ocultar este producto? No se podrá usar en nuevas ventas ni pedidos.')) {
+    const handleDeactivateProduct = async (id: string) => {
+        if (await confirm({
+            title: '¿Desactivar producto?',
+            message: '¿Estás seguro de que deseas desactivar/ocultar este producto? No se podrá usar en nuevas ventas ni pedidos.',
+            type: 'danger',
+            confirmLabel: 'Desactivar',
+            cancelLabel: 'Cancelar'
+        })) {
             deactivateMut.mutate(id);
         }
     };
@@ -87,8 +96,14 @@ export default function CatalogoPage() {
         }
     });
 
-    const handleReactivateProduct = (product: Product) => {
-        if (confirm('¿Estás seguro de que deseas reactivar este producto?')) {
+    const handleReactivateProduct = async (product: Product) => {
+        if (await confirm({
+            title: '¿Reactivar producto?',
+            message: '¿Estás seguro de que deseas reactivar este producto?',
+            type: 'info',
+            confirmLabel: 'Reactivar',
+            cancelLabel: 'Cancelar'
+        })) {
             reactivateMut.mutate(product);
         }
     };
@@ -388,7 +403,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
         try {
             await exportProductTemplate();
         } catch (err) {
-            alert("Error descargando plantilla");
+            toast.error("Error descargando plantilla");
         }
     }
 
