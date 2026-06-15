@@ -11,6 +11,7 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 
 from app.domain.models.cliente import Cliente, TipoCliente
 from app.domain.models.user import User
+from app.domain.models.client_wallet import ClientWallet
 from app.infrastructure.auth import get_current_active_user
 
 router = APIRouter()
@@ -173,3 +174,23 @@ async def eliminar_cliente(
     cliente.deleted_by = str(current_user.id)
     await cliente.save()
     return {"message": "Cliente eliminado exitosamente"}
+
+
+@router.get("/clientes/{cliente_id}/wallet")
+async def obtener_wallet_cliente(
+    cliente_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    tenant_id = current_user.tenant_id or "default"
+    
+    # Verificar que el cliente exista y pertenezca al tenant
+    cliente = await Cliente.get(cliente_id)
+    if not cliente or cliente.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    wallets = await ClientWallet.find(
+        ClientWallet.tenant_id == tenant_id,
+        ClientWallet.cliente_id == cliente_id
+    ).to_list()
+    
+    return wallets

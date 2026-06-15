@@ -37,6 +37,7 @@ export const deleteTenant = (id: string) => client<{message: string}>(`/tenants/
 export const getMyFeatures = () => client<{ features: string[]; plan: string; plan_name?: string }>('/tenants/my-features');
 export const getMyTenant = () => client<Tenant>('/tenants/me');
 export const updateMyTenantSettings = (data: Partial<TenantSettings>) => client<Tenant>('/tenants/me/settings', { method: 'PUT', body: data });
+export const updateMyTenantConfiguracion = (data: Record<string, any>) => client<Record<string, any>>('/tenants/me/configuracion', { method: 'PUT', body: data });
 
 export const getAuditLogs = (limit: number = 100, skip: number = 0, action?: string, entity?: string, username?: string) => {
     const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });

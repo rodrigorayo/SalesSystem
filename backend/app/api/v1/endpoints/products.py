@@ -12,7 +12,7 @@ from app.domain.models.category import Category
 from app.domain.models.user import User, UserRole
 from app.domain.models.sucursal import Sucursal
 from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
-from app.infrastructure.auth import get_current_active_user
+from app.infrastructure.auth import get_current_active_user, require_roles
 
 router = APIRouter()
 async def _enrich(product: Product) -> Product:
@@ -93,7 +93,7 @@ async def get_products(
 @router.post("/products", response_model=Product)
 async def create_product(
     data: ProductCreate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     from app.application.services.product_service import ProductService
     return await ProductService.create_product(data, current_user)
@@ -103,7 +103,7 @@ async def create_product(
 async def update_product(
     product_id: str,
     data: ProductUpdate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     from app.application.services.product_service import ProductService
     return await ProductService.update_product(product_id, data, current_user)
@@ -112,7 +112,7 @@ async def update_product(
 @router.delete("/products/{product_id}")
 async def deactivate_product(
     product_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     from app.application.services.product_service import ProductService
     return await ProductService.deactivate_product(product_id, current_user)
@@ -120,11 +120,8 @@ async def deactivate_product(
 
 @router.get("/productos/exportar-plantilla")
 async def export_product_template(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="No autorizado para exportar plantilla")
-        
     tenant_id = current_user.tenant_id or "default"
     
     categories = await Category.find(Category.tenant_id == tenant_id, Category.is_active == True).to_list()
@@ -170,7 +167,7 @@ async def export_product_template(
 @router.post("/productos/importar")
 async def import_products(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     from app.application.services.excel_import_service import ExcelImportService
     contents = await file.read()
@@ -180,7 +177,7 @@ async def import_products(
 @router.post("/productos/importacion-global")
 async def importacion_global_excel(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     from app.application.services.excel_import_service import ExcelImportService
     contents = await file.read()
@@ -190,11 +187,8 @@ async def importacion_global_excel(
 @router.get("/productos/exportar-plantilla-precios")
 async def export_product_price_template(
     sucursal_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="No autorizado para exportar plantilla de precios")
-        
     tenant_id = current_user.tenant_id or "default"
     
     # Validar sucursal
@@ -240,7 +234,7 @@ async def export_product_price_template(
 async def import_product_prices(
     sucursal_id: str = Form(...),
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     from app.application.services.excel_import_service import ExcelImportService
     contents = await file.read()

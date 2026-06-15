@@ -32,12 +32,20 @@ class PlanType(str, Enum):
     # Legacy
     BASIC      = "BASICO"
 
+class RubroEmpresa(str, Enum):
+    RETAIL = "RETAIL"
+    DARK_KITCHEN = "DARK_KITCHEN"
+    SERVICIOS = "SERVICIOS"
+
 class Tenant(Document, SoftDeleteMixin):
     name: str
     plan_id: Optional[str] = None          # Ref to plans collection
     plan: PlanType = PlanType.BASICO
     plan_expires_at: Optional[datetime] = None
     settings: TenantSettings = Field(default_factory=TenantSettings)
+    configuracion: dict = Field(default_factory=dict)
+    rubro: RubroEmpresa = Field(default=RubroEmpresa.RETAIL)
+    modulos_activos: List[str] = Field(default_factory=lambda: ["INVENTARIO", "POS", "KARDEX"])
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

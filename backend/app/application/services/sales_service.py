@@ -49,39 +49,43 @@ class SalesService:
                         # Resolver almacen_id: el ítem tiene precedencia sobre el global de la venta
                         item_almacen_id = item.almacen_id or sale_in.almacen_id or "default"
 
-                        inv_query = {
-                            "tenant_id": tenant_id,
-                            "sucursal_id": sucursal_id,
-                            "producto_id": item.producto_id,
-                        }
-                        if item_almacen_id == "default":
-                            inv_query["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
-                        else:
-                            inv_query["almacen_id"] = item_almacen_id
+                        es_fisico = product.tipo_item == "FISICO"
+                        updated_inv = None
 
-                        update_query = dict(inv_query)
-                        update_query["cantidad"] = {"$gte": item.cantidad}
+                        if es_fisico:
+                            inv_query = {
+                                "tenant_id": tenant_id,
+                                "sucursal_id": sucursal_id,
+                                "producto_id": item.producto_id,
+                            }
+                            if item_almacen_id == "default":
+                                inv_query["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
+                            else:
+                                inv_query["almacen_id"] = item_almacen_id
 
-                        updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
-                            update_query,
-                            {
-                                "$inc": {"cantidad": -item.cantidad}
-                            },
-                            return_document=ReturnDocument.AFTER,
-                            session=session.client_session if hasattr(session, "client_session") else session
-                        )
+                            update_query = dict(inv_query)
+                            update_query["cantidad"] = {"$gte": item.cantidad}
 
-                        if not updated_inv:
-                            # For the error message, just check what we have
-                            inv_check = await Inventario.get_pymongo_collection().find_one(
-                                inv_query,
+                            updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
+                                update_query,
+                                {
+                                    "$inc": {"cantidad": -item.cantidad}
+                                },
+                                return_document=ReturnDocument.AFTER,
                                 session=session.client_session if hasattr(session, "client_session") else session
                             )
-                            available = inv_check["cantidad"] if inv_check else 0
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"Stock insuficiente para '{product.descripcion}'. Disponible: {available}, solicitado: {item.cantidad}",
-                            )
+
+                            if not updated_inv:
+                                # For the error message, just check what we have
+                                inv_check = await Inventario.get_pymongo_collection().find_one(
+                                    inv_query,
+                                    session=session.client_session if hasattr(session, "client_session") else session
+                                )
+                                available = inv_check["cantidad"] if inv_check else 0
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail=f"Stock insuficiente para '{product.descripcion}'. Disponible: {available}, solicitado: {item.cantidad}",
+                                )
 
                         unit_price_base = DecimalMoney(item.precio_unitario)
                         if unit_price_base == Decimal("0"):
@@ -114,22 +118,23 @@ class SalesService:
                             almacen_id=item_almacen_id,  # Snapshot del almacén real usado
                         ))
 
-                        await InventoryLog(
-                            tenant_id=tenant_id,
-                            sucursal_id=sucursal_id,
-                            almacen_id=item_almacen_id,  # Almacén real por ítem
-                            producto_id=item.producto_id,
-                            descripcion=product.descripcion,
-                            tipo_movimiento=TipoMovimiento.VENTA,
-                            cantidad_movida=-item.cantidad,
-                            stock_resultante=updated_inv["cantidad"],
-                            costo_unitario_momento=product.costo_producto,
-                            precio_venta_momento=unit_price,
-                            usuario_id=str(current_user.id),
-                            usuario_nombre=current_user.full_name or current_user.username,
-                            notas="Salida por Venta POS",
-                            referencia_id="PENDING"
-                        ).create(session=session)
+                        if es_fisico:
+                            await InventoryLog(
+                                tenant_id=tenant_id,
+                                sucursal_id=sucursal_id,
+                                almacen_id=item_almacen_id,  # Almacén real por ítem
+                                producto_id=item.producto_id,
+                                descripcion=product.descripcion,
+                                tipo_movimiento=TipoMovimiento.VENTA,
+                                cantidad_movida=-item.cantidad,
+                                stock_resultante=updated_inv["cantidad"],
+                                costo_unitario_momento=product.costo_producto,
+                                precio_venta_momento=unit_price,
+                                usuario_id=str(current_user.id),
+                                usuario_nombre=current_user.full_name or current_user.username,
+                                notas="Salida por Venta POS",
+                                referencia_id="PENDING"
+                            ).create(session=session)
 
                         await SaleItemAnalytics(
                             tenant_id=tenant_id,
@@ -426,43 +431,47 @@ class SalesService:
 
                     # ── 1. Revertir stock (siempre, por almacén específico del ítem) ──
                     for item in sale.items:
-                        # Usar el almacen_id guardado en el ítem (snapshot del momento de venta).
-                        # Fallback al almacen_id global de la venta para ventas antiguas.
-                        item_almacen_id_anul = getattr(item, "almacen_id", None) or sale.almacen_id or "default"
+                        product = await Product.get(item.producto_id, session=session)
+                        es_fisico = product.tipo_item == "FISICO" if product else True
 
-                        inv_query_anul = {
-                            "tenant_id": tenant_id,
-                            "sucursal_id": sucursal_id,
-                            "producto_id": item.producto_id,
-                        }
-                        if item_almacen_id_anul == "default":
-                            inv_query_anul["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
-                        else:
-                            inv_query_anul["almacen_id"] = item_almacen_id_anul
+                        if es_fisico:
+                            # Usar el almacen_id guardado en el ítem (snapshot del momento de venta).
+                            # Fallback al almacen_id global de la venta para ventas antiguas.
+                            item_almacen_id_anul = getattr(item, "almacen_id", None) or sale.almacen_id or "default"
 
-                        updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
-                            inv_query_anul,
-                            {"$inc": {"cantidad": item.cantidad}},
-                            return_document=ReturnDocument.AFTER,
-                            session=session.client_session if hasattr(session, "client_session") else session
-                        )
-                        if updated_inv:
-                            await InventoryLog(
-                                tenant_id=tenant_id,
-                                sucursal_id=sucursal_id,
-                                almacen_id=item_almacen_id_anul,  # Revertir al almacén exacto de origen
-                                producto_id=item.producto_id,
-                                descripcion=item.descripcion,
-                                tipo_movimiento=TipoMovimiento.ENTRADA_MANUAL,
-                                cantidad_movida=item.cantidad,
-                                stock_resultante=updated_inv["cantidad"],
-                                costo_unitario_momento=item.costo_unitario,
-                                precio_venta_momento=item.precio_unitario,
-                                usuario_id=str(current_user.id),
-                                usuario_nombre=current_user.full_name or current_user.username,
-                                notas=f"Anulación de Venta #{str(sale.id)[-6:]} — Motivo: {motivo}",
-                                referencia_id=str(sale.id)
-                            ).create(session=session)
+                            inv_query_anul = {
+                                "tenant_id": tenant_id,
+                                "sucursal_id": sucursal_id,
+                                "producto_id": item.producto_id,
+                            }
+                            if item_almacen_id_anul == "default":
+                                inv_query_anul["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
+                            else:
+                                inv_query_anul["almacen_id"] = item_almacen_id_anul
+
+                            updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
+                                inv_query_anul,
+                                {"$inc": {"cantidad": item.cantidad}},
+                                return_document=ReturnDocument.AFTER,
+                                session=session.client_session if hasattr(session, "client_session") else session
+                            )
+                            if updated_inv:
+                                await InventoryLog(
+                                    tenant_id=tenant_id,
+                                    sucursal_id=sucursal_id,
+                                    almacen_id=item_almacen_id_anul,  # Revertir al almacén exacto de origen
+                                    producto_id=item.producto_id,
+                                    descripcion=item.descripcion,
+                                    tipo_movimiento=TipoMovimiento.ANULACION,
+                                    cantidad_movida=item.cantidad,
+                                    stock_resultante=updated_inv["cantidad"],
+                                    costo_unitario_momento=item.costo_unitario,
+                                    precio_venta_momento=item.precio_unitario,
+                                    usuario_id=str(current_user.id),
+                                    usuario_nombre=current_user.full_name or current_user.username,
+                                    notas=f"Anulación de Venta #{str(sale.id)[-6:]} — Motivo: {motivo}",
+                                    referencia_id=str(sale.id)
+                                ).create(session=session)
 
                     # ── 1.5 Revertir deuda de crédito (si la venta fue a crédito) ──
                     has_credit_payment = any(p.metodo == "CREDITO" for p in sale.pagos)
@@ -604,55 +613,59 @@ class SalesService:
                         
                         # A. Descontar stock para la nueva venta y registrar logs
                         for item in sale.items:
-                            inv_query_corr = {
-                                "tenant_id": tenant_id,
-                                "sucursal_id": sucursal_id,
-                                "producto_id": item.producto_id,
-                            }
-                            if sale.almacen_id == "default":
-                                inv_query_corr["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
-                            else:
-                                inv_query_corr["almacen_id"] = sale.almacen_id
+                            product = await Product.get(item.producto_id, session=session)
+                            es_fisico = product.tipo_item == "FISICO" if product else True
 
-                            updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
-                                inv_query_corr,
-                                {"$inc": {"cantidad": -item.cantidad}},
-                                return_document=ReturnDocument.AFTER,
-                                session=session.client_session if hasattr(session, "client_session") else session
-                            )
-                            # Crear log de venta para el kárdex (con descripcion correcta)
-                            if updated_inv:
-                                await InventoryLog(
-                                    tenant_id=tenant_id,
-                                    sucursal_id=sucursal_id,
-                                    almacen_id=sale.almacen_id,
-                                    producto_id=item.producto_id,
-                                    descripcion=item.descripcion,
-                                    tipo_movimiento=TipoMovimiento.VENTA,
-                                    cantidad_movida=-item.cantidad,
-                                    stock_resultante=updated_inv["cantidad"],
-                                    costo_unitario_momento=item.costo_unitario,
-                                    precio_venta_momento=item.precio_unitario,
-                                    usuario_id=str(current_user.id),
-                                    usuario_nombre=current_user.full_name or current_user.username,
-                                    notas=f"Salida por Venta POS (Corrección de Ticket #{str(sale.id)[-6:].upper()})",
-                                    referencia_id=new_sale_id
-                                ).create(session=session)
+                            if es_fisico:
+                                inv_query_corr = {
+                                    "tenant_id": tenant_id,
+                                    "sucursal_id": sucursal_id,
+                                    "producto_id": item.producto_id,
+                                }
+                                if sale.almacen_id == "default":
+                                    inv_query_corr["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
+                                else:
+                                    inv_query_corr["almacen_id"] = sale.almacen_id
+
+                                updated_inv = await Inventario.get_pymongo_collection().find_one_and_update(
+                                    inv_query_corr,
+                                    {"$inc": {"cantidad": -item.cantidad}},
+                                    return_document=ReturnDocument.AFTER,
+                                    session=session.client_session if hasattr(session, "client_session") else session
+                                )
+                                # Crear log de venta para el kárdex (con descripcion correcta)
+                                if updated_inv:
+                                    await InventoryLog(
+                                        tenant_id=tenant_id,
+                                        sucursal_id=sucursal_id,
+                                        almacen_id=sale.almacen_id,
+                                        producto_id=item.producto_id,
+                                        descripcion=item.descripcion,
+                                        tipo_movimiento=TipoMovimiento.VENTA,
+                                        cantidad_movida=-item.cantidad,
+                                        stock_resultante=updated_inv["cantidad"],
+                                        costo_unitario_momento=item.costo_unitario,
+                                        precio_venta_momento=item.precio_unitario,
+                                        usuario_id=str(current_user.id),
+                                        usuario_nombre=current_user.full_name or current_user.username,
+                                        notas=f"Salida por Venta POS (Corrección de Ticket #{str(sale.id)[-6:].upper()})",
+                                        referencia_id=new_sale_id
+                                    ).create(session=session)
                                 
-                                # Crear SaleItemAnalytics para la nueva venta
-                                await SaleItemAnalytics(
-                                    tenant_id=tenant_id,
-                                    sucursal_id=sucursal_id,
-                                    sale_id=new_sale_id,
-                                    sale_date=datetime.utcnow(),
-                                    producto_id=item.producto_id,
-                                    descripcion=item.descripcion,
-                                    cantidad=item.cantidad,
-                                    precio_unitario=item.precio_unitario,
-                                    costo_unitario=item.costo_unitario,
-                                    descuento_unitario=item.descuento_unitario,
-                                    subtotal=item.subtotal
-                                ).create(session=session)
+                            # Crear SaleItemAnalytics para la nueva venta
+                            await SaleItemAnalytics(
+                                tenant_id=tenant_id,
+                                sucursal_id=sucursal_id,
+                                sale_id=new_sale_id,
+                                sale_date=datetime.utcnow(),
+                                producto_id=item.producto_id,
+                                descripcion=item.descripcion,
+                                cantidad=item.cantidad,
+                                precio_unitario=item.precio_unitario,
+                                costo_unitario=item.costo_unitario,
+                                descuento_unitario=item.descuento_unitario,
+                                subtotal=item.subtotal
+                            ).create(session=session)
 
                         # B. Crear el documento de la nueva venta
                         new_pagos = [PagoItem(metodo=metodo_pago_correcto, monto=sale.total)]

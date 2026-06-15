@@ -169,6 +169,8 @@ const MATRIZ_ROLES = ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'];
 const BRANCH_ROLES = ['ADMIN_SUCURSAL', 'ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'];
 const MOBILE_MANAGEMENT_ROLES = [...BRANCH_ROLES, 'SUPERVISOR'];
 const ALL_STAFF = ['ADMIN_MATRIZ', 'ADMIN_SUCURSAL', 'CAJERO', 'ADMIN', 'USER', 'SUPERADMIN', 'SUPERVISOR', 'VENDEDOR'];
+const STAFF_NO_CAJERO = ['ADMIN_MATRIZ', 'ADMIN_SUCURSAL', 'ADMIN', 'USER', 'SUPERADMIN', 'SUPERVISOR', 'VENDEDOR'];
+
 
 function App() {
   return (
@@ -234,13 +236,13 @@ function App() {
                 } />
 
                 <Route path="/catalogo" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="INVENTARIO">
+                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO} requiredFeature="INVENTARIO">
                     <CatalogoPage />
                   </ProtectedRoute>
                 } />
 
                 <Route path="/inventario" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="INVENTARIO">
+                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO} requiredFeature="INVENTARIO">
                     <InventarioPage />
                   </ProtectedRoute>
                 } />
@@ -261,28 +263,28 @@ function App() {
 
                 {/* Historial de Ventas */}
                 <Route path="/ventas" element={
-                  <ProtectedRoute allowedRoles={[...ALL_STAFF, 'FACTURADOR']} requiredFeature="VENTAS">
+                  <ProtectedRoute allowedRoles={[...STAFF_NO_CAJERO, 'FACTURADOR']} requiredFeature="VENTAS">
                     <VentasPage />
                   </ProtectedRoute>
                 } />
 
                 {/* Control QR */}
                 <Route path="/qr-control" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CONTROL_QR">
+                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO} requiredFeature="CONTROL_QR">
                     <ControlQRPage />
                   </ProtectedRoute>
                 } />
 
                 {/* Créditos */}
                 <Route path="/creditos" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CREDITOS">
+                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO} requiredFeature="CREDITOS">
                     <CreditosPage />
                   </ProtectedRoute>
                 } />
 
                 {/* Clientes */}
                 <Route path="/clientes" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF}>
+                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO}>
                     <ClientesPage />
                   </ProtectedRoute>
                 } />
@@ -306,7 +308,7 @@ function App() {
                   </ProtectedRoute>
                 } />
                 <Route path="/produccion" element={
-                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="INVENTARIO">
+                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO} requiredFeature="INVENTARIO">
                     <ProductionCalendarPage />
                   </ProtectedRoute>
                 } />

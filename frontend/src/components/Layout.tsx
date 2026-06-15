@@ -51,17 +51,17 @@ export default function Layout({ children }: LayoutProps) {
             { icon: LayoutDashboard, label: 'Dashboard',    path: '/dashboard-sucursal', feature: null,                   roles: ['ADMIN_SUCURSAL'] },
             // Módulos con feature flag
             { icon: ShoppingBag,     label: 'POS',          path: '/pos',                feature: 'VENTAS',               roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
-            { icon: RotateCcw,       label: 'Ventas',       path: '/ventas',             feature: 'VENTAS',               roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR', 'FACTURADOR'] },
+            { icon: RotateCcw,       label: 'Ventas',       path: '/ventas',             feature: 'VENTAS',               roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR', 'FACTURADOR'] },
             { icon: Wallet,          label: 'Caja',         path: '/caja',               feature: 'CAJA',                 roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
-            { icon: Package,         label: 'Catálogo',     path: '/catalogo',           feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
-            { icon: Warehouse,       label: 'Inventario',   path: '/inventario',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Package,         label: 'Catálogo',     path: '/catalogo',           feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Warehouse,       label: 'Inventario',   path: '/inventario',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: Truck,           label: 'Traslados',    path: '/traslados',          feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             // Dark Kitchen Module
             { icon: Utensils,        label: 'Recetas',      path: '/recetas',            feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN'] },
             { icon: CalendarRange,   label: 'Planes Comida',path: '/planes-comida',      feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN'] },
-            { icon: Calendar,        label: 'Producción',   path: '/produccion',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'SUPERVISOR'] },
+            { icon: Calendar,        label: 'Producción',   path: '/produccion',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             
-            { icon: Banknote,        label: 'Créditos',     path: '/creditos',           feature: 'CREDITOS',             roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Banknote,        label: 'Créditos',     path: '/creditos',           feature: 'CREDITOS',             roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: BarChart3,       label: 'Reportes',     path: '/reportes',           feature: 'REPORTES_AVANZADOS',   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERADMIN'] },
             { icon: Percent,         label: 'Descuentos',   path: '/descuentos',         feature: 'DESCUENTOS_AVANZADOS', roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL'] },
             { icon: Tag,             label: 'Precios',      path: '/solicitudes-precio', feature: 'LISTAS_PRECIOS',       roles: ['ADMIN_MATRIZ', 'ADMIN'] },
@@ -69,9 +69,9 @@ export default function Layout({ children }: LayoutProps) {
             { icon: Store,           label: 'Sucursales',   path: '/sucursales',         feature: 'MULTI_SUCURSAL',       roles: ['ADMIN_MATRIZ', 'ADMIN'] },
             { icon: ClipboardList,   label: 'Pedidos',      path: '/pedidos',            feature: 'PEDIDOS_INTERNOS',     roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             { icon: Users,           label: 'Personal',     path: '/usuarios',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
-            { icon: Users,           label: 'Clientes',     path: '/clientes',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
+            { icon: Users,           label: 'Clientes',     path: '/clientes',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: Briefcase,       label: 'Proveedores',  path: '/proveedores',        feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
-            { icon: QrCode,          label: 'Control QR',   path: '/qr-control',         feature: 'CONTROL_QR',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR'] },
+            { icon: QrCode,          label: 'Control QR',   path: '/qr-control',         feature: 'CONTROL_QR',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR'] },
             { icon: Users,           label: 'Comunidad',    path: '/comunidad',          feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'] },
             // { icon: Warehouse,       label: 'Deuda Fábrica',path: '/b2b/mermas',         feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'] },
             { icon: Settings,        label: 'Configuración',path: '/configuracion',      feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN'] },
@@ -90,86 +90,119 @@ export default function Layout({ children }: LayoutProps) {
 
     return (
         <div className="flex h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden">
-            {/* ── Desktop Sidebar (hidden on mobile) ── */}
-            <aside className={cn("hidden md:flex flex-col p-4 gap-5 transition-all duration-300 relative", isCollapsed ? "w-20" : "w-52")}>
+            {/* ── Desktop Sidebar (hidden on mobile and for CAJERO) ── */}
+            {role !== 'CAJERO' && (
+                <aside className={cn("hidden md:flex flex-col p-4 gap-5 transition-all duration-300 relative", isCollapsed ? "w-20" : "w-52")}>
 
-                {/* Header (Menu Toggle + Brand) */}
-                <div className="flex items-center gap-3 px-1 h-8">
-                    <button
-                        onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-                    >
-                        <Menu size={20} />
-                    </button>
-                    <div className={cn("flex items-center overflow-hidden transition-all duration-300", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100")}>
-                        <span className="text-base font-bold tracking-tight whitespace-nowrap">Sales System</span>
-                    </div>
-                </div>
-
-                {/* Navigation */}
-                <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1 custom-scrollbar">
-                    <p className={cn("text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 transition-all", isCollapsed ? "text-center px-0" : "px-1")}>
-                        {isCollapsed ? '•••' : 'Menu'}
-                    </p>
-                    {navItems.map((item) => {
-                        const isActive = item.path !== '/' && location.pathname.startsWith(item.path);
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                title={isCollapsed ? item.label : undefined}
-                                className={cn(
-                                    'flex items-center gap-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden text-sm shrink-0',
-                                    isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'py-2.5 px-3',
-                                    isActive
-                                        ? 'bg-white text-black shadow-lg shadow-white/10 font-medium'
-                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                )}
-                            >
-                                <item.icon size={isCollapsed ? 18 : 16} className={cn("transition-colors shrink-0", isActive ? "text-black" : "text-gray-400 group-hover:text-white")} />
-                                <div className={cn("overflow-hidden transition-all duration-300 flex items-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
-                                    <span className="whitespace-nowrap">{item.label}</span>
-                                </div>
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                {/* User Profile / Logout */}
-                <div className="mt-auto pt-4 border-t border-gray-800 flex flex-col gap-2">
-                    <div className={cn("flex items-center gap-2 p-1 rounded-xl", isCollapsed ? "justify-center" : "")}>
-                        <div className="w-8 h-8 rounded-full border-2 border-gray-700 bg-white/10 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold text-white uppercase">
-                                {(user?.username || 'U')[0].toUpperCase()}
-                            </span>
-                        </div>
-                        <div className={cn("overflow-hidden transition-all duration-300 flex flex-col justify-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
-                            <p className="text-xs font-medium text-white truncate">{user?.username || 'Usuario'}</p>
-                            <p className="text-[10px] text-gray-500 truncate">{user?.role || 'Miembro'}</p>
+                    {/* Header (Menu Toggle + Brand) */}
+                    <div className="flex items-center gap-3 px-1 h-8">
+                        <button
+                            onClick={() => setIsCollapsed(!isCollapsed)}
+                            className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                        >
+                            <Menu size={20} />
+                        </button>
+                        <div className={cn("flex items-center overflow-hidden transition-all duration-300", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100")}>
+                            <span className="text-base font-bold tracking-tight whitespace-nowrap">Sales System</span>
                         </div>
                     </div>
-                    <button onClick={() => setShowLogoutConfirm(true)} title={isCollapsed ? "Cerrar Sesión" : undefined} className={cn("flex items-center gap-2 w-full p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-colors group", isCollapsed ? "justify-center" : "")}>
-                        <LogOut size={16} className="shrink-0" />
-                        <div className={cn("overflow-hidden transition-all duration-300 flex items-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
-                            <span className="text-xs font-medium whitespace-nowrap">Cerrar Sesión</span>
+
+                    {/* Navigation */}
+                    <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1 custom-scrollbar">
+                        <p className={cn("text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 transition-all", isCollapsed ? "text-center px-0" : "px-1")}>
+                            {isCollapsed ? '•••' : 'Menu'}
+                        </p>
+                        {navItems.map((item) => {
+                            const isActive = item.path !== '/' && location.pathname.startsWith(item.path);
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    title={isCollapsed ? item.label : undefined}
+                                    className={cn(
+                                        'flex items-center gap-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden text-sm shrink-0',
+                                        isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'py-2.5 px-3',
+                                        isActive
+                                            ? 'bg-white text-black shadow-lg shadow-white/10 font-medium'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                    )}
+                                >
+                                    <item.icon size={isCollapsed ? 18 : 16} className={cn("transition-colors shrink-0", isActive ? "text-black" : "text-gray-400 group-hover:text-white")} />
+                                    <div className={cn("overflow-hidden transition-all duration-300 flex items-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
+                                        <span className="whitespace-nowrap">{item.label}</span>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </nav>
+
+                    {/* User Profile / Logout */}
+                    <div className="mt-auto pt-4 border-t border-gray-800 flex flex-col gap-2">
+                        <div className={cn("flex items-center gap-2 p-1 rounded-xl", isCollapsed ? "justify-center" : "")}>
+                            <div className="w-8 h-8 rounded-full border-2 border-gray-700 bg-white/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-white uppercase">
+                                    {(user?.username || 'U')[0].toUpperCase()}
+                                </span>
+                            </div>
+                            <div className={cn("overflow-hidden transition-all duration-300 flex flex-col justify-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
+                                <p className="text-xs font-medium text-white truncate">{user?.username || 'Usuario'}</p>
+                                <p className="text-[10px] text-gray-500 truncate">{user?.role || 'Miembro'}</p>
+                            </div>
                         </div>
-                    </button>
-                </div>
-            </aside>
+                        <button onClick={() => setShowLogoutConfirm(true)} title={isCollapsed ? "Cerrar Sesión" : undefined} className={cn("flex items-center gap-2 w-full p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-colors group", isCollapsed ? "justify-center" : "")}>
+                            <LogOut size={16} className="shrink-0" />
+                            <div className={cn("overflow-hidden transition-all duration-300 flex items-center", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
+                                <span className="text-xs font-medium whitespace-nowrap">Cerrar Sesión</span>
+                            </div>
+                        </button>
+                    </div>
+                </aside>
+            )}
 
             {/* ── Main Content Shell ── */}
             <main className="flex-1 flex flex-col min-w-0 bg-[#0a0a0a] md:pr-4 md:py-4">
                 <div className="h-full bg-[#f2f4f7] md:rounded-2xl flex flex-col overflow-hidden relative shadow-2xl shadow-black/50 border border-white/5">
-                    {/* Mobile Top Bar */}
-                    <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
-                        <img src="/vite.svg" alt="Sales System" className="h-7 w-auto object-contain" />
-                        <button
-                            onClick={() => setMobileMenuOpen(true)}
-                            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600"
-                        >
-                            <Menu size={20} />
-                        </button>
-                    </div>
+                    {/* Mobile Top Bar (hidden for CAJERO) */}
+                    {role !== 'CAJERO' && (
+                        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
+                            <img src="/vite.svg" alt="Sales System" className="h-7 w-auto object-contain" />
+                            <button
+                                onClick={() => setMobileMenuOpen(true)}
+                                className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600"
+                            >
+                                <Menu size={20} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Cajero Top Header (Desktop & Mobile) */}
+                    {role === 'CAJERO' && (
+                        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
+                            <div className="flex items-center gap-6">
+                                <span className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                    <ShoppingBag className="text-indigo-600 w-5 h-5" /> Sales System POS
+                                </span>
+                                <nav className="hidden md:flex gap-1 bg-gray-100 p-1 rounded-xl">
+                                    <Link to="/pos" className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", location.pathname === '/pos' ? "bg-white text-black shadow-xs" : "text-gray-500 hover:text-gray-800")}>POS</Link>
+                                    <Link to="/caja" className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", location.pathname === '/caja' ? "bg-white text-black shadow-xs" : "text-gray-500 hover:text-gray-800")}>Caja</Link>
+                                </nav>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-full border-2 border-indigo-100 bg-indigo-50/50 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                                        {(user?.username || 'C')[0].toUpperCase()}
+                                    </div>
+                                    <div className="text-left leading-tight hidden sm:block">
+                                        <p className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{user?.username || 'Cajero'}</p>
+                                        <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-orange-100 text-orange-700">CAJERO</span>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowLogoutConfirm(true)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" title="Cerrar Sesión">
+                                    <LogOut size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Scrollable Content */}
                     <div className={`flex-1 min-h-0 relative scroll-smooth ${location.pathname === '/pos'

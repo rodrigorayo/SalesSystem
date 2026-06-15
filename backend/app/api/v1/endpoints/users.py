@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from app.domain.models.user import User, UserRole
 from app.domain.models.sucursal import Sucursal, TipoSucursal
-from app.infrastructure.auth import get_current_active_user, get_password_hash
+from app.infrastructure.auth import get_current_active_user, get_password_hash, require_roles
 
 router = APIRouter()
 
@@ -96,7 +96,7 @@ async def get_users(current_user: User = Depends(get_current_active_user)):
 @router.post("/users/employee", response_model=User)
 async def create_cajero(
     data: CajeroCreate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Create a CAJERO user.
@@ -104,11 +104,8 @@ async def create_cajero(
     SECURITY RULE: sucursal_id is NEVER accepted from the request body.
     It is always extracted from the authenticated user's JWT context.
 
-    - ADMIN_SUCURSAL → cajero is bound to their sucursal automatically.
     - ADMIN_MATRIZ   → cajero is bound to the matrix (no sucursal).
     """
-    if current_user.role not in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.ADMIN_MATRIZ, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="Not authorized")
 
     import re
     username_lower = data.username.lower()
@@ -166,17 +163,15 @@ async def get_employees(current_user: User = Depends(get_current_active_user)):
 
 
 @router.post("/employees", response_model=User)
-async def create_employee(data: CajeroCreate, current_user: User = Depends(get_current_active_user)):
+async def create_employee(data: CajeroCreate, current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))):
     return await create_cajero(data, current_user)
 
 @router.put("/users/{user_id}", response_model=User)
 async def update_employee(
     user_id: str,
     data: EmployeeUpdate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="Not authorized")
         
     from beanie import PydanticObjectId
     target_user = await User.get(PydanticObjectId(user_id))
@@ -220,10 +215,8 @@ async def update_employee(
 async def toggle_employee_status(
     user_id: str,
     is_active: bool,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="Not authorized")
         
     from beanie import PydanticObjectId
     from datetime import datetime

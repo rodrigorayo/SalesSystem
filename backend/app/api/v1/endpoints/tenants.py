@@ -9,7 +9,7 @@ from app.domain.models.plan_feature import PlanFeature
 from app.domain.models.user import User, UserRole
 from app.domain.models.product import Product
 from app.domain.models.sale import Sale
-from app.infrastructure.auth import get_current_active_user, get_password_hash
+from app.infrastructure.auth import get_current_active_user, get_password_hash, require_roles
 
 router = APIRouter()
 
@@ -78,30 +78,42 @@ async def get_my_features(current_user: User = Depends(get_current_active_user))
     """
     # SUPERADMIN siempre ve todo
     if current_user.role == UserRole.SUPERADMIN:
-        return {"features": ALL_FEATURES, "plan": "SUPERADMIN"}
+        return {"features": ALL_FEATURES, "plan": "SUPERADMIN", "rubro": "RETAIL", "modulos_activos": ["INVENTARIO", "POS", "KARDEX"]}
 
     tenant_id = current_user.tenant_id
     if not tenant_id:
-        return {"features": ALL_FEATURES, "plan": "NONE"}
+        return {"features": ALL_FEATURES, "plan": "NONE", "rubro": "RETAIL", "modulos_activos": ["INVENTARIO", "POS", "KARDEX"]}
 
     tenant = await Tenant.get(tenant_id)
     if not tenant:
-        return {"features": ALL_FEATURES, "plan": "NONE"}
+        return {"features": ALL_FEATURES, "plan": "NONE", "rubro": "RETAIL", "modulos_activos": ["INVENTARIO", "POS", "KARDEX"]}
 
     # Plan ILIMITADO o plan no asignado → acceso total
     if not tenant.plan_id or tenant.plan == PlanType.ILIMITADO:
-        return {"features": ALL_FEATURES, "plan": tenant.plan.value if tenant.plan else "NONE"}
+        return {
+            "features": ALL_FEATURES, 
+            "plan": tenant.plan.value if tenant.plan else "NONE",
+            "rubro": tenant.rubro.value,
+            "modulos_activos": tenant.modulos_activos
+        }
 
     # Buscar el plan en la colección
     plan = await Plan.get(tenant.plan_id)
     if not plan:
         # Plan no encontrado → fallback seguro: acceso total
-        return {"features": ALL_FEATURES, "plan": "UNKNOWN"}
+        return {
+            "features": ALL_FEATURES, 
+            "plan": "UNKNOWN",
+            "rubro": tenant.rubro.value,
+            "modulos_activos": tenant.modulos_activos
+        }
 
     return {
         "features": [f.value for f in plan.features],
         "plan": plan.code,
         "plan_name": plan.name,
+        "rubro": tenant.rubro.value,
+        "modulos_activos": tenant.modulos_activos
     }
 
 
@@ -341,6 +353,25 @@ async def update_my_tenant_settings(
         
     await tenant.save()
     return tenant
+
+
+@router.put("/tenants/me/configuracion")
+async def update_tenant_configuracion(
+    config_data: dict,
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
+):
+    tenant_id = current_user.tenant_id
+    if not tenant_id:
+        raise HTTPException(status_code=404, detail="No tenant associated")
+        
+    from beanie import PydanticObjectId
+    tenant = await Tenant.get(PydanticObjectId(tenant_id))
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+        
+    tenant.configuracion = config_data
+    await tenant.save()
+    return tenant.configuracion
 
 # ─── Admin: Seed Plans ───────────────────────────────────────────────────────
 

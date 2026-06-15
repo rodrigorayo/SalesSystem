@@ -35,6 +35,7 @@ export interface Tenant {
     is_active: boolean;
     plan_expires_at?: string;
     settings?: TenantSettings;
+    configuracion?: Record<string, any>;
     created_at: string;
 }
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional
 from decimal import Decimal
-from app.infrastructure.auth import get_current_active_user
+from app.infrastructure.auth import get_current_active_user, require_roles
 from app.domain.models.user import User, UserRole
 from app.domain.models.sale_item import SaleItem
 from app.domain.models.sucursal import Sucursal
@@ -21,7 +21,7 @@ router = APIRouter()
 @router.get("/general")
 async def get_general_reports(
     days: int = 30,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ) -> Dict[str, Any]:
     """
     Returns general analytics data (KPIs, sales by branch, top products, daily evolution)
@@ -259,7 +259,7 @@ async def get_general_reports(
 async def get_daily_report(
     date: str, # YYYY-MM-DD
     sucursal_id: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns a detailed daily report for a specific branch.
@@ -412,7 +412,7 @@ async def get_financial_report(
     start_date: str, # YYYY-MM-DD
     end_date: str,   # YYYY-MM-DD
     sucursal_id: Optional[str] = "all", 
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns a financial detail report for General Admins.
@@ -505,7 +505,7 @@ async def get_anulaciones_report(
     start_date: str, # YYYY-MM-DD
     end_date: str,   # YYYY-MM-DD
     sucursal_id: Optional[str] = "all",
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns a detailed report of all cancelled (anulada) sales.
@@ -567,7 +567,7 @@ async def get_anulaciones_report(
 async def get_valued_inventory(
     date: Optional[str] = None, # YYYY-MM-DD
     sucursal_id: Optional[str] = "all",
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns the total value of inventory (cantidad * costo_producto)
@@ -805,7 +805,7 @@ from fastapi.responses import StreamingResponse
 async def export_valued_inventory(
     date: Optional[str] = None, # YYYY-MM-DD
     sucursal_id: Optional[str] = "all",
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Exports the valued inventory report to Excel.
@@ -863,7 +863,7 @@ async def export_valued_inventory(
 async def get_sales_by_hour(
     date: str, # YYYY-MM-DD
     sucursal_id: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns total sales grouped by hour for a specific day.
@@ -928,7 +928,7 @@ async def get_staff_performance(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     sucursal_id: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns sales grouped by cashier and by vendor for a specific day or date range.
@@ -1139,7 +1139,7 @@ async def get_sales_matrix(
     start_date: str, # YYYY-MM-DD
     end_date: str, # YYYY-MM-DD
     sucursal_id: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns sales matrix grouped by product and day.
@@ -1241,7 +1241,7 @@ async def get_inventory_reconciliation(
     start_date: str,
     end_date: str,
     sucursal_id: str = "all",
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ) -> Dict[str, Any]:
     from app.domain.models.inventario import InventoryLog
     from app.domain.models.sale import Sale
@@ -1384,7 +1384,7 @@ async def get_expenses_report(
     end_date: str,   # YYYY-MM-DD
     sucursal_id: Optional[str] = None,
     categoria_id: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     """
     Returns a detailed expenses report filtered by date range, branch and category.
@@ -1466,7 +1466,7 @@ class ProductStatsRequest(BaseModel):
 @router.post("/product-stats")
 async def get_product_stats(
     req: ProductStatsRequest,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ]))
 ):
     tenant_id = current_user.tenant_id or "default"
     

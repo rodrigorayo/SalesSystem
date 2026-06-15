@@ -39,9 +39,35 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
     )
     return {"access_token": access_token, "token_type": "bearer", "role": user.role}
 
-@router.get("/users/me", response_model=User)
+@router.get("/users/me")
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
-    return current_user
+    user_dict = current_user.model_dump()
+    if current_user.tenant_id:
+        from app.domain.models.tenant import Tenant
+        from beanie import PydanticObjectId
+        try:
+            tenant = await Tenant.get(PydanticObjectId(current_user.tenant_id))
+            if tenant:
+                user_dict["configuracion"] = tenant.configuracion
+                user_dict["rubro"] = tenant.rubro.value
+                user_dict["modulos_activos"] = tenant.modulos_activos
+            else:
+                user_dict["configuracion"] = {}
+                user_dict["rubro"] = "RETAIL"
+                user_dict["modulos_activos"] = ["INVENTARIO", "POS", "KARDEX"]
+        except Exception:
+            user_dict["configuracion"] = {}
+            user_dict["rubro"] = "RETAIL"
+            user_dict["modulos_activos"] = ["INVENTARIO", "POS", "KARDEX"]
+    else:
+        user_dict["configuracion"] = {}
+        user_dict["rubro"] = "RETAIL"
+        user_dict["modulos_activos"] = ["INVENTARIO", "POS", "KARDEX"]
+    
+    # Asegurar que el ID sea string
+    user_dict["id"] = str(current_user.id)
+    user_dict["_id"] = str(current_user.id)
+    return user_dict
 
 @router.post("/impersonate/{tenant_id}")
 async def impersonate_tenant(tenant_id: str, current_user: User = Depends(get_current_active_user)):

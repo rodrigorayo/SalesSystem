@@ -8,8 +8,9 @@ import io
 import math
 from app.domain.models.inventario import Inventario
 from app.domain.models.product import Product
+from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.domain.models.user import User, UserRole
-from app.infrastructure.auth import get_current_active_user
+from app.infrastructure.auth import get_current_active_user, require_roles
 from app.domain.schemas.inventario import InventarioItem, AjusteInventario, InventarioPaginated, AjusteInventarioMasivoRequest
 from app.utils.date_utils import get_day_range_bolivia
 
@@ -165,18 +166,16 @@ async def ajustar_inventario(
 
     motor_coll = Inventario.get_pymongo_collection()
     
-    query = {
+    # Búsqueda tolerante a documentos antiguos sin almacen_id (Auto-sanación)
+    update_query = {
         "tenant_id": tenant_id,
         "sucursal_id": sucursal_id,
-        "almacen_id": almacen_id,
         "producto_id": ajuste.producto_id,
     }
-
-    # Fetch previous stock to calculate 'cantidad_cambio'
-    # We do a read first just to know the old stock for the Kardex log, 
-    # but the actual update is atomic.
-    entry_before = await motor_coll.find_one(query)
-    stock_anterior = entry_before["cantidad"] if entry_before else 0
+    if almacen_id == "default":
+        update_query["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
+    else:
+        update_query["almacen_id"] = almacen_id
 
     from app.domain.models.inventario import TipoMovimiento, InventoryLog
 
@@ -192,7 +191,7 @@ async def ajustar_inventario(
     if ajuste.tipo == "ENTRADA":
         update = {
             "$inc": {"cantidad": ajuste.cantidad},
-            "$set": {"updated_at": now},
+            "$set": {"updated_at": now, "almacen_id": almacen_id}, # Forzamos sanar el almacen_id
             "$setOnInsert": set_on_insert
         }
         tipo_mov = TipoMovimiento.ENTRADA_MANUAL
@@ -205,7 +204,7 @@ async def ajustar_inventario(
                     "updated_at": now,
                     "tenant_id": tenant_id,
                     "sucursal_id": sucursal_id,
-                    "almacen_id": almacen_id,
+                    "almacen_id": almacen_id, # Forzamos sanar el almacen_id
                     "producto_id": ajuste.producto_id,
                     "created_at": {"$ifNull": ["$created_at", now]}
                 }
@@ -214,7 +213,7 @@ async def ajustar_inventario(
         tipo_mov = TipoMovimiento.SALIDA_MANUAL
     elif ajuste.tipo == "AJUSTE":
         update = {
-            "$set": {"cantidad": ajuste.cantidad, "updated_at": now},
+            "$set": {"cantidad": ajuste.cantidad, "updated_at": now, "almacen_id": almacen_id},
             "$setOnInsert": set_on_insert
         }
         tipo_mov = TipoMovimiento.AJUSTE_FISICO
@@ -222,14 +221,24 @@ async def ajustar_inventario(
         raise HTTPException(status_code=400, detail="Tipo de ajuste inválido")
 
     # Ejecutar operación atómica
-    updated_doc = await motor_coll.find_one_and_update(
-        query,
+    # ReturnDocument.BEFORE nos asegura saber exactamente el stock que había
+    # en el microsegundo exacto en el que MongoDB aplicó nuestro bloqueo de fila.
+    doc_before = await motor_coll.find_one_and_update(
+        update_query,
         update,
         upsert=True,
-        return_document=ReturnDocument.AFTER
+        return_document=ReturnDocument.BEFORE
     )
     
-    nuevo_stock = updated_doc["cantidad"]
+    stock_anterior = doc_before["cantidad"] if doc_before else 0.0
+
+    if ajuste.tipo == "ENTRADA":
+        nuevo_stock = stock_anterior + ajuste.cantidad
+    elif ajuste.tipo == "SALIDA":
+        nuevo_stock = max(0.0, stock_anterior - ajuste.cantidad)
+    elif ajuste.tipo == "AJUSTE":
+        nuevo_stock = ajuste.cantidad
+
     cantidad_cambio = nuevo_stock - stock_anterior
 
     # Guardar en Kárdex (Log Inmutable)
@@ -262,128 +271,164 @@ async def ajustar_inventario(
     return {"sucursal_id": sucursal_id, "almacen_id": almacen_id, "producto_id": ajuste.producto_id, "cantidad": nuevo_stock, "movimiento": cantidad_cambio}
 
 
+from app.dependencies import get_uow
+from app.domain.uow.base_uow import BaseUnitOfWork
+
 @router.post("/inventario/ajuste-masivo")
 async def ajustar_inventario_masivo(
     req: AjusteInventarioMasivoRequest,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_roles([UserRole.ADMIN_MATRIZ])),
+    uow: BaseUnitOfWork = Depends(get_uow)
 ):
     """
-    Manually adjust inventory for multiple products at once.
+    Manually adjust inventory for multiple products at once using Bulk Write and ACID Transactions.
     """
-    if current_user.role not in [UserRole.ADMIN_MATRIZ, UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR, UserRole.SUPERADMIN]:
-        raise HTTPException(status_code=403, detail="Not authorized")
 
     tenant_id = current_user.tenant_id or ""
     sucursal_id = req.sucursal_id
 
     from app.domain.models.inventario import TipoMovimiento, InventoryLog
-    
+    from pymongo import UpdateOne
+    from datetime import datetime
+    import bson
+
+    # Filtrar solo ajustes válidos
+    ajustes_validos = [a for a in req.ajustes if a.cantidad >= 0]
+    if not ajustes_validos:
+        return {"message": "No hay ajustes válidos para procesar", "procesados": 0}
+
+    # Extraer IDs de productos y validar
+    valid_pids = []
+    for a in ajustes_validos:
+        if bson.ObjectId.is_valid(a.producto_id):
+            valid_pids.append(bson.ObjectId(a.producto_id))
+
+    # 1. Obtener productos existentes
+    product_query = {"_id": {"$in": valid_pids}}
+    if current_user.role != UserRole.SUPERADMIN:
+        product_query["tenant_id"] = tenant_id
+
+    products_db = await Product.find(product_query).to_list()
+    product_map = {str(p.id): p for p in products_db}
+
+    ajustes_permitidos = [a for a in ajustes_validos if a.producto_id in product_map]
+    if not ajustes_permitidos:
+        return {"message": "No se encontraron productos válidos o autorizados", "procesados": 0}
+
+    now = datetime.utcnow()
+    operaciones_update = []
+    logs_a_insertar = []
     resultados = []
-    
-    for ajuste in req.ajustes:
-        if ajuste.cantidad < 0:
-            continue
-            
-        product = await Product.get(ajuste.producto_id)
-        if not product or (current_user.role != UserRole.SUPERADMIN and product.tenant_id != tenant_id):
-            continue
 
-        from pymongo import ReturnDocument
-        from datetime import datetime
+    motor_coll = Inventario.get_pymongo_collection()
 
-        motor_coll = Inventario.get_pymongo_collection()
-        
-        query = {
+    async with uow:
+        # 2. Obtener el inventario actual tolerando documentos antiguos (Auto-sanación)
+        inventario_query = {
             "tenant_id": tenant_id,
             "sucursal_id": sucursal_id,
-            "almacen_id": req.almacen_id,
-            "producto_id": ajuste.producto_id,
+            "producto_id": {"$in": [a.producto_id for a in ajustes_permitidos]}
         }
-
-        entry_before = await motor_coll.find_one(query)
-        stock_anterior = entry_before["cantidad"] if entry_before else 0
-
-        now = datetime.utcnow()
-        set_on_insert = {
-            "tenant_id": tenant_id,
-            "sucursal_id": sucursal_id,
-            "almacen_id": req.almacen_id,
-            "producto_id": ajuste.producto_id,
-            "created_at": now,
-        }
-
-        if ajuste.tipo == "ENTRADA":
-            update = {
-                "$inc": {"cantidad": ajuste.cantidad},
-                "$set": {"updated_at": now},
-                "$setOnInsert": set_on_insert
-            }
-            tipo_mov = TipoMovimiento.ENTRADA_MANUAL
-        elif ajuste.tipo == "SALIDA":
-            update = [
-                {
-                    "$set": {
-                        "cantidad": {"$max": [0, {"$subtract": [{"$ifNull": ["$cantidad", 0]}, ajuste.cantidad]}]},
-                        "updated_at": now,
-                        "tenant_id": tenant_id,
-                        "sucursal_id": sucursal_id,
-                        "almacen_id": req.almacen_id,
-                        "producto_id": ajuste.producto_id,
-                        "created_at": {"$ifNull": ["$created_at", now]}
-                    }
-                }
-            ]
-            tipo_mov = TipoMovimiento.SALIDA_MANUAL
-        elif ajuste.tipo == "AJUSTE":
-            update = {
-                "$set": {"cantidad": ajuste.cantidad, "updated_at": now},
-                "$setOnInsert": set_on_insert
-            }
-            tipo_mov = TipoMovimiento.AJUSTE_FISICO
+        if req.almacen_id == "default":
+            inventario_query["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
         else:
-            continue
+            inventario_query["almacen_id"] = req.almacen_id
 
-        updated_doc = await motor_coll.find_one_and_update(
-            query,
-            update,
-            upsert=True,
-            return_document=ReturnDocument.AFTER
-        )
-        
-        nuevo_stock = updated_doc["cantidad"]
-        cantidad_cambio = nuevo_stock - stock_anterior
+        inventarios_db = await motor_coll.find(inventario_query, session=uow.session).to_list(length=None)
+        inventario_map = {inv["producto_id"]: inv for inv in inventarios_db}
 
-        if cantidad_cambio != 0:
-            mismatch_note = ""
-            if ajuste.tipo == "AJUSTE":
-                mismatch_note = f"[Ajuste Físico Masivo: Sistema tenía {stock_anterior} u., físico {nuevo_stock} u. Discrepancia: {'+' if cantidad_cambio > 0 else ''}{cantidad_cambio} u.]"
-            elif ajuste.tipo == "ENTRADA":
-                mismatch_note = f"[Entrada Masiva: {stock_anterior} u. -> {nuevo_stock} u. (+{ajuste.cantidad} u.)]"
-            elif ajuste.tipo == "SALIDA":
-                mismatch_note = f"[Salida Masiva: {stock_anterior} u. -> {nuevo_stock} u. (-{ajuste.cantidad} u.)]"
-                
-            final_notes = f"{mismatch_note} - {req.notas_generales}" if req.notas_generales else mismatch_note
-
-            log = InventoryLog(
-                tenant_id=tenant_id,
-                sucursal_id=sucursal_id,
-                almacen_id=req.almacen_id,
-                producto_id=ajuste.producto_id,
-                descripcion=product.descripcion,
-                tipo_movimiento=tipo_mov,
-                cantidad_movida=cantidad_cambio,
-                stock_resultante=nuevo_stock,
-                usuario_id=str(current_user.id),
-                usuario_nombre=current_user.username,
-                notas=final_notes
-            )
-            await log.create()
+        # 3. Preparar Bulk Write en memoria (0 consultas a DB aquí)
+        for ajuste in ajustes_permitidos:
+            doc_actual = inventario_map.get(ajuste.producto_id)
+            stock_anterior = doc_actual["cantidad"] if doc_actual else 0.0
             
-        resultados.append({
-            "producto_id": ajuste.producto_id,
-            "cantidad": nuevo_stock,
-            "movimiento": cantidad_cambio
-        })
+            # Cálculo atómico seguro en Python porque estamos bajo un Unit Of Work
+            if ajuste.tipo == "ENTRADA":
+                nuevo_stock = stock_anterior + ajuste.cantidad
+                tipo_mov = TipoMovimiento.ENTRADA_MANUAL
+            elif ajuste.tipo == "SALIDA":
+                nuevo_stock = max(0.0, stock_anterior - ajuste.cantidad)
+                tipo_mov = TipoMovimiento.SALIDA_MANUAL
+            elif ajuste.tipo == "AJUSTE":
+                nuevo_stock = ajuste.cantidad
+                tipo_mov = TipoMovimiento.AJUSTE_FISICO
+            else:
+                continue
+
+            cantidad_cambio = nuevo_stock - stock_anterior
+
+            # Preparar UpdateOne
+            if doc_actual:
+                query = {"_id": doc_actual["_id"]}
+                update_set = {
+                    "cantidad": nuevo_stock,
+                    "updated_at": now,
+                    "almacen_id": req.almacen_id # Auto-sana el campo si faltaba
+                }
+            else:
+                query = {
+                    "tenant_id": tenant_id,
+                    "sucursal_id": sucursal_id,
+                    "almacen_id": req.almacen_id,
+                    "producto_id": ajuste.producto_id,
+                }
+                update_set = {
+                    "cantidad": nuevo_stock,
+                    "updated_at": now
+                }
+
+            update = {
+                "$set": update_set,
+                "$setOnInsert": {
+                    "created_at": now
+                }
+            }
+            operaciones_update.append(UpdateOne(query, update, upsert=True))
+
+            # Preparar Log
+            if cantidad_cambio != 0:
+                mismatch_note = ""
+                if ajuste.tipo == "AJUSTE":
+                    mismatch_note = f"[Ajuste Físico Masivo: Sistema tenía {stock_anterior} u., físico {nuevo_stock} u. Discrepancia: {'+' if cantidad_cambio > 0 else ''}{cantidad_cambio} u.]"
+                elif ajuste.tipo == "ENTRADA":
+                    mismatch_note = f"[Entrada Masiva: {stock_anterior} u. -> {nuevo_stock} u. (+{ajuste.cantidad} u.)]"
+                elif ajuste.tipo == "SALIDA":
+                    mismatch_note = f"[Salida Masiva: {stock_anterior} u. -> {nuevo_stock} u. (-{ajuste.cantidad} u.)]"
+                    
+                final_notes = f"{mismatch_note} - {req.notas_generales}" if getattr(req, "notas_generales", None) else mismatch_note
+
+                product = product_map[ajuste.producto_id]
+                log = InventoryLog(
+                    tenant_id=tenant_id,
+                    sucursal_id=sucursal_id,
+                    almacen_id=req.almacen_id,
+                    producto_id=ajuste.producto_id,
+                    descripcion=product.descripcion,
+                    tipo_movimiento=tipo_mov,
+                    cantidad_movida=cantidad_cambio,
+                    stock_resultante=nuevo_stock,
+                    usuario_id=str(current_user.id),
+                    usuario_nombre=current_user.username,
+                    notas=final_notes
+                )
+                logs_a_insertar.append(log)
+
+            resultados.append({
+                "producto_id": ajuste.producto_id,
+                "cantidad": nuevo_stock,
+                "movimiento": cantidad_cambio
+            })
+
+        # 4. Ejecutar todas las actualizaciones de inventario de una vez (1 consulta)
+        if operaciones_update:
+            await motor_coll.bulk_write(operaciones_update, session=uow.session)
+        
+        # 5. Insertar todo el Kárdex de una vez (1 consulta)
+        if logs_a_insertar:
+            await InventoryLog.insert_many(logs_a_insertar, session=uow.session)
+            
+        # Automáticamente se hace el commit() al salir del bloque 'async with uow'
+        # Si falla, hace rollback() de todo.
 
     return {"message": "Ajuste masivo procesado exitosamente", "procesados": len(resultados)}
 

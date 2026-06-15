@@ -4,7 +4,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from app.domain.models.user import User
+from app.domain.models.user import User, UserRole
 from app.infrastructure.core.config import settings
 
 # Configuration — override via environment variable in production
@@ -55,3 +55,15 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+def require_roles(allowed_roles: list[UserRole]):
+    """
+    Dependency to protect routes based on UserRole.
+    SUPERADMIN always has access.
+    """
+    async def role_checker(current_user: User = Depends(get_current_active_user)) -> User:
+        if current_user.role not in allowed_roles and current_user.role != UserRole.SUPERADMIN:
+            raise HTTPException(status_code=403, detail="Operación no permitida para tu rol")
+        return current_user
+    return role_checker

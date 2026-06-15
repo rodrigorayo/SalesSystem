@@ -8,6 +8,13 @@ import uuid
 from .base import SoftDeleteMixin, DecimalMoney
 
 
+from enum import Enum
+
+class TipoItem(str, Enum):
+    FISICO = "FISICO"
+    SERVICIO = "SERVICIO"
+    PAQUETE = "PAQUETE"
+
 class Product(Document, SoftDeleteMixin):
     """
     Catálogo central de productos — sin stock (stock vive en Inventario).
@@ -32,6 +39,7 @@ class Product(Document, SoftDeleteMixin):
     proveedor: Optional[str] = None              # supplier/provider
     costo_producto: DecimalMoney = DecimalMoney("0.0")                  # production/purchase cost
     precio_venta: DecimalMoney = DecimalMoney("0.0")                    # retail price (deprecated for MATRIZ, mapped from sucursal)
+    tipo_item: TipoItem = Field(default=TipoItem.FISICO)         # Nuevo campo multi-vertical
     meal_plan_template_id: Optional[str] = None  # Si está seteado, vender este producto activa un plan de comida B2C
 
     # optional enrichment (resolved at query time, not stored)

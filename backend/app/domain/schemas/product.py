@@ -10,6 +10,7 @@ Moving them here allows:
 
 from typing import Optional
 from pydantic import BaseModel
+from app.domain.models.product import TipoItem
 
 
 class ProductCreate(BaseModel):
@@ -23,6 +24,7 @@ class ProductCreate(BaseModel):
     image_url: Optional[str] = None
     precios_sucursales: Optional[dict[str, float]] = None
     meal_plan_template_id: Optional[str] = None
+    tipo_item: Optional[TipoItem] = TipoItem.FISICO
 
 
 class ProductUpdate(BaseModel):
@@ -37,3 +39,4 @@ class ProductUpdate(BaseModel):
     is_active: Optional[bool] = None
     precios_sucursales: Optional[dict[str, float]] = None
     meal_plan_template_id: Optional[str] = None
+    tipo_item: Optional[TipoItem] = None

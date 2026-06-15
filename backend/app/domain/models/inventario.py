@@ -47,6 +47,7 @@ class TipoMovimiento(str, Enum):
     VENTA = "VENTA"
     COMPRA = "COMPRA"
     TRASLADO = "TRASLADO"
+    ANULACION = "ANULACION"
 
 
 class InventoryLog(Document):
