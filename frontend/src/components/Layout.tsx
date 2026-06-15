@@ -71,7 +71,7 @@ export default function Layout({ children }: LayoutProps) {
             { icon: Users,           label: 'Personal',     path: '/usuarios',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             { icon: Users,           label: 'Clientes',     path: '/clientes',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: Briefcase,       label: 'Proveedores',  path: '/proveedores',        feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
-            { icon: QrCode,          label: 'Control QR',   path: '/qr-control',         feature: 'CONTROL_QR',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR'] },
+            { icon: QrCode,          label: 'Control QR',   path: '/qr-control',         feature: 'CONTROL_QR',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR'] },
             { icon: Users,           label: 'Comunidad',    path: '/comunidad',          feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'] },
             // { icon: Warehouse,       label: 'Deuda Fábrica',path: '/b2b/mermas',         feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'SUPERADMIN'] },
             { icon: Settings,        label: 'Configuración',path: '/configuracion',      feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN'] },
@@ -185,6 +185,10 @@ export default function Layout({ children }: LayoutProps) {
                                 <nav className="hidden md:flex gap-1 bg-gray-100 p-1 rounded-xl">
                                     <Link to="/pos" className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", location.pathname === '/pos' ? "bg-white text-black shadow-xs" : "text-gray-500 hover:text-gray-800")}>POS</Link>
                                     <Link to="/caja" className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", location.pathname === '/caja' ? "bg-white text-black shadow-xs" : "text-gray-500 hover:text-gray-800")}>Caja</Link>
+                                    <Link to="/ventas" className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", location.pathname === '/ventas' ? "bg-white text-black shadow-xs" : "text-gray-500 hover:text-gray-800")}>Ventas</Link>
+                                    {hasFeature('CONTROL_QR') && (
+                                        <Link to="/qr-control" className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", location.pathname === '/qr-control' ? "bg-white text-black shadow-xs" : "text-gray-500 hover:text-gray-800")}>Control QR</Link>
+                                    )}
                                 </nav>
                             </div>
                             <div className="flex items-center gap-4">

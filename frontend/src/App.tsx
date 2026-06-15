@@ -263,14 +263,14 @@ function App() {
 
                 {/* Historial de Ventas */}
                 <Route path="/ventas" element={
-                  <ProtectedRoute allowedRoles={[...STAFF_NO_CAJERO, 'FACTURADOR']} requiredFeature="VENTAS">
+                  <ProtectedRoute allowedRoles={[...ALL_STAFF, 'FACTURADOR']} requiredFeature="VENTAS">
                     <VentasPage />
                   </ProtectedRoute>
                 } />
 
                 {/* Control QR */}
                 <Route path="/qr-control" element={
-                  <ProtectedRoute allowedRoles={STAFF_NO_CAJERO} requiredFeature="CONTROL_QR">
+                  <ProtectedRoute allowedRoles={ALL_STAFF} requiredFeature="CONTROL_QR">
                     <ControlQRPage />
                   </ProtectedRoute>
                 } />

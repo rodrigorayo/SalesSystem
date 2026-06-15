@@ -307,6 +307,9 @@ async def update_qr_info(
         
     if current_user.role in [UserRole.ADMIN_SUCURSAL, UserRole.SUPERVISOR, UserRole.VENDEDOR] and sale.sucursal_id != current_user.sucursal_id:
         raise HTTPException(status_code=403, detail="Solo puedes confirmar pagos de tu propia sucursal")
+        
+    if current_user.role == UserRole.CAJERO and sale.cashier_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Los cajeros solo pueden confirmar QR de sus propias ventas")
     if not sale.qr_info:
         from app.domain.models.sale import QRInfo
         sale.qr_info = QRInfo()
