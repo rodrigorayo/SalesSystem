@@ -167,14 +167,27 @@ async def ajustar_inventario(
     motor_coll = Inventario.get_pymongo_collection()
     
     # Búsqueda tolerante a documentos antiguos sin almacen_id (Auto-sanación)
-    update_query = {
+    base_query = {
         "tenant_id": tenant_id,
         "sucursal_id": sucursal_id,
         "producto_id": ajuste.producto_id,
     }
+    
+    # Check if a document exists (with or without almacen_id for default)
+    search_query = dict(base_query)
     if almacen_id == "default":
-        update_query["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
+        search_query["$or"] = [{"almacen_id": "default"}, {"almacen_id": {"$exists": False}}]
     else:
+        search_query["almacen_id"] = almacen_id
+        
+    existing_doc = await motor_coll.find_one(search_query)
+    
+    if existing_doc:
+        # Use exact _id to avoid $or with upsert=True error in MongoDB
+        update_query = {"_id": existing_doc["_id"]}
+    else:
+        # Use exact fields for clean upsert insertion
+        update_query = dict(base_query)
         update_query["almacen_id"] = almacen_id
 
     from app.domain.models.inventario import TipoMovimiento, InventoryLog
