@@ -49,7 +49,11 @@ def health():
 # Parse allowed origins from comma-separated env var
 origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip() and origin.strip() != "*"]
 if not origins or settings.ENVIRONMENT != "production":
-    for local_origin in ["http://localhost:5173", "http://127.0.0.1:5173"]:
+    for local_origin in [
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5174", "http://127.0.0.1:5174",
+        "http://localhost:5175", "http://127.0.0.1:5175"
+    ]:
         if local_origin not in origins:
             origins.append(local_origin)
 
