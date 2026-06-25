@@ -115,7 +115,7 @@ export default function DashboardMaestro() {
     }, [timeRange, selectedMonth, selectedYear, customStartDate, customEndDate, selectedSucursal, sucursales]);
 
     useEffect(() => {
-        getSucursales().then(setSucursales).catch(console.error);
+        getSucursales(false).then(setSucursales).catch(console.error);
     }, []);
 
     const getAvailableYears = () => {

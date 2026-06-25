@@ -51,13 +51,19 @@ class SucursalCreatedResponse(BaseModel):
 
 
 @router.get("/sucursales", response_model=List[Sucursal])
-async def list_sucursales(current_user: User = Depends(get_current_active_user)):
+async def list_sucursales(
+    all_branches: bool = True,
+    current_user: User = Depends(get_current_active_user)
+):
     """List all branches for the current tenant."""
     if not current_user.tenant_id:
         raise HTTPException(status_code=403, detail="No tenant context")
         
     sucursales = await Sucursal.find(Sucursal.tenant_id == current_user.tenant_id).to_list()
     
+    if all_branches:
+        return sucursales
+        
     # === LISTA BLANCA ESTRICTA (Limpiar Dropdown del Frontend) ===
     sucursales_limpias = []
     for s in sucursales:

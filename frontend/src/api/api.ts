@@ -268,7 +268,10 @@ export const getSalesMatrix = (start_date: string, end_date: string, sucursal_id
 
 
 // ─── Sucursales ───────────────────────────────────────────────────────────
-export const getSucursales = () => client<Sucursal[]>('/sucursales');
+export const getSucursales = (allBranches?: boolean | any) => {
+    const isAll = typeof allBranches === 'boolean' ? allBranches : true;
+    return client<Sucursal[]>(`/sucursales?all_branches=${isAll}`);
+};
 export const createSucursal = (data: SucursalCreate) => client<Sucursal>('/sucursales', { body: data });
 export const updateSucursal = (id: string, data: Partial<SucursalCreate>) => client<Sucursal>(`/sucursales/${id}`, { method: 'PATCH', body: data });
 
