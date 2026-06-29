@@ -22,7 +22,7 @@ export default function InventarioTrasladosPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 20;
 
-    const canManage = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN_SUCURSAL' || user?.role === 'ADMIN' || user?.role === 'SUPERVISOR' || user?.role === 'VENDEDOR';
+    const canManage = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN_SUCURSAL' || user?.role === 'ADMIN' || user?.role === 'SUPERVISOR' || user?.role === 'VENDEDOR' || user?.role === 'CAJERO';
 
     useEffect(() => {
         setCurrentPage(1);
@@ -243,7 +243,7 @@ export default function InventarioTrasladosPage() {
 
 function TrasladoDetailModal({ traslado: t, onClose, onReceive, onCancel, tab }: any) {
     const { user } = useAuthStore();
-    const canManage = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN_SUCURSAL' || user?.role === 'ADMIN' || user?.role === 'SUPERVISOR' || user?.role === 'VENDEDOR';
+    const canManage = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN_MATRIZ' || user?.role === 'ADMIN_SUCURSAL' || user?.role === 'ADMIN' || user?.role === 'SUPERVISOR' || user?.role === 'VENDEDOR' || user?.role === 'CAJERO';
     const bs = (n: number) => `Bs. ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
     const handlePDF = async () => {
