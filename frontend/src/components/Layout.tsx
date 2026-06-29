@@ -57,7 +57,7 @@ export default function Layout({ children }: LayoutProps) {
             { icon: Wallet,          label: 'Caja',         path: '/caja',               feature: 'CAJA',                 roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'CAJERO', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: Package,         label: 'Catálogo',     path: '/catalogo',           feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: Warehouse,       label: 'Inventario',   path: '/inventario',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
-            { icon: Truck,           label: 'Traslados',    path: '/traslados',          feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
+            { icon: Truck,           label: 'Traslados',    path: '/traslados',          feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR', 'VENDEDOR', 'CAJERO'] },
             // Dark Kitchen Module
             { icon: Utensils,        label: 'Recetas',      path: '/recetas',            feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN'] },
             { icon: CalendarRange,   label: 'Planes Comida',path: '/planes-comida',      feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN'] },
@@ -69,7 +69,7 @@ export default function Layout({ children }: LayoutProps) {
             { icon: Tag,             label: 'Precios',      path: '/solicitudes-precio', feature: 'LISTAS_PRECIOS',       roles: ['ADMIN_MATRIZ', 'ADMIN'] },
             { icon: Tag,             label: 'Categorías',   path: '/categories',         feature: 'INVENTARIO',           roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL'] },
             { icon: Store,           label: 'Sucursales',   path: '/sucursales',         feature: 'MULTI_SUCURSAL',       roles: ['ADMIN_MATRIZ', 'ADMIN'] },
-            { icon: ClipboardList,   label: 'Pedidos',      path: '/pedidos',            feature: 'PEDIDOS_INTERNOS',     roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
+            { icon: ClipboardList,   label: 'Pedidos',      path: '/pedidos',            feature: 'PEDIDOS_INTERNOS',     roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR', 'VENDEDOR', 'CAJERO'] },
             { icon: Users,           label: 'Personal',     path: '/usuarios',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
             { icon: Users,           label: 'Clientes',     path: '/clientes',           feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'USER', 'SUPERVISOR', 'VENDEDOR'] },
             { icon: Briefcase,       label: 'Proveedores',  path: '/proveedores',        feature: null,                   roles: ['ADMIN_MATRIZ', 'ADMIN', 'ADMIN_SUCURSAL', 'SUPERVISOR'] },
