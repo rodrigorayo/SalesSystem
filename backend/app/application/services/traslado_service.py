@@ -9,7 +9,7 @@ from app.domain.models.traslado import TrasladoInventario, TrasladoItem, EstadoT
 from app.domain.models.inventario import Inventario, InventoryLog, TipoMovimiento
 from app.domain.models.product import Product
 from app.domain.models.sucursal import Sucursal
-from app.domain.models.user import User
+from app.domain.models.user import User, UserRole
 from app.domain.schemas.traslado import TrasladoCreate, TrasladoReceive
 from app.domain.models.base import DecimalMoney
 from app.utils.errors import retry_on_write_conflict
@@ -183,7 +183,7 @@ class TrasladoService:
                     if traslado.estado != EstadoTraslado.EN_TRANSITO:
                         raise HTTPException(status_code=400, detail=f"El traslado ya está {traslado.estado.value}.")
                         
-                    if traslado.sucursal_destino_id != sucursal_destino_id and current_user.role not in ["SUPERADMIN", "ADMIN"]:
+                    if traslado.sucursal_destino_id != sucursal_destino_id and current_user.role not in [UserRole.SUPERADMIN, UserRole.ADMIN_MATRIZ, UserRole.ADMIN]:
                         raise HTTPException(status_code=403, detail="No tienes permiso para recibir un traslado destinado a otra sucursal.")
 
                     valor_total_recibido = DecimalMoney("0.0")
